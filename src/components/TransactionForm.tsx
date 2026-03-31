@@ -70,88 +70,96 @@ export function TransactionForm({ onSuccess, defaultCategoryId }: TransactionFor
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="tx-category" className="block text-sm font-medium text-slate-600 mb-1.5">
           Category
         </label>
         <select
+          id="tx-category"
           value={form.categoryId}
           onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
           required
         >
           <option value="">Select a category...</option>
           {categories?.map((cat) => (
             <option key={cat._id} value={cat._id}>
-              {cat.icon ?? "💰"} {cat.name}
+              {cat.name}
             </option>
           ))}
         </select>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="tx-amount" className="block text-sm font-medium text-slate-600 mb-1.5">
           Amount ($)
         </label>
         <input
+          id="tx-amount"
           type="number"
           step="0.01"
           min="0.01"
+          max="9999999"
           value={form.amount}
           onChange={(e) => setForm({ ...form, amount: e.target.value })}
           placeholder="0.00"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
           required
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="tx-description" className="block text-sm font-medium text-slate-600 mb-1.5">
           Description
         </label>
         <input
+          id="tx-description"
           type="text"
           value={form.description}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           placeholder="e.g. Grocery run, Netflix subscription..."
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          maxLength={200}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
           required
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="tx-date" className="block text-sm font-medium text-slate-600 mb-1.5">
           Date
         </label>
         <input
+          id="tx-date"
           type="date"
           value={form.date}
           onChange={(e) => setForm({ ...form, date: e.target.value })}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
           required
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="tx-note" className="block text-sm font-medium text-slate-600 mb-1.5">
           Note (optional)
         </label>
         <textarea
+          id="tx-note"
           value={form.note}
           onChange={(e) => setForm({ ...form, note: e.target.value })}
           placeholder="Any additional details..."
           rows={2}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+          maxLength={500}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors resize-none"
         />
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+        <p role="alert" className="text-sm text-rose-600 bg-rose-50 px-3 py-2 rounded-xl">{error}</p>
       )}
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-indigo-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="w-full bg-teal-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-teal-700 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-all"
       >
         {loading ? "Adding..." : "Add Transaction"}
       </button>

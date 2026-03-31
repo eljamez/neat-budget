@@ -6,9 +6,11 @@ import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { formatCurrency } from "@/lib/utils";
-
-const CATEGORY_ICONS = ["💰", "🏠", "🚗", "🍔", "🎮", "✈️", "👕", "💊", "📚", "🎵", "💅", "🐾", "🏋️", "☕", "🎁"];
-const CATEGORY_COLORS = ["#6366f1", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ef4444", "#14b8a6"];
+import {
+  CATEGORY_ICON_MAP,
+  CATEGORY_ICON_GROUPS,
+  CATEGORY_COLORS,
+} from "@/lib/icons";
 
 interface Category {
   _id: Id<"categories">;
@@ -33,7 +35,7 @@ export function CategoryManager({ editCategory, onSuccess, onCancel }: CategoryM
     name: editCategory?.name ?? "",
     monthlyLimit: editCategory?.monthlyLimit?.toString() ?? "",
     color: editCategory?.color ?? CATEGORY_COLORS[0],
-    icon: editCategory?.icon ?? CATEGORY_ICONS[0],
+    icon: editCategory?.icon ?? "Receipt",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -69,7 +71,7 @@ export function CategoryManager({ editCategory, onSuccess, onCancel }: CategoryM
         });
       }
       onSuccess?.();
-    } catch (err) {
+    } catch {
       setError("Failed to save category. Please try again.");
     } finally {
       setLoading(false);
@@ -79,65 +81,98 @@ export function CategoryManager({ editCategory, onSuccess, onCancel }: CategoryM
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="cat-name" className="block text-sm font-medium text-slate-600 mb-1.5">
           Category Name
         </label>
         <input
+          id="cat-name"
           type="text"
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           placeholder="e.g. Groceries, Rent, Entertainment"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          maxLength={100}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
           required
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="cat-limit" className="block text-sm font-medium text-slate-600 mb-1.5">
           Monthly Limit ($)
         </label>
         <input
+          id="cat-limit"
           type="number"
           step="1"
           min="1"
+          max="9999999"
           value={form.monthlyLimit}
           onChange={(e) => setForm({ ...form, monthlyLimit: e.target.value })}
           placeholder="500"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
           required
         />
       </div>
 
+      {/* Icon picker — grouped */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Icon</label>
-        <div className="flex flex-wrap gap-2">
-          {CATEGORY_ICONS.map((icon) => (
-            <button
-              key={icon}
-              type="button"
-              onClick={() => setForm({ ...form, icon })}
-              className={`text-xl p-1.5 rounded-lg border-2 transition-all ${
-                form.icon === icon
-                  ? "border-indigo-500 bg-indigo-50"
-                  : "border-transparent hover:border-gray-200"
-              }`}
-            >
-              {icon}
-            </button>
+        <p className="text-sm font-medium text-slate-600 mb-2" id="icon-label">Icon</p>
+        <div
+          className="border border-slate-200 rounded-xl overflow-y-auto max-h-48 bg-slate-50 p-2 space-y-3"
+          role="group"
+          aria-labelledby="icon-label"
+        >
+          {CATEGORY_ICON_GROUPS.map((group) => (
+            <div key={group.label}>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest px-1 mb-1">
+                {group.label}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {group.icons.map((iconName) => {
+                  const Icon = CATEGORY_ICON_MAP[iconName];
+                  const selected = form.icon === iconName;
+                  return (
+                    <button
+                      key={iconName}
+                      type="button"
+                      onClick={() => setForm({ ...form, icon: iconName })}
+                      aria-label={`Select icon: ${iconName}`}
+                      aria-pressed={selected}
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all border-2 ${
+                        selected
+                          ? "border-teal-500 bg-teal-50 text-teal-600"
+                          : "border-transparent hover:border-slate-300 hover:bg-white text-slate-500"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           ))}
         </div>
       </div>
 
+      {/* Color picker */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
-        <div className="flex gap-2">
+        <p className="text-sm font-medium text-slate-600 mb-2" id="color-label">Color</p>
+        <div
+          className="flex flex-wrap gap-2"
+          role="group"
+          aria-labelledby="color-label"
+        >
           {CATEGORY_COLORS.map((color) => (
             <button
               key={color}
               type="button"
               onClick={() => setForm({ ...form, color })}
-              className={`w-7 h-7 rounded-full border-2 transition-all ${
-                form.color === color ? "border-gray-800 scale-110" : "border-transparent"
+              aria-label={`Select color ${color}`}
+              aria-pressed={form.color === color}
+              className={`w-8 h-8 rounded-full border-2 transition-all ${
+                form.color === color
+                  ? "border-slate-700 scale-110 ring-2 ring-offset-1 ring-slate-300"
+                  : "border-transparent hover:scale-105"
               }`}
               style={{ backgroundColor: color }}
             />
@@ -146,14 +181,14 @@ export function CategoryManager({ editCategory, onSuccess, onCancel }: CategoryM
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+        <p role="alert" className="text-sm text-rose-600 bg-rose-50 px-3 py-2 rounded-xl">{error}</p>
       )}
 
       <div className="flex gap-2">
         <button
           type="submit"
           disabled={loading}
-          className="flex-1 bg-indigo-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          className="flex-1 bg-teal-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-teal-700 active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100 transition-all"
         >
           {loading ? "Saving..." : editCategory ? "Update Category" : "Create Category"}
         </button>
@@ -161,7 +196,7 @@ export function CategoryManager({ editCategory, onSuccess, onCancel }: CategoryM
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 bg-gray-100 text-gray-700 rounded-lg py-2.5 text-sm font-medium hover:bg-gray-200 transition-colors"
+            className="flex-1 bg-slate-100 text-slate-700 rounded-xl py-2.5 text-sm font-medium hover:bg-slate-200 transition-colors"
           >
             Cancel
           </button>

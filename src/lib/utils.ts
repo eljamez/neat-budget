@@ -23,6 +23,14 @@ export function formatMonth(month: string): string {
   return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
+export function formatShortDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export function getProgressColor(percent: number): string {
   if (percent >= 100) return "bg-red-500";
   if (percent >= 80) return "bg-yellow-500";
