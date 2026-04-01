@@ -1,4 +1,4 @@
-# SuperBudget
+# Neat Budget
 
 A YNAB/Mint-style personal budgeting app built with Next.js 14, Convex, and Clerk.
 

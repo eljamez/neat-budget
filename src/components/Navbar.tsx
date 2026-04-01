@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils";
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/categories", label: "Categories" },
+  { href: "/credit-cards", label: "Cards" },
+  { href: "/debts", label: "Debts" },
+  { href: "/accounts", label: "Accounts" },
   { href: "/add-transaction", label: "Add Transaction" },
 ];
 

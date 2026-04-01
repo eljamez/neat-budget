@@ -5,10 +5,15 @@ import { CATEGORY_ICON_MAP } from "@/lib/icons";
 
 interface BudgetCardProps {
   name: string;
+  /** Full monthly budget (manual extra + planned expenses). */
   monthlyLimit: number;
   spent: number;
   color?: string;
   icon?: string;
+  /** When set, shown under the title instead of a single budget line. */
+  budgetBreakdown?: { manualExtra: number; fromPlannedExpenses: number };
+  /** e.g. "spent this month" or "spent in April 2026" when the dashboard month differs from today */
+  spentPeriodLabel?: string;
   onEdit?: () => void;
   onViewTransactions?: () => void;
 }
@@ -19,6 +24,8 @@ export function BudgetCard({
   spent,
   color = "#0d9488",
   icon = "Receipt",
+  budgetBreakdown,
+  spentPeriodLabel = "spent this month",
   onEdit,
   onViewTransactions,
 }: BudgetCardProps) {
@@ -49,11 +56,10 @@ export function BudgetCard({
       }
     >
       <div className="p-5">
-        {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
               style={{ backgroundColor: `${color}18` }}
             >
               {(() => {
@@ -65,7 +71,16 @@ export function BudgetCard({
             </div>
             <div>
               <h3 className="font-semibold text-slate-800 leading-tight">{name}</h3>
-              <p className="text-xs text-slate-400 mt-0.5">{formatCurrency(monthlyLimit)} budget</p>
+              {budgetBreakdown ? (
+                <p className="text-xs text-slate-400 mt-0.5">
+                  <span className="font-medium text-slate-500">{formatCurrency(monthlyLimit)} total</span>
+                  {" · "}
+                  {formatCurrency(budgetBreakdown.fromPlannedExpenses)} expenses +{" "}
+                  {formatCurrency(budgetBreakdown.manualExtra)} extra
+                </p>
+              ) : (
+                <p className="text-xs text-slate-400 mt-0.5">{formatCurrency(monthlyLimit)} budget</p>
+              )}
             </div>
           </div>
           {onEdit && (
@@ -78,11 +93,10 @@ export function BudgetCard({
           )}
         </div>
 
-        {/* Amount */}
         <div className="flex items-end justify-between mb-3">
           <div>
             <p className="text-2xl font-bold text-slate-900 leading-none">{formatCurrency(spent)}</p>
-            <p className="text-xs text-slate-400 mt-1">spent this month</p>
+            <p className="text-xs text-slate-400 mt-1">{spentPeriodLabel}</p>
           </div>
           <div className="text-right">
             <p
@@ -97,7 +111,6 @@ export function BudgetCard({
           </div>
         </div>
 
-        {/* Progress bar */}
         <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
           <div
             className="h-1.5 rounded-full transition-all duration-500"
@@ -105,7 +118,6 @@ export function BudgetCard({
           />
         </div>
 
-        {/* Over budget pill */}
         {isOverBudget && (
           <div role="status" aria-label="Over budget" className="mt-3 inline-flex items-center gap-1.5 bg-rose-50 text-rose-600 text-xs font-medium px-2.5 py-1 rounded-full">
             <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />

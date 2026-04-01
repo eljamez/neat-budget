@@ -96,7 +96,7 @@ export default function AddTransactionPage() {
   };
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="w-full space-y-6">
       <div>
         <Link
           href="/dashboard"

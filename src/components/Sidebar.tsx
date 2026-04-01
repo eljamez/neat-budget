@@ -8,6 +8,9 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Tags,
+  CreditCard,
+  TrendingDown,
+  Wallet,
   PlusCircle,
   Menu,
   X,
@@ -17,6 +20,9 @@ import { LogoMark } from "@/components/LogoMark";
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/categories", label: "Categories", icon: Tags },
+  { href: "/credit-cards", label: "Cards", icon: CreditCard },
+  { href: "/debts", label: "Debts", icon: TrendingDown },
+  { href: "/accounts", label: "Accounts", icon: Wallet },
   { href: "/add-transaction", label: "Add", icon: PlusCircle },
 ];
 

@@ -8,7 +8,14 @@
  * @module
  */
 
+import type * as accountBalance from "../accountBalance.js";
+import type * as accounts from "../accounts.js";
+import type * as budgetItems from "../budgetItems.js";
 import type * as categories from "../categories.js";
+import type * as creditCards from "../creditCards.js";
+import type * as debtExpenses from "../debtExpenses.js";
+import type * as debts from "../debts.js";
+import type * as expenseAllocations from "../expenseAllocations.js";
 import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
 
@@ -19,7 +26,14 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  accountBalance: typeof accountBalance;
+  accounts: typeof accounts;
+  budgetItems: typeof budgetItems;
   categories: typeof categories;
+  creditCards: typeof creditCards;
+  debtExpenses: typeof debtExpenses;
+  debts: typeof debts;
+  expenseAllocations: typeof expenseAllocations;
   transactions: typeof transactions;
   users: typeof users;
 }>;

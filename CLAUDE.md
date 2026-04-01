@@ -18,7 +18,7 @@ There are no tests configured.
 
 ## Architecture
 
-**SuperBudget** is a YNAB-style budgeting app. The stack is Next.js 14 (App Router) + Convex (backend/database) + Clerk (auth).
+**Neat Budget** is a YNAB-style budgeting app. The stack is Next.js 14 (App Router) + Convex (backend/database) + Clerk (auth).
 
 ### Auth flow
 
