@@ -14,7 +14,6 @@ import {
 interface Category {
   _id: Id<"categories">;
   name: string;
-  monthlyLimit: number;
   color?: string;
   icon?: string;
 }
@@ -32,7 +31,6 @@ export function CategoryManager({ editCategory, onSuccess, onCancel }: CategoryM
 
   const [form, setForm] = useState({
     name: editCategory?.name ?? "",
-    monthlyLimit: editCategory?.monthlyLimit?.toString() ?? "0",
     color: editCategory?.color ?? CATEGORY_COLORS[0],
     icon: editCategory?.icon ?? "Receipt",
   });
@@ -43,12 +41,6 @@ export function CategoryManager({ editCategory, onSuccess, onCancel }: CategoryM
     e.preventDefault();
     if (!user) return;
 
-    const limit = parseFloat(form.monthlyLimit);
-    if (isNaN(limit) || limit < 0) {
-      setError("Please enter a valid amount (0 or more)");
-      return;
-    }
-
     setLoading(true);
     setError("");
     try {
@@ -56,7 +48,6 @@ export function CategoryManager({ editCategory, onSuccess, onCancel }: CategoryM
         await updateCategory({
           id: editCategory._id,
           name: form.name,
-          monthlyLimit: limit,
           color: form.color,
           icon: form.icon,
         });
@@ -64,7 +55,6 @@ export function CategoryManager({ editCategory, onSuccess, onCancel }: CategoryM
         await createCategory({
           userId: user.id,
           name: form.name,
-          monthlyLimit: limit,
           color: form.color,
           icon: form.icon,
         });
@@ -93,27 +83,6 @@ export function CategoryManager({ editCategory, onSuccess, onCancel }: CategoryM
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
           required
         />
-      </div>
-
-      <div>
-        <label htmlFor="cat-limit" className="block text-sm font-medium text-slate-600 mb-1.5">
-          Extra per month ($)
-        </label>
-        <input
-          id="cat-limit"
-          type="number"
-          step="0.01"
-          min="0"
-          max="9999999"
-          value={form.monthlyLimit}
-          onChange={(e) => setForm({ ...form, monthlyLimit: e.target.value })}
-          placeholder="0"
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
-          required
-        />
-        <p className="text-xs text-slate-400 mt-1.5">
-          Your total monthly budget for this category is this amount plus the sum of all planned expenses under it.
-        </p>
       </div>
 
       <div>

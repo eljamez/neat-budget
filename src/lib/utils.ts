@@ -17,6 +17,20 @@ export function getCurrentMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/**
+ * For dashboard / planning views tied to `monthKey` (`YYYY-MM`): use today when that month is
+ * current (local), otherwise the last calendar day of that month (local). Returned as `YYYY-MM-DD`.
+ */
+export function asOfDateForBudgetView(monthKey: string): string {
+  if (monthKey === getCurrentMonth()) {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  const [y, m] = monthKey.split("-").map(Number);
+  const last = new Date(y, m, 0);
+  return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, "0")}-${String(last.getDate()).padStart(2, "0")}`;
+}
+
 /** `monthKey` is `YYYY-MM`. `deltaMonths` adds (or subtracts) whole calendar months. */
 export function shiftMonth(monthKey: string, deltaMonths: number): string {
   const [y, m] = monthKey.split("-").map(Number);
@@ -80,14 +94,6 @@ export function sumBudgetItemsByCategory(
     map[item.categoryId] = (map[item.categoryId] ?? 0) + item.amount;
   }
   return map;
-}
-
-/** Total monthly budget cap = manual amount + planned expenses in the category. */
-export function categoryMonthlyBudgetTotal(
-  manualMonthlyAmount: number,
-  plannedExpensesSum: number
-): number {
-  return manualMonthlyAmount + plannedExpensesSum;
 }
 
 export const DEBT_TYPE_LABELS = {
@@ -230,4 +236,91 @@ export function estimateDebtPayoff(
     monthsRemaining: months,
     note: null,
   };
+}
+
+/**
+ * Pay-from **bank** is set (`budgetItems.accountId`, or `paymentAccountId` on debts/cards).
+ */
+export function expenseHasPayFromAccount(item: {
+  accountId?: string | null;
+  paymentAccountId?: string | null;
+}): boolean {
+  const id = item.accountId ?? item.paymentAccountId;
+  return id != null && id !== "";
+}
+
+export type ExpenseFundingLevel = "none" | "partial" | "full";
+
+export function expenseFundingLevel(
+  billAmount: number,
+  allocatedTotal: number
+): ExpenseFundingLevel {
+  if (billAmount <= 0.005) {
+    return allocatedTotal > 0.005 ? "full" : "none";
+  }
+  if (allocatedTotal <= 0.005) return "none";
+  if (allocatedTotal + 0.005 >= billAmount) return "full";
+  return "partial";
+}
+
+/** Max cash earmarked per month for a monthly bucket (fill goal vs spending target). */
+export function bucketMonthlyFundingCap(bucket: {
+  targetAmount: number;
+  monthlyFillGoal?: number | null;
+}): number {
+  const g = bucket.monthlyFillGoal;
+  if (g != null && g > 0.005) return g;
+  return bucket.targetAmount;
+}
+
+/**
+ * For one bank account: remaining cash to plan for the month — recurring bills (funded vs amount),
+ * plus planned debt/card payments not yet marked paid, when those use this account as pay-from.
+ */
+export function sumLeftToFundFromAccountForMonth(
+  budgetItems: {
+    _id: string;
+    accountId?: string;
+    amount: number;
+    status?: "unfunded" | "funded" | "paid";
+    markedPaidForMonth?: string;
+  }[],
+  allocatedByBudgetId: Record<string, number>,
+  debts: {
+    paymentAccountId?: string;
+    plannedMonthlyPayment?: number;
+    markedPaidForMonth?: string;
+  }[],
+  creditCards: {
+    paymentAccountId?: string;
+    plannedMonthlyPayment?: number;
+    markedPaidForMonth?: string;
+  }[],
+  accountId: string,
+  monthKey: string
+): number {
+  let sum = 0;
+  for (const item of budgetItems) {
+    if (item.accountId !== accountId) continue;
+    if (item.markedPaidForMonth === monthKey) continue;
+    const st = item.status ?? "unfunded";
+    if (st === "funded") continue;
+    const alloc = allocatedByBudgetId[item._id] ?? 0;
+    sum += Math.max(0, item.amount - alloc);
+  }
+  for (const d of debts) {
+    if (d.paymentAccountId !== accountId) continue;
+    const planned = d.plannedMonthlyPayment ?? 0;
+    if (planned <= 0) continue;
+    if (d.markedPaidForMonth === monthKey) continue;
+    sum += planned;
+  }
+  for (const c of creditCards) {
+    if (c.paymentAccountId !== accountId) continue;
+    const planned = c.plannedMonthlyPayment ?? 0;
+    if (planned <= 0) continue;
+    if (c.markedPaidForMonth === monthKey) continue;
+    sum += planned;
+  }
+  return sum;
 }

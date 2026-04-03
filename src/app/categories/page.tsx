@@ -14,13 +14,14 @@ import {
   formatMonth,
   getCurrentMonth,
   sumBudgetItemsByCategory,
-  categoryMonthlyBudgetTotal,
   CREDIT_CARD_USAGE_LABELS,
   budgetItemPaidFromLabel,
   formatAccountType,
   calendarDaysFromTo,
   dateInBudgetMonth,
   startOfLocalDay,
+  expenseFundingLevel,
+  expenseHasPayFromAccount,
 } from "@/lib/utils";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
 import {
@@ -35,12 +36,12 @@ import {
   CheckCircle2,
   Circle,
   Landmark,
+  Star,
 } from "lucide-react";
 
 interface Category {
   _id: Id<"categories">;
   name: string;
-  monthlyLimit: number;
   color?: string;
   icon?: string;
 }
@@ -51,10 +52,12 @@ interface BudgetExpense {
   name: string;
   amount: number;
   paymentDayOfMonth: number;
-  moneyNeededByDay: number;
   accountId?: Id<"accounts">;
   paidFrom?: string;
   markedPaidForMonth?: string;
+  status?: "unfunded" | "funded" | "paid";
+  fundedDate?: number;
+  paidDate?: number;
   isAutopay?: boolean;
   note?: string;
 }
@@ -88,11 +91,25 @@ function CategoryExpensesSection({
   const { user } = useUser();
   const archiveItem = useMutation(api.budgetItems.archive);
   const setPaidForMonth = useMutation(api.budgetItems.setPaidForMonth);
+  const fundExpense = useMutation(api.budgetItems.fundExpense);
   const updateExpenseRow = useMutation(api.budgetItems.update);
   const expenses = useQuery(api.budgetItems.listByCategory, {
     categoryId: category._id,
   });
   const accounts = useQuery(api.accounts.list, user ? { userId: user.id } : "skip");
+  const allocations = useQuery(
+    api.expenseAllocations.listByUserMonth,
+    user ? { userId: user.id, monthKey: budgetMonth } : "skip"
+  );
+  const allocatedByBudgetId = useMemo(() => {
+    if (!allocations) return {};
+    const m: Record<string, number> = {};
+    for (const a of allocations) {
+      const k = a.budgetItemId as string;
+      m[k] = (m[k] ?? 0) + a.amount;
+    }
+    return m;
+  }, [allocations]);
   const accountsSorted = useMemo(
     () =>
       accounts ? [...accounts].sort((a, b) => a.name.localeCompare(b.name)) : [],
@@ -109,6 +126,8 @@ function CategoryExpensesSection({
   const [autopayTogglePendingId, setAutopayTogglePendingId] =
     useState<Id<"budgetItems"> | null>(null);
   const [accountSelectPendingId, setAccountSelectPendingId] =
+    useState<Id<"budgetItems"> | null>(null);
+  const [fundExpensePendingId, setFundExpensePendingId] =
     useState<Id<"budgetItems"> | null>(null);
 
   const todayStart = startOfLocalDay(new Date());
@@ -136,15 +155,19 @@ function CategoryExpensesSection({
 
           <div className="space-y-1 py-1">
             {expenses.map((item) => {
-              const neededStart = dateInBudgetMonth(budgetMonth, item.moneyNeededByDay);
-              const paymentStart = dateInBudgetMonth(budgetMonth, item.paymentDayOfMonth);
-              const daysUntilNeeded = calendarDaysFromTo(todayStart, neededStart);
-              const daysUntilPayment = calendarDaysFromTo(todayStart, paymentStart);
-              const isUrgent = daysUntilNeeded >= 0 && daysUntilNeeded <= 3;
+              const dueStart = dateInBudgetMonth(budgetMonth, item.paymentDayOfMonth);
+              const daysUntilDue = calendarDaysFromTo(todayStart, dueStart);
+              const isUrgent = daysUntilDue >= 0 && daysUntilDue <= 3;
               const isDragging = dragState?.itemId === item._id;
               const isPaidForMonth = item.markedPaidForMonth === budgetMonth;
-              const isPast = !isPaidForMonth && daysUntilPayment < 0;
+              const isPast = !isPaidForMonth && daysUntilDue < 0;
               const paidFromLabel = budgetItemPaidFromLabel(item, accountMap);
+              const setAsideTotal = allocatedByBudgetId[item._id] ?? 0;
+              const earmarkLevel = expenseFundingLevel(item.amount, setAsideTotal);
+              const accountFunded = expenseHasPayFromAccount(item);
+              const isOverAllocated =
+                item.amount > 0.005 && setAsideTotal > item.amount + 0.005;
+              const isReserved = item.status === "funded" && !isPaidForMonth;
 
               return (
                 <div key={item._id}>
@@ -159,7 +182,13 @@ function CategoryExpensesSection({
                     onDragEnd={onExpenseDragEnd}
                     className={`flex items-center gap-1.5 rounded-xl px-2 py-2 border group transition-colors cursor-grab active:cursor-grabbing select-none ${
                       isPaidForMonth
-                        ? "bg-teal-50/60 border-teal-100/80 hover:border-teal-200/90"
+                        ? "bg-emerald-50/60 border-emerald-200/85 ring-1 ring-emerald-200/40 hover:border-emerald-300/90"
+                        : isReserved
+                        ? "bg-emerald-50/45 border-emerald-200/80 ring-1 ring-emerald-200/35 hover:border-emerald-300/85"
+                        : isOverAllocated
+                        ? "bg-white border-slate-100 hover:border-slate-200 ring-2 ring-amber-400/65 ring-offset-2 ring-offset-white"
+                        : !accountFunded
+                        ? "bg-white border-amber-100/90 hover:border-amber-200/90"
                         : "bg-white border-slate-100 hover:border-slate-200"
                     } ${isDragging ? "opacity-60 ring-2 ring-teal-300" : ""}`}
                   >
@@ -188,7 +217,7 @@ function CategoryExpensesSection({
                       }
                       className={`flex-shrink-0 p-1 rounded-lg transition-colors disabled:opacity-50 ${
                         isPaidForMonth
-                          ? "text-teal-600 hover:bg-teal-100/80"
+                          ? "text-emerald-600 hover:bg-emerald-100/80"
                           : "text-slate-300 hover:text-teal-600 hover:bg-teal-50"
                       }`}
                     >
@@ -218,9 +247,77 @@ function CategoryExpensesSection({
                             Due date passed
                           </span>
                         )}
+                        {accountFunded ? (
+                          <span
+                            className="text-[10px] font-semibold bg-slate-100 text-slate-800 border border-slate-200/90 px-1.5 py-0.5 rounded-md"
+                            title={`Pay-from: ${paidFromLabel ?? "linked account"}`}
+                          >
+                            Bank ✓
+                          </span>
+                        ) : (
+                          <span
+                            className="text-[10px] font-semibold bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded-md"
+                            title="Choose a bank account in the dropdown on this row"
+                          >
+                            No bank
+                          </span>
+                        )}
+                        {isReserved && (
+                          <span
+                            className="text-[10px] font-semibold bg-emerald-200/90 text-emerald-950 px-1.5 py-0.5 rounded-md"
+                            title="Marked funded — reduces Available from funded date until paid"
+                          >
+                            Reserved
+                          </span>
+                        )}
+                        {accountFunded &&
+                          !isPaidForMonth &&
+                          item.status !== "funded" &&
+                          user && (
+                            <button
+                              type="button"
+                              draggable={false}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                setFundExpensePendingId(item._id);
+                                try {
+                                  await fundExpense({ id: item._id, userId: user.id });
+                                } finally {
+                                  setFundExpensePendingId(null);
+                                }
+                              }}
+                              disabled={fundExpensePendingId === item._id}
+                              title="Reserve the full bill amount from today"
+                              className="text-[10px] font-semibold bg-emerald-50 text-emerald-900 border border-emerald-200 px-1.5 py-0.5 rounded-md hover:bg-emerald-100/90 disabled:opacity-50"
+                            >
+                              Reserve
+                            </button>
+                          )}
+                        {earmarkLevel === "full" && !isPaidForMonth && !isReserved && (
+                          <span
+                            className="text-[10px] font-semibold bg-sky-100 text-sky-900 px-1.5 py-0.5 rounded-md"
+                            title="Bill amount fully earmarked this month"
+                          >
+                            Earmarked
+                          </span>
+                        )}
+                        {earmarkLevel === "partial" && !isPaidForMonth && (
+                          <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/90 px-1.5 py-0.5 rounded-md">
+                            Partly earmarked
+                          </span>
+                        )}
                         {isPaidForMonth && (
-                          <span className="text-[10px] font-semibold bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded-md">
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded-md">
+                            <Star
+                              className="h-3 w-3 fill-emerald-500 text-emerald-600"
+                              aria-hidden="true"
+                            />
                             Paid
+                          </span>
+                        )}
+                        {isOverAllocated && !isPaidForMonth && (
+                          <span className="text-[10px] font-semibold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded-md">
+                            Over-earmarked
                           </span>
                         )}
                         {item.isAutopay && (
@@ -230,10 +327,6 @@ function CategoryExpensesSection({
                         )}
                       </div>
                       <div className="flex items-center gap-3 mt-0.5">
-                        <span className="flex items-center gap-1 text-xs text-slate-400">
-                          <Clock className="w-3 h-3" aria-hidden="true" />
-                          Funds needed by {ordinal(item.moneyNeededByDay)}
-                        </span>
                         <span className="flex items-center gap-1 text-xs text-slate-400">
                           <Calendar className="w-3 h-3" aria-hidden="true" />
                           Due {ordinal(item.paymentDayOfMonth)}
@@ -368,6 +461,7 @@ function CategoryExpensesSection({
                 key={editExpense?._id ?? "new"}
                 categoryId={category._id}
                 editItem={editExpense}
+                transactionsMonthKey={budgetMonth}
                 onSuccess={() => {
                   setShowForm(false);
                   setEditExpense(null);
@@ -997,7 +1091,6 @@ export default function CategoriesPage() {
             const isExpanded = expandedCategories.has(cat._id);
             const color = cat.color ?? "#0d9488";
             const plannedSum = plannedByCategory[cat._id] ?? 0;
-            const monthlyTotal = categoryMonthlyBudgetTotal(cat.monthlyLimit, plannedSum);
 
             const showDropRing =
               expenseDrag &&
@@ -1038,11 +1131,10 @@ export default function CategoriesPage() {
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-800">{cat.name}</p>
                         <p className="text-sm text-slate-500">
-                          {formatCurrency(monthlyTotal)} / month total
+                          {formatCurrency(plannedSum)} / month from expenses
                         </p>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          {formatCurrency(plannedSum)} from expenses + {formatCurrency(cat.monthlyLimit)}{" "}
-                          extra
+                          Sum of recurring expenses in this category
                         </p>
                       </div>
                       <div className="ml-2 text-slate-400 flex-shrink-0">

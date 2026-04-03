@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -13,11 +13,21 @@ import {
   calendarDaysFromTo,
   dateInBudgetMonth,
   startOfLocalDay,
+  expenseFundingLevel,
+  expenseHasPayFromAccount,
 } from "@/lib/utils";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
 import { BudgetItemManager } from "@/components/BudgetItemManager";
 import { BudgetAllocationModal } from "@/components/BudgetAllocationModal";
-import { CheckCircle2, Circle, Landmark, CreditCard, PiggyBank } from "lucide-react";
+import { DebtManager } from "@/components/DebtManager";
+import {
+  CheckCircle2,
+  Circle,
+  CreditCard,
+  Landmark,
+  MoreVertical,
+  PiggyBank,
+} from "lucide-react";
 
 export interface TimelineCategory {
   _id: Id<"categories">;
@@ -32,10 +42,12 @@ export interface TimelineExpense {
   name: string;
   amount: number;
   paymentDayOfMonth: number;
-  moneyNeededByDay: number;
   paidFrom?: string;
   accountId?: Id<"accounts">;
   markedPaidForMonth?: string;
+  status?: "unfunded" | "funded" | "paid";
+  fundedDate?: number;
+  paidDate?: number;
   isAutopay?: boolean;
   note?: string;
 }
@@ -48,10 +60,12 @@ export type PlannerDebtRow = {
   name: string;
   amount: number;
   paymentDayOfMonth: number;
-  moneyNeededByDay: number;
   markedPaidForMonth?: string;
   accentColor?: string;
   isAutopay?: boolean;
+  paymentAccountId?: Id<"accounts">;
+  /** False when due day was defaulted for timeline placement — user should set on Debts page. */
+  hasConfiguredDueDay?: boolean;
 };
 
 export type PlannerCreditCardRow = {
@@ -60,11 +74,12 @@ export type PlannerCreditCardRow = {
   name: string;
   amount: number;
   paymentDayOfMonth: number;
-  moneyNeededByDay: number;
   markedPaidForMonth?: string;
   accentColor?: string;
   isAutopay?: boolean;
   usageMode: "paying_off" | "active_use";
+  paymentAccountId?: Id<"accounts">;
+  hasConfiguredDueDay?: boolean;
 };
 
 export type PlannerRow = PlannerBudgetRow | PlannerDebtRow | PlannerCreditCardRow;
@@ -87,11 +102,53 @@ function ordinal(n: number) {
   return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
 }
 
+function TimelineRowActionsMenu({
+  rowKey,
+  menuOpenKey,
+  setMenuOpenKey,
+  children,
+}: {
+  rowKey: string;
+  menuOpenKey: string | null;
+  setMenuOpenKey: (key: string | null) => void;
+  children: ReactNode;
+}) {
+  const open = menuOpenKey === rowKey;
+  return (
+    <div className="relative shrink-0" data-timeline-row-menu>
+      <button
+        type="button"
+        className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={(e) => {
+          e.stopPropagation();
+          setMenuOpenKey(open ? null : rowKey);
+        }}
+      >
+        <MoreVertical className="h-4 w-4" aria-hidden="true" />
+        <span className="sr-only">Open row actions</span>
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 z-20 mt-0.5 min-w-36 rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 interface ExpenseTimelineProps {
   items: PlannerRow[];
   categories: TimelineCategory[];
   budgetMonth: string;
   userId: string;
+  /** Full debt records so timeline rows can open the same edit flow as the Debts page. */
+  debts?: Doc<"debts">[];
 }
 
 export function ExpenseTimeline({
@@ -99,10 +156,12 @@ export function ExpenseTimeline({
   categories,
   budgetMonth,
   userId,
+  debts,
 }: ExpenseTimelineProps) {
   const archiveItem = useMutation(api.budgetItems.archive);
   const updateBudgetItem = useMutation(api.budgetItems.update);
   const setBudgetPaidForMonth = useMutation(api.budgetItems.setPaidForMonth);
+  const fundExpenseMutation = useMutation(api.budgetItems.fundExpense);
   const setDebtPaidForMonth = useMutation(api.debts.setPaidForMonth);
   const setCreditCardPaidForMonth = useMutation(api.creditCards.setPaidForMonth);
 
@@ -133,11 +192,11 @@ export function ExpenseTimeline({
     [categories]
   );
 
-  const groupedByNeededDay = useMemo(() => {
+  const groupedByDueDay = useMemo(() => {
     if (!items.length) return [];
     const map = new Map<number, PlannerRow[]>();
     for (const item of items) {
-      const d = item.moneyNeededByDay;
+      const d = item.paymentDayOfMonth;
       const list = map.get(d) ?? [];
       list.push(item);
       map.set(d, list);
@@ -150,20 +209,32 @@ export function ExpenseTimeline({
           const oa = rowSortOrder(a);
           const ob = rowSortOrder(b);
           if (oa !== ob) return oa - ob;
-          if (a.paymentDayOfMonth !== b.paymentDayOfMonth) {
-            return a.paymentDayOfMonth - b.paymentDayOfMonth;
-          }
           return a.name.localeCompare(b.name);
         }),
       }));
   }, [items]);
 
   const [editTarget, setEditTarget] = useState<TimelineExpense | null>(null);
+  const [editDebtId, setEditDebtId] = useState<Id<"debts"> | null>(null);
   const [archivePendingId, setArchivePendingId] = useState<Id<"budgetItems"> | null>(null);
   const [paidTogglePendingKey, setPaidTogglePendingKey] = useState<string | null>(null);
   const [autopayTogglePendingId, setAutopayTogglePendingId] =
     useState<Id<"budgetItems"> | null>(null);
   const [allocationTarget, setAllocationTarget] = useState<TimelineExpense | null>(null);
+  const [fundExpensePendingId, setFundExpensePendingId] =
+    useState<Id<"budgetItems"> | null>(null);
+  const [rowMenuKey, setRowMenuKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (rowMenuKey == null) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest("[data-timeline-row-menu]")) return;
+      setRowMenuKey(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [rowMenuKey]);
 
   const handleArchive = async (id: Id<"budgetItems">) => {
     await archiveItem({ id });
@@ -189,9 +260,9 @@ export function ExpenseTimeline({
       <div className="absolute left-[8px] sm:left-[11px] top-3 bottom-3 w-px bg-slate-200" aria-hidden="true" />
 
       <ol className="space-y-6 w-full min-w-0">
-        {groupedByNeededDay.map(({ day, items: dayItems }) => {
-          const neededStart = dateInBudgetMonth(budgetMonth, day);
-          const deltaNeeded = calendarDaysFromTo(todayStart, neededStart);
+        {groupedByDueDay.map(({ day, items: dayItems }) => {
+          const dueDateStart = dateInBudgetMonth(budgetMonth, day);
+          const deltaNeeded = calendarDaysFromTo(todayStart, dueDateStart);
           const isToday = deltaNeeded === 0;
           const isPast = deltaNeeded < 0;
           let rel: string | null = null;
@@ -223,7 +294,7 @@ export function ExpenseTimeline({
               </div>
 
               <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm">
-                <h3 className="font-semibold text-slate-800">Funds needed {ordinal(day)}</h3>
+                <h3 className="font-semibold text-slate-800">Due {ordinal(day)}</h3>
                 <span className="text-slate-300" aria-hidden="true">
                   ·
                 </span>
@@ -254,28 +325,37 @@ export function ExpenseTimeline({
 
                   if (item.rowKind === "creditCard") {
                     const color = item.accentColor ?? CREDIT_CARDS_SECTION_COLOR;
+                    const bankLinked = expenseHasPayFromAccount({
+                      paymentAccountId: item.paymentAccountId,
+                    });
                     const isPaidForMonth = item.markedPaidForMonth === budgetMonth;
                     const paymentStart = dateInBudgetMonth(budgetMonth, item.paymentDayOfMonth);
                     const deltaPayment = calendarDaysFromTo(todayStart, paymentStart);
-                    const daysUntilPayment = deltaPayment;
                     const isDuePast = !isPaidForMonth && deltaPayment < 0;
                     const usageLabel =
                       item.usageMode === "paying_off"
                         ? CREDIT_CARD_USAGE_LABELS.paying_off
                         : CREDIT_CARD_USAGE_LABELS.active_use;
+                    const payFromCc =
+                      item.paymentAccountId && accountMap[item.paymentAccountId]
+                        ? `Pay from ${accountMap[item.paymentAccountId].name}`
+                        : null;
                     const metaParts = [
-                      item.paymentDayOfMonth !== item.moneyNeededByDay
-                        ? `Due ${ordinal(item.paymentDayOfMonth)}` +
-                          (daysUntilPayment > 0
-                            ? ` (+${daysUntilPayment}d)`
-                            : daysUntilPayment < 0
-                            ? ` (${Math.abs(daysUntilPayment)}d ago)`
-                            : "")
+                      item.hasConfiguredDueDay === false
+                        ? `Due ${ordinal(item.paymentDayOfMonth)} (placeholder — set on Cards)`
                         : null,
                       item.isAutopay ? "Autopay" : null,
                       usageLabel,
+                      payFromCc,
                     ].filter(Boolean);
                     const metaLine = metaParts.join(" · ");
+                    const ccSubline = [
+                      !bankLinked ? "No bank linked" : null,
+                      metaLine || null,
+                      isDuePast ? "Past due" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
 
                     return (
                       <li key={rk} className="w-full min-w-0">
@@ -283,6 +363,8 @@ export function ExpenseTimeline({
                           className={`group/row flex w-full min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border py-1 pl-1 pr-1.5 sm:pr-2 shadow-sm transition-colors ${
                             isPaidForMonth
                               ? "bg-teal-50/45 border-teal-100/90"
+                              : !bankLinked
+                              ? "bg-white border-amber-100/90"
                               : "bg-white border-slate-100"
                           }`}
                           style={{ borderLeftWidth: 3, borderLeftColor: color }}
@@ -304,6 +386,11 @@ export function ExpenseTimeline({
                             }}
                             disabled={paidTogglePendingKey === rk}
                             aria-pressed={isPaidForMonth}
+                            title={
+                              isPaidForMonth
+                                ? `Paid for ${formatMonth(budgetMonth)} — click to clear`
+                                : `Mark as paid — payment settled this month`
+                            }
                             aria-label={
                               isPaidForMonth
                                 ? `Mark ${item.name} payment not paid for ${formatMonth(budgetMonth)}`
@@ -323,47 +410,26 @@ export function ExpenseTimeline({
                           </button>
 
                           <div
-                            className="flex max-w-[min(148px,38vw)] shrink-0 items-center gap-1 rounded-full py-0.5 pl-0.5 pr-2 sm:max-w-[200px] lg:max-w-[240px]"
-                            style={{ backgroundColor: `${CREDIT_CARDS_SECTION_COLOR}18` }}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                            style={{ backgroundColor: `${CREDIT_CARDS_SECTION_COLOR}26` }}
                             title="Credit cards"
                           >
-                            <span
-                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
-                              style={{ backgroundColor: `${CREDIT_CARDS_SECTION_COLOR}26` }}
-                            >
-                              <CreditCard
-                                className="w-3 h-3"
-                                style={{ color: CREDIT_CARDS_SECTION_COLOR }}
-                                aria-hidden="true"
-                              />
-                            </span>
-                            <span
-                              className="truncate text-[10px] sm:text-[11px] font-semibold"
+                            <CreditCard
+                              className="w-3 h-3"
                               style={{ color: CREDIT_CARDS_SECTION_COLOR }}
-                            >
-                              Cards
-                            </span>
+                              aria-hidden="true"
+                            />
                           </div>
 
-                          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
-                            <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-800 sm:text-sm">
+                          <div className="min-w-0 flex-1 overflow-hidden">
+                            <div className="truncate text-xs font-medium text-slate-800 sm:text-sm">
                               {item.name}
-                              <span className="text-slate-400 font-normal"> · payment</span>
-                            </span>
-                            {isPaidForMonth && (
-                              <span className="shrink-0 rounded px-1 py-px text-[9px] font-semibold bg-teal-100 text-teal-800 sm:text-[10px]">
-                                Paid
-                              </span>
-                            )}
-                            {isDuePast && (
-                              <span className="shrink-0 rounded px-1 py-px text-[9px] font-semibold bg-slate-100 text-slate-500 sm:text-[10px]">
-                                Past due
-                              </span>
-                            )}
-                            {metaLine ? (
-                              <span className="hidden min-w-0 flex-1 truncate text-[11px] text-slate-400 sm:inline">
-                                <span className="text-slate-300">·</span> {metaLine}
-                              </span>
+                              <span className="font-normal text-slate-400"> · payment</span>
+                            </div>
+                            {ccSubline ? (
+                              <p className="truncate text-[10px] leading-snug text-slate-500" title={ccSubline}>
+                                {ccSubline}
+                              </p>
                             ) : null}
                           </div>
 
@@ -371,44 +437,55 @@ export function ExpenseTimeline({
                             {formatCurrency(item.amount)}
                           </span>
 
-                          <div className="flex shrink-0 items-center border-l border-slate-100 pl-1 sm:pl-1.5 ml-0.5">
+                          <TimelineRowActionsMenu
+                            rowKey={rk}
+                            menuOpenKey={rowMenuKey}
+                            setMenuOpenKey={setRowMenuKey}
+                          >
                             <Link
                               href="/credit-cards"
-                              className="rounded-md px-1.5 py-0.5 text-[10px] sm:text-xs font-medium text-teal-600 hover:bg-teal-50 sm:px-2"
+                              role="menuitem"
+                              className="block px-3 py-1.5 text-left text-sm font-medium text-teal-700 hover:bg-teal-50"
+                              onClick={() => setRowMenuKey(null)}
                             >
-                              Cards
+                              Credit cards
                             </Link>
-                          </div>
+                          </TimelineRowActionsMenu>
                         </div>
-
-                        {metaLine ? (
-                          <p className="mt-0.5 truncate pl-6 text-[10px] text-slate-400 sm:hidden">
-                            {metaLine}
-                          </p>
-                        ) : null}
                       </li>
                     );
                   }
 
                   if (item.rowKind === "debt") {
                     const color = item.accentColor ?? DEBTS_SECTION_COLOR;
+                    const bankLinked = expenseHasPayFromAccount({
+                      paymentAccountId: item.paymentAccountId,
+                    });
                     const isPaidForMonth = item.markedPaidForMonth === budgetMonth;
                     const paymentStart = dateInBudgetMonth(budgetMonth, item.paymentDayOfMonth);
                     const deltaPayment = calendarDaysFromTo(todayStart, paymentStart);
-                    const daysUntilPayment = deltaPayment;
                     const isDuePast = !isPaidForMonth && deltaPayment < 0;
+                    const payFromDebt =
+                      item.paymentAccountId && accountMap[item.paymentAccountId]
+                        ? `Pay from ${accountMap[item.paymentAccountId].name}`
+                        : null;
                     const metaParts = [
-                      item.paymentDayOfMonth !== item.moneyNeededByDay
-                        ? `Due ${ordinal(item.paymentDayOfMonth)}` +
-                          (daysUntilPayment > 0
-                            ? ` (+${daysUntilPayment}d)`
-                            : daysUntilPayment < 0
-                            ? ` (${Math.abs(daysUntilPayment)}d ago)`
-                            : "")
+                      item.hasConfiguredDueDay === false
+                        ? `Due ${ordinal(item.paymentDayOfMonth)} (placeholder — set on Debts)`
                         : null,
                       item.isAutopay ? "Autopay" : null,
+                      payFromDebt,
+                      item.amount <= 0.005 ? "Add planned paydown ($)" : null,
                     ].filter(Boolean);
                     const metaLine = metaParts.join(" · ");
+                    const debtSubline = [
+                      !bankLinked ? "No bank linked" : null,
+                      metaLine || null,
+                      isDuePast ? "Past due" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+                    const debtEditable = debts?.some((d) => d._id === item.debtId);
 
                     return (
                       <li key={rk} className="w-full min-w-0">
@@ -416,6 +493,8 @@ export function ExpenseTimeline({
                           className={`group/row flex w-full min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border py-1 pl-1 pr-1.5 sm:pr-2 shadow-sm transition-colors ${
                             isPaidForMonth
                               ? "bg-teal-50/45 border-teal-100/90"
+                              : !bankLinked
+                              ? "bg-white border-amber-100/90"
                               : "bg-white border-slate-100"
                           }`}
                           style={{ borderLeftWidth: 3, borderLeftColor: color }}
@@ -437,6 +516,11 @@ export function ExpenseTimeline({
                             }}
                             disabled={paidTogglePendingKey === rk}
                             aria-pressed={isPaidForMonth}
+                            title={
+                              isPaidForMonth
+                                ? `Paid for ${formatMonth(budgetMonth)} — click to clear`
+                                : `Mark as paid — payment settled this month`
+                            }
                             aria-label={
                               isPaidForMonth
                                 ? `Mark ${item.name} payment not paid for ${formatMonth(budgetMonth)}`
@@ -456,47 +540,26 @@ export function ExpenseTimeline({
                           </button>
 
                           <div
-                            className="flex max-w-[min(148px,38vw)] shrink-0 items-center gap-1 rounded-full py-0.5 pl-0.5 pr-2 sm:max-w-[200px] lg:max-w-[240px]"
-                            style={{ backgroundColor: `${DEBTS_SECTION_COLOR}18` }}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                            style={{ backgroundColor: `${DEBTS_SECTION_COLOR}26` }}
                             title="Debts"
                           >
-                            <span
-                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
-                              style={{ backgroundColor: `${DEBTS_SECTION_COLOR}26` }}
-                            >
-                              <Landmark
-                                className="w-3 h-3"
-                                style={{ color: DEBTS_SECTION_COLOR }}
-                                aria-hidden="true"
-                              />
-                            </span>
-                            <span
-                              className="truncate text-[10px] sm:text-[11px] font-semibold"
+                            <Landmark
+                              className="w-3 h-3"
                               style={{ color: DEBTS_SECTION_COLOR }}
-                            >
-                              Debts
-                            </span>
+                              aria-hidden="true"
+                            />
                           </div>
 
-                          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
-                            <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-800 sm:text-sm">
+                          <div className="min-w-0 flex-1 overflow-hidden">
+                            <div className="truncate text-xs font-medium text-slate-800 sm:text-sm">
                               {item.name}
-                              <span className="text-slate-400 font-normal"> · payment</span>
-                            </span>
-                            {isPaidForMonth && (
-                              <span className="shrink-0 rounded px-1 py-px text-[9px] font-semibold bg-teal-100 text-teal-800 sm:text-[10px]">
-                                Paid
-                              </span>
-                            )}
-                            {isDuePast && (
-                              <span className="shrink-0 rounded px-1 py-px text-[9px] font-semibold bg-slate-100 text-slate-500 sm:text-[10px]">
-                                Past due
-                              </span>
-                            )}
-                            {metaLine ? (
-                              <span className="hidden min-w-0 flex-1 truncate text-[11px] text-slate-400 sm:inline">
-                                <span className="text-slate-300">·</span> {metaLine}
-                              </span>
+                              <span className="font-normal text-slate-400"> · payment</span>
+                            </div>
+                            {debtSubline ? (
+                              <p className="truncate text-[10px] leading-snug text-slate-500" title={debtSubline}>
+                                {debtSubline}
+                              </p>
                             ) : null}
                           </div>
 
@@ -504,21 +567,34 @@ export function ExpenseTimeline({
                             {formatCurrency(item.amount)}
                           </span>
 
-                          <div className="flex shrink-0 items-center border-l border-slate-100 pl-1 sm:pl-1.5 ml-0.5">
+                          <TimelineRowActionsMenu
+                            rowKey={rk}
+                            menuOpenKey={rowMenuKey}
+                            setMenuOpenKey={setRowMenuKey}
+                          >
+                            <button
+                              type="button"
+                              role="menuitem"
+                              disabled={!debtEditable}
+                              className="block w-full px-3 py-1.5 text-left text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-40"
+                              onClick={() => {
+                                if (!debtEditable) return;
+                                setEditDebtId(item.debtId);
+                                setRowMenuKey(null);
+                              }}
+                            >
+                              Edit
+                            </button>
                             <Link
                               href="/debts"
-                              className="rounded-md px-1.5 py-0.5 text-[10px] sm:text-xs font-medium text-teal-600 hover:bg-teal-50 sm:px-2"
+                              role="menuitem"
+                              className="block px-3 py-1.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-50"
+                              onClick={() => setRowMenuKey(null)}
                             >
-                              Debts
+                              Debts page
                             </Link>
-                          </div>
+                          </TimelineRowActionsMenu>
                         </div>
-
-                        {metaLine ? (
-                          <p className="mt-0.5 truncate pl-6 text-[10px] text-slate-400 sm:hidden">
-                            {metaLine}
-                          </p>
-                        ) : null}
                       </li>
                     );
                   }
@@ -533,24 +609,31 @@ export function ExpenseTimeline({
                   const isPaidForMonth = item.markedPaidForMonth === budgetMonth;
                   const paymentStart = dateInBudgetMonth(budgetMonth, item.paymentDayOfMonth);
                   const deltaPayment = calendarDaysFromTo(todayStart, paymentStart);
-                  const daysUntilPayment = deltaPayment;
                   const isDuePast = !isPaidForMonth && deltaPayment < 0;
+                  const setAsideTotal = allocatedByBudgetId[item._id] ?? 0;
+                  const earmarkLevel = expenseFundingLevel(item.amount, setAsideTotal);
+                  const accountFunded = expenseHasPayFromAccount(item);
+                  const isOverAllocated =
+                    item.amount > 0.005 && setAsideTotal > item.amount + 0.005;
+                  const isReserved =
+                    item.status === "funded" && !isPaidForMonth;
 
-                  const dueBit =
-                    item.paymentDayOfMonth !== item.moneyNeededByDay
-                      ? `Due ${ordinal(item.paymentDayOfMonth)}` +
-                        (daysUntilPayment > 0
-                          ? ` (+${daysUntilPayment}d)`
-                          : daysUntilPayment < 0
-                          ? ` (${Math.abs(daysUntilPayment)}d ago)`
-                          : "")
-                      : null;
                   const paidFromResolved = budgetItemPaidFromLabel(item, accountMap);
                   const metaLine = [
-                    dueBit,
                     item.isAutopay ? "Autopay" : null,
                     paidFromResolved ?? null,
                     item.note ? item.note : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ");
+                  const budgetSubline = [
+                    !accountFunded ? "No bank linked" : null,
+                    metaLine || null,
+                    isReserved ? "Reserved" : null,
+                    earmarkLevel === "full" && !isPaidForMonth && !isReserved ? "Earmarked" : null,
+                    earmarkLevel === "partial" && !isPaidForMonth ? "Partly funded" : null,
+                    isOverAllocated && !isPaidForMonth ? "Over-funded" : null,
+                    isDuePast ? "Past due" : null,
                   ]
                     .filter(Boolean)
                     .join(" · ");
@@ -560,7 +643,13 @@ export function ExpenseTimeline({
                       <div
                         className={`group/row flex w-full min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border py-1 pl-1 pr-1.5 sm:pr-2 shadow-sm transition-colors ${
                           isPaidForMonth
-                            ? "bg-teal-50/45 border-teal-100/90"
+                            ? "bg-emerald-50/55 border-emerald-200/85 ring-1 ring-emerald-200/45"
+                            : isReserved
+                            ? "bg-emerald-50/40 border-emerald-200/80 ring-1 ring-emerald-200/35"
+                            : isOverAllocated
+                            ? "bg-white border-slate-100 ring-2 ring-amber-400/65 ring-offset-2 ring-offset-white"
+                            : !accountFunded
+                            ? "bg-white border-amber-100/90"
                             : "bg-white border-slate-100"
                         }`}
                         style={{ borderLeftWidth: 3, borderLeftColor: color }}
@@ -581,6 +670,11 @@ export function ExpenseTimeline({
                           }}
                           disabled={paidTogglePendingKey === rk}
                           aria-pressed={isPaidForMonth}
+                          title={
+                            isPaidForMonth
+                              ? `Paid for ${formatMonth(budgetMonth)} — click to clear`
+                              : `Mark as paid — bill settled this month`
+                          }
                           aria-label={
                             isPaidForMonth
                               ? `Mark ${item.name} not paid for ${formatMonth(budgetMonth)}`
@@ -588,7 +682,7 @@ export function ExpenseTimeline({
                           }
                           className={`shrink-0 rounded-md p-0.5 transition-colors disabled:opacity-50 ${
                             isPaidForMonth
-                              ? "text-teal-600 hover:bg-teal-100/80"
+                              ? "text-emerald-600 hover:bg-emerald-100/80"
                               : "text-slate-300 hover:text-teal-600 hover:bg-teal-50"
                           }`}
                         >
@@ -600,72 +694,87 @@ export function ExpenseTimeline({
                         </button>
 
                         <div
-                          className="flex max-w-[min(148px,38vw)] shrink-0 items-center gap-1 rounded-full py-0.5 pl-0.5 pr-2 sm:max-w-[200px] lg:max-w-[240px]"
-                          style={{ backgroundColor: `${color}18` }}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                          style={{ backgroundColor: `${color}26` }}
                           title={cat?.name ?? "Category"}
+                          aria-label={cat?.name ?? "Category"}
                         >
-                          <span
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
-                            style={{ backgroundColor: `${color}26` }}
-                          >
-                            {IconComp ? (
-                              <IconComp className="w-3 h-3" style={{ color }} aria-hidden="true" />
-                            ) : (
-                              <span className="text-[10px] leading-none" aria-hidden="true">
-                                {iconName ?? "💰"}
-                              </span>
-                            )}
-                          </span>
-                          <span
-                            className="truncate text-[10px] sm:text-[11px] font-semibold"
-                            style={{ color }}
-                          >
-                            {cat?.name ?? "Uncategorized"}
-                          </span>
+                          {IconComp ? (
+                            <IconComp className="w-3 h-3" style={{ color }} aria-hidden="true" />
+                          ) : (
+                            <span className="text-[10px] leading-none" aria-hidden="true">
+                              {iconName ?? "💰"}
+                            </span>
+                          )}
                         </div>
 
-                        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden flex-wrap">
-                          <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-800 sm:text-sm">
-                            {item.name}
-                          </span>
-                          {(() => {
-                            const aside = allocatedByBudgetId[item._id] ?? 0;
-                            return (
-                              <button
-                                type="button"
-                                title="Set aside cash from an account for this bill"
-                                onClick={() => setAllocationTarget(item)}
-                                className={`shrink-0 inline-flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[10px] font-semibold border sm:text-[11px] ${
-                                  aside > 0.005
-                                    ? "border-teal-200 bg-teal-50/90 text-teal-800"
-                                    : "border-slate-200 bg-white text-slate-600 hover:border-teal-200 hover:text-teal-700"
-                                }`}
-                              >
-                                <PiggyBank className="w-3 h-3 shrink-0" aria-hidden="true" />
-                                {aside > 0.005 ? (
-                                  <span className="tabular-nums">
-                                    {formatCurrency(aside)} / {formatCurrency(item.amount)}
-                                  </span>
-                                ) : (
-                                  <span>Set aside</span>
-                                )}
-                              </button>
-                            );
-                          })()}
-                          {isPaidForMonth && (
-                            <span className="shrink-0 rounded px-1 py-px text-[9px] font-semibold bg-teal-100 text-teal-800 sm:text-[10px]">
-                              Paid
+                        <div className="flex min-w-0 flex-1 flex-col gap-0 overflow-hidden">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-800 sm:text-sm">
+                              {item.name}
                             </span>
-                          )}
-                          {isDuePast && (
-                            <span className="shrink-0 rounded px-1 py-px text-[9px] font-semibold bg-slate-100 text-slate-500 sm:text-[10px]">
-                              Past due
-                            </span>
-                          )}
-                          {metaLine ? (
-                            <span className="hidden min-w-0 basis-full truncate text-[11px] text-slate-400 sm:inline sm:basis-auto">
-                              <span className="text-slate-300">·</span> {metaLine}
-                            </span>
+                            {(() => {
+                              const aside = allocatedByBudgetId[item._id] ?? 0;
+                              const overFunded = item.amount > 0.005 && aside > item.amount + 0.005;
+                              return (
+                                <span className="inline-flex shrink-0 items-center gap-0.5">
+                                  <button
+                                    type="button"
+                                    title={
+                                      overFunded
+                                        ? "Earmark exceeds this bill (remove or adjust lines)"
+                                        : "Earmark — plan cash from an account toward this bill this month"
+                                    }
+                                    onClick={() => setAllocationTarget(item)}
+                                    className={`inline-flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[10px] font-semibold border sm:text-[11px] ${
+                                      overFunded
+                                        ? "border-amber-300 bg-amber-50/95 text-amber-900"
+                                        : aside > 0.005
+                                        ? "border-teal-200 bg-teal-50/90 text-teal-800"
+                                        : "border-slate-200 bg-white text-slate-600 hover:border-teal-200 hover:text-teal-700"
+                                    }`}
+                                  >
+                                    <PiggyBank className="w-3 h-3 shrink-0" aria-hidden="true" />
+                                    {aside > 0.005 ? (
+                                      <span className="tabular-nums">
+                                        {formatCurrency(aside)} / {formatCurrency(item.amount)}
+                                      </span>
+                                    ) : (
+                                      <span>Earmark</span>
+                                    )}
+                                  </button>
+                                  {accountFunded && !isPaidForMonth && item.status !== "funded" && (
+                                    <button
+                                      type="button"
+                                      title="Reserve the full bill amount against Available from today (no split lines)"
+                                      disabled={fundExpensePendingId === item._id}
+                                      onClick={async () => {
+                                        setFundExpensePendingId(item._id);
+                                        try {
+                                          await fundExpenseMutation({
+                                            id: item._id,
+                                            userId,
+                                          });
+                                        } finally {
+                                          setFundExpensePendingId(null);
+                                        }
+                                      }}
+                                      className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50/90 px-1 py-0.5 text-[10px] font-semibold text-emerald-900 hover:bg-emerald-100/90 disabled:opacity-50 sm:text-[11px]"
+                                    >
+                                      Reserve
+                                    </button>
+                                  )}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                          {budgetSubline ? (
+                            <p
+                              className="truncate text-[10px] leading-snug text-slate-500"
+                              title={budgetSubline}
+                            >
+                              {budgetSubline}
+                            </p>
                           ) : null}
                         </div>
 
@@ -702,31 +811,37 @@ export function ExpenseTimeline({
                           </span>
                         </label>
 
-                        <div className="flex shrink-0 items-center gap-0.5 border-l border-slate-100 pl-1 sm:pl-1.5 ml-0.5">
+                        <TimelineRowActionsMenu
+                          rowKey={rk}
+                          menuOpenKey={rowMenuKey}
+                          setMenuOpenKey={setRowMenuKey}
+                        >
                           <button
                             type="button"
-                            onClick={() => setEditTarget(item)}
-                            className="rounded-md px-1.5 py-0.5 text-[10px] sm:text-xs font-medium text-teal-600 hover:bg-teal-50 sm:px-2"
+                            role="menuitem"
+                            className="block w-full px-3 py-1.5 text-left text-sm font-medium text-teal-700 hover:bg-teal-50"
+                            onClick={() => {
+                              setEditTarget(item);
+                              setRowMenuKey(null);
+                            }}
                           >
                             Edit
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
-                              setArchivePendingId(archivePendingId === item._id ? null : item._id)
-                            }
-                            className="rounded-md px-1.5 py-0.5 text-[10px] sm:text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-600 sm:px-2"
+                            role="menuitem"
+                            className="block w-full px-3 py-1.5 text-left text-sm font-medium text-rose-600 hover:bg-rose-50"
+                            onClick={() => {
+                              setArchivePendingId(
+                                archivePendingId === item._id ? null : item._id
+                              );
+                              setRowMenuKey(null);
+                            }}
                           >
                             Remove
                           </button>
-                        </div>
+                        </TimelineRowActionsMenu>
                       </div>
-
-                      {metaLine ? (
-                        <p className="mt-0.5 truncate pl-6 text-[10px] text-slate-400 sm:hidden">
-                          {metaLine}
-                        </p>
-                      ) : null}
 
                       {archivePendingId === item._id && (
                         <div className="mt-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
@@ -797,14 +912,75 @@ export function ExpenseTimeline({
             <BudgetItemManager
               categoryId={editTarget.categoryId}
               editItem={editTarget}
+              transactionsMonthKey={budgetMonth}
               onSuccess={() => setEditTarget(null)}
               onCancel={() => setEditTarget(null)}
             />
           </div>
         </div>
       )}
+
+      {editDebtId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="timeline-debt-edit-title"
+          onClick={() => setEditDebtId(null)}
+        >
+          <div
+            className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="timeline-debt-edit-title" className="font-semibold text-slate-800 mb-4">
+              Edit debt
+            </h2>
+            {(() => {
+              const d = debts?.find((x) => x._id === editDebtId);
+              if (!d) {
+                return (
+                  <p className="text-sm text-slate-600">
+                    This debt is not available to edit. Try again from the{" "}
+                    <Link href="/debts" className="font-medium text-teal-600 hover:text-teal-700">
+                      Debts
+                    </Link>{" "}
+                    page.
+                  </p>
+                );
+              }
+              return (
+                <DebtManager
+                  key={editDebtId}
+                  editDebt={d}
+                  onSuccess={() => setEditDebtId(null)}
+                  onCancel={() => setEditDebtId(null)}
+                />
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function clampPlannerDueDay(d: number | undefined | null): { day: number; configured: boolean } {
+  if (d != null && d >= 1 && d <= 31) {
+    return { day: d, configured: true };
+  }
+  return { day: 28, configured: false };
+}
+
+function debtPlannerAmount(d: Doc<"debts">): number {
+  const planned = d.plannedMonthlyPayment ?? 0;
+  if (planned > 0) return planned;
+  return d.minimumPayment ?? 0;
+}
+
+function cardPlannerAmount(c: Doc<"creditCards">): number {
+  const planned = c.plannedMonthlyPayment ?? 0;
+  if (planned > 0) return planned;
+  return c.minimumPayment ?? 0;
 }
 
 export function buildPlannerRows(
@@ -816,46 +992,38 @@ export function buildPlannerRows(
     ...i,
     rowKind: "budget" as const,
   }));
-  const cardRows: PlannerRow[] = (creditCards ?? [])
-    .filter(
-      (c) =>
-        (c.plannedMonthlyPayment ?? 0) > 0 &&
-        c.dueDayOfMonth != null &&
-        c.dueDayOfMonth >= 1 &&
-        c.dueDayOfMonth <= 31
-    )
-    .map((c) => ({
+  const cardRows: PlannerRow[] = (creditCards ?? []).map((c) => {
+    const { day, configured } = clampPlannerDueDay(c.dueDayOfMonth);
+    return {
       rowKind: "creditCard" as const,
       creditCardId: c._id,
       name: c.name,
-      amount: c.plannedMonthlyPayment!,
-      paymentDayOfMonth: c.dueDayOfMonth!,
-      moneyNeededByDay: c.dueDayOfMonth!,
+      amount: cardPlannerAmount(c),
+      paymentDayOfMonth: day,
       markedPaidForMonth: c.markedPaidForMonth,
       accentColor: c.color,
       isAutopay: c.isAutopay,
+      paymentAccountId: c.paymentAccountId,
+      hasConfiguredDueDay: configured,
       usageMode: (c.usageMode === "paying_off" ? "paying_off" : "active_use") as
         | "paying_off"
         | "active_use",
-    }));
-  const debtRows: PlannerRow[] = (debts ?? [])
-    .filter(
-      (d) =>
-        (d.plannedMonthlyPayment ?? 0) > 0 &&
-        d.dueDayOfMonth != null &&
-        d.dueDayOfMonth >= 1 &&
-        d.dueDayOfMonth <= 31
-    )
-    .map((d) => ({
+    };
+  });
+  const debtRows: PlannerRow[] = (debts ?? []).map((d) => {
+    const { day, configured } = clampPlannerDueDay(d.dueDayOfMonth);
+    return {
       rowKind: "debt" as const,
       debtId: d._id,
       name: d.name,
-      amount: d.plannedMonthlyPayment!,
-      paymentDayOfMonth: d.dueDayOfMonth!,
-      moneyNeededByDay: d.dueDayOfMonth!,
+      amount: debtPlannerAmount(d),
+      paymentDayOfMonth: day,
       markedPaidForMonth: d.markedPaidForMonth,
       accentColor: d.color,
       isAutopay: d.isAutopay,
-    }));
+      paymentAccountId: d.paymentAccountId,
+      hasConfiguredDueDay: configured,
+    };
+  });
   return [...budget, ...cardRows, ...debtRows];
 }

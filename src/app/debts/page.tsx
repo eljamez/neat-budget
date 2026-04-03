@@ -13,6 +13,7 @@ import {
   formatAprPercent,
   formatOrdinalDay,
   estimateDebtPayoff,
+  formatAccountType,
 } from "@/lib/utils";
 import {
   Landmark,
@@ -23,6 +24,7 @@ import {
 export default function DebtsPage() {
   const { user } = useUser();
   const debts = useQuery(api.debts.list, user ? { userId: user.id } : "skip");
+  const accounts = useQuery(api.accounts.list, user ? { userId: user.id } : "skip");
   const archiveDebt = useMutation(api.debts.archive);
 
   const [showForm, setShowForm] = useState(false);
@@ -148,6 +150,10 @@ export default function DebtsPage() {
               d.plannedMonthlyPayment != null && d.plannedMonthlyPayment > 0
                 ? estimateDebtPayoff(d.balance, d.plannedMonthlyPayment, d.aprPercent)
                 : null;
+            const payFromAccount =
+              d.paymentAccountId && accounts
+                ? accounts.find((a) => a._id === d.paymentAccountId)
+                : undefined;
 
             return (
               <div key={d._id}>
@@ -199,6 +205,15 @@ export default function DebtsPage() {
                             Plan {formatCurrency(d.plannedMonthlyPayment)}/mo
                             {d.dueDayOfMonth != null &&
                               ` · day ${d.dueDayOfMonth} on Categories timeline & Debts section`}
+                          </p>
+                        )}
+                        {payFromAccount && (
+                          <p className="text-xs text-slate-600 mt-1">
+                            Pay from{" "}
+                            <span className="font-medium text-slate-800">
+                              {payFromAccount.name}
+                            </span>{" "}
+                            ({formatAccountType(payFromAccount.accountType)})
                           </p>
                         )}
                         {payoff?.payoffMonthLabel && (

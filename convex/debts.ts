@@ -1,5 +1,18 @@
 import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+
+async function assertPaymentAccount(
+  ctx: MutationCtx,
+  userId: string,
+  accountId: Id<"accounts">
+) {
+  const a = await ctx.db.get(accountId);
+  if (!a || a.userId !== userId) {
+    throw new Error("Invalid payment account");
+  }
+}
 
 /** Allowed for create/update — not `credit_card` (use `creditCards` table). */
 const debtTypeForWrite = v.union(
@@ -35,8 +48,12 @@ export const create = mutation({
     plannedMonthlyPayment: v.optional(v.number()),
     isAutopay: v.optional(v.boolean()),
     color: v.optional(v.string()),
+    paymentAccountId: v.optional(v.id("accounts")),
   },
   handler: async (ctx, args) => {
+    if (args.paymentAccountId) {
+      await assertPaymentAccount(ctx, args.userId, args.paymentAccountId);
+    }
     return await ctx.db.insert("debts", {
       userId: args.userId,
       name: args.name,
@@ -51,6 +68,7 @@ export const create = mutation({
       plannedMonthlyPayment: args.plannedMonthlyPayment,
       isAutopay: args.isAutopay,
       color: args.color,
+      paymentAccountId: args.paymentAccountId,
       isArchived: false,
     });
   },
@@ -72,17 +90,26 @@ export const update = mutation({
     plannedMonthlyPayment: v.optional(v.number()),
     isAutopay: v.optional(v.boolean()),
     color: v.optional(v.string()),
+    paymentAccountId: v.optional(v.union(v.id("accounts"), v.null())),
   },
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.id);
     if (!doc || doc.userId !== args.userId) {
       throw new Error("Debt not found");
     }
-    const { id, userId: _uid, ...rest } = args;
-    const patch = Object.fromEntries(
+    const { id, userId, paymentAccountId, ...rest } = args;
+    const patch: Record<string, unknown> = Object.fromEntries(
       Object.entries(rest).filter(([, val]) => val !== undefined)
-    ) as Record<string, unknown>;
-    await ctx.db.patch(id, patch);
+    );
+    if (paymentAccountId !== undefined) {
+      if (paymentAccountId === null) {
+        patch.paymentAccountId = undefined;
+      } else {
+        await assertPaymentAccount(ctx, userId, paymentAccountId);
+        patch.paymentAccountId = paymentAccountId;
+      }
+    }
+    await ctx.db.patch(id, patch as Record<string, never>);
   },
 });
 

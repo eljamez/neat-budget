@@ -14,12 +14,14 @@ import {
   estimateDebtPayoff,
   formatCreditCardUsageMode,
   CREDIT_CARD_USAGE_LABELS,
+  formatAccountType,
 } from "@/lib/utils";
 import { ChevronDown, ChevronRight, CreditCard } from "lucide-react";
 
 export default function CreditCardsPage() {
   const { user } = useUser();
   const cards = useQuery(api.creditCards.list, user ? { userId: user.id } : "skip");
+  const accounts = useQuery(api.accounts.list, user ? { userId: user.id } : "skip");
   const archiveCard = useMutation(api.creditCards.archive);
 
   const [showForm, setShowForm] = useState(false);
@@ -153,6 +155,10 @@ export default function CreditCardsPage() {
               c.usageMode === "paying_off"
                 ? CREDIT_CARD_USAGE_LABELS.paying_off
                 : CREDIT_CARD_USAGE_LABELS.active_use;
+            const payFromAccount =
+              c.paymentAccountId && accounts
+                ? accounts.find((a) => a._id === c.paymentAccountId)
+                : undefined;
 
             return (
               <div key={c._id}>
@@ -221,6 +227,15 @@ export default function CreditCardsPage() {
                             Plan {formatCurrency(c.plannedMonthlyPayment)}/mo
                             {c.dueDayOfMonth != null &&
                               ` · day ${c.dueDayOfMonth} on timeline & Categories`}
+                          </p>
+                        )}
+                        {payFromAccount && (
+                          <p className="text-xs text-slate-600 mt-1">
+                            Pay bill from{" "}
+                            <span className="font-medium text-slate-800">
+                              {payFromAccount.name}
+                            </span>{" "}
+                            ({formatAccountType(payFromAccount.accountType)})
                           </p>
                         )}
                         {payoff?.payoffMonthLabel && c.usageMode === "paying_off" && (

@@ -7,13 +7,13 @@ import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { formatAccountType } from "@/lib/utils";
+import { ExpenseLinkedTransactions } from "@/components/ExpenseLinkedTransactions";
 
 interface BudgetExpense {
   _id: Id<"budgetItems">;
   name: string;
   amount: number;
   paymentDayOfMonth: number;
-  moneyNeededByDay: number;
   accountId?: Id<"accounts">;
   paidFrom?: string;
   isAutopay?: boolean;
@@ -25,6 +25,8 @@ interface BudgetItemManagerProps {
   editItem?: BudgetExpense | null;
   onSuccess?: () => void;
   onCancel?: () => void;
+  /** When editing, list payments for this calendar month (`YYYY-MM`). */
+  transactionsMonthKey?: string;
 }
 
 function ordinal(n: number) {
@@ -38,6 +40,7 @@ export function BudgetItemManager({
   editItem,
   onSuccess,
   onCancel,
+  transactionsMonthKey,
 }: BudgetItemManagerProps) {
   const { user } = useUser();
   const createItem = useMutation(api.budgetItems.create);
@@ -56,7 +59,6 @@ export function BudgetItemManager({
     name: editItem?.name ?? "",
     amount: editItem?.amount?.toString() ?? "",
     paymentDayOfMonth: editItem?.paymentDayOfMonth?.toString() ?? "",
-    moneyNeededByDay: editItem?.moneyNeededByDay?.toString() ?? "",
     accountId: editItem?.accountId ?? "",
     isAutopay: editItem?.isAutopay === true,
     note: editItem?.note ?? "",
@@ -69,19 +71,14 @@ export function BudgetItemManager({
     if (!user) return;
 
     const amount = parseFloat(form.amount);
-    const paymentDay = parseInt(form.paymentDayOfMonth);
-    const neededByDay = parseInt(form.moneyNeededByDay);
+    const dueDay = parseInt(form.paymentDayOfMonth, 10);
 
     if (isNaN(amount) || amount <= 0) {
       setError("Please enter a valid amount");
       return;
     }
-    if (isNaN(paymentDay) || paymentDay < 1 || paymentDay > 31) {
-      setError("Payment day must be between 1 and 31");
-      return;
-    }
-    if (isNaN(neededByDay) || neededByDay < 1 || neededByDay > 31) {
-      setError("Money needed by day must be between 1 and 31");
+    if (isNaN(dueDay) || dueDay < 1 || dueDay > 31) {
+      setError("Due day must be between 1 and 31");
       return;
     }
 
@@ -99,8 +96,7 @@ export function BudgetItemManager({
           id: editItem._id,
           name: form.name,
           amount,
-          paymentDayOfMonth: paymentDay,
-          moneyNeededByDay: neededByDay,
+          paymentDayOfMonth: dueDay,
           accountId: accountIdVal,
           isAutopay: form.isAutopay,
           note: form.note || undefined,
@@ -111,8 +107,7 @@ export function BudgetItemManager({
           categoryId,
           name: form.name,
           amount,
-          paymentDayOfMonth: paymentDay,
-          moneyNeededByDay: neededByDay,
+          paymentDayOfMonth: dueDay,
           accountId: accountIdVal === null ? undefined : accountIdVal,
           isAutopay: form.isAutopay ? true : undefined,
           note: form.note || undefined,
@@ -126,10 +121,10 @@ export function BudgetItemManager({
     }
   };
 
-  const payDay = parseInt(form.paymentDayOfMonth);
-  const neededDay = parseInt(form.moneyNeededByDay);
+  const dueDayPreview = parseInt(form.paymentDayOfMonth, 10);
 
   return (
+    <div className="space-y-4">
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
@@ -166,33 +161,16 @@ export function BudgetItemManager({
         </div>
 
         <div>
-          <label htmlFor="item-payment-day" className="block text-xs font-medium text-slate-600 mb-1">
-            Bill Due (day of month)
+          <label htmlFor="item-due-day" className="block text-xs font-medium text-slate-600 mb-1">
+            Due (day of month)
           </label>
           <input
-            id="item-payment-day"
+            id="item-due-day"
             type="number"
             min="1"
             max="31"
             value={form.paymentDayOfMonth}
             onChange={(e) => setForm({ ...form, paymentDayOfMonth: e.target.value })}
-            placeholder="1–31"
-            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
-            required
-          />
-        </div>
-
-        <div>
-          <label htmlFor="item-needed-by" className="block text-xs font-medium text-slate-600 mb-1">
-            Money Needed By (day of month)
-          </label>
-          <input
-            id="item-needed-by"
-            type="number"
-            min="1"
-            max="31"
-            value={form.moneyNeededByDay}
-            onChange={(e) => setForm({ ...form, moneyNeededByDay: e.target.value })}
             placeholder="1–31"
             className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
             required
@@ -259,11 +237,9 @@ export function BudgetItemManager({
       </label>
 
       {/* Preview hint */}
-      {!isNaN(payDay) && !isNaN(neededDay) && form.name && (
+      {!isNaN(dueDayPreview) && form.name && (
         <p className="text-xs text-teal-700 bg-teal-50 border border-teal-100 rounded-xl px-3 py-2">
-          <strong>{form.name}</strong> — funds needed by the{" "}
-          <strong>{ordinal(neededDay)}</strong>, payment goes through on the{" "}
-          <strong>{ordinal(payDay)}</strong>
+          <strong>{form.name}</strong> — due on the <strong>{ordinal(dueDayPreview)}</strong>
           {form.accountId ? (
             <>
               {" "}
@@ -302,5 +278,13 @@ export function BudgetItemManager({
         )}
       </div>
     </form>
+    {editItem ? (
+      <ExpenseLinkedTransactions
+        budgetItemId={editItem._id}
+        monthKey={transactionsMonthKey}
+        className="pt-1"
+      />
+    ) : null}
+    </div>
   );
 }

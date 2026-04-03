@@ -16,7 +16,6 @@ export const create = mutation({
   args: {
     userId: v.string(),
     name: v.string(),
-    monthlyLimit: v.number(),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
   },
@@ -24,7 +23,6 @@ export const create = mutation({
     return await ctx.db.insert("categories", {
       userId: args.userId,
       name: args.name,
-      monthlyLimit: args.monthlyLimit,
       color: args.color,
       icon: args.icon,
       isArchived: false,
@@ -36,7 +34,6 @@ export const update = mutation({
   args: {
     id: v.id("categories"),
     name: v.optional(v.string()),
-    monthlyLimit: v.optional(v.number()),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
   },

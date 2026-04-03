@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import {
   CREDIT_CARD_USAGE_LABELS,
   type CreditCardUsageModeKey,
+  formatAccountType,
 } from "@/lib/utils";
 import { CATEGORY_COLORS } from "@/lib/icons";
 
@@ -26,6 +27,7 @@ interface CreditCard {
   creditLimit?: number;
   isAutopay?: boolean;
   color?: string;
+  paymentAccountId?: Id<"accounts">;
 }
 
 interface CreditCardManagerProps {
@@ -36,6 +38,7 @@ interface CreditCardManagerProps {
 
 export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardManagerProps) {
   const { user } = useUser();
+  const accounts = useQuery(api.accounts.list, user ? { userId: user.id } : "skip");
   const createCard = useMutation(api.creditCards.create);
   const updateCard = useMutation(api.creditCards.update);
 
@@ -69,6 +72,7 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
         : "",
     isAutopay: editCard?.isAutopay === true,
     color: editCard?.color ?? CATEGORY_COLORS[3],
+    paymentAccountId: editCard?.paymentAccountId ?? "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -153,9 +157,21 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
       };
 
       if (editCard) {
-        await updateCard({ id: editCard._id, userId: user.id, ...payload });
+        await updateCard({
+          id: editCard._id,
+          userId: user.id,
+          ...payload,
+          paymentAccountId:
+            form.paymentAccountId === "" ? null : (form.paymentAccountId as Id<"accounts">),
+        });
       } else {
-        await createCard({ userId: user.id, ...payload });
+        await createCard({
+          userId: user.id,
+          ...payload,
+          ...(form.paymentAccountId
+            ? { paymentAccountId: form.paymentAccountId as Id<"accounts"> }
+            : {}),
+        });
       }
       onSuccess?.();
     } catch {
@@ -321,6 +337,32 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
           </span>
         </span>
       </label>
+
+      <div>
+        <label htmlFor="cc-pay-from" className="block text-sm font-medium text-slate-600 mb-1.5">
+          Pay card bill from <span className="text-slate-400 font-normal">(optional)</span>
+        </label>
+        <select
+          id="cc-pay-from"
+          value={form.paymentAccountId}
+          onChange={(e) => setForm({ ...form, paymentAccountId: e.target.value })}
+          disabled={accounts === undefined}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors disabled:opacity-60"
+        >
+          <option value="">Not set — choose when logging payment</option>
+          {(accounts ?? [])
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((a) => (
+              <option key={a._id} value={a._id}>
+                {a.name} ({formatAccountType(a.accountType)})
+              </option>
+            ))}
+        </select>
+        <p className="text-xs text-slate-400 mt-1.5">
+          Checking or savings you use to pay this issuer — not the card&apos;s balance account.
+        </p>
+      </div>
 
       <div>
         <label htmlFor="cc-purpose" className="block text-sm font-medium text-slate-600 mb-1.5">

@@ -5,7 +5,7 @@ import { CATEGORY_ICON_MAP } from "@/lib/icons";
 
 interface BudgetCardProps {
   name: string;
-  /** Full monthly budget (manual extra + planned expenses). */
+  /** Monthly cap from recurring expenses in this category (sum of budget items). */
   monthlyLimit: number;
   spent: number;
   color?: string;

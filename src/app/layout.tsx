@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { ConvexClerkProvider } from "@/components/providers/ConvexClerkProvider";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 
 const geist = Geist({ subsets: ["latin"] });
 
@@ -33,12 +33,7 @@ export default function RootLayout({
           Skip to main content
         </a>
         <ConvexClerkProvider>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <main id="main-content" className="flex-1 min-w-0 w-full p-5 pt-[5.5rem] pb-24 lg:p-8 lg:pt-8 lg:pb-8" tabIndex={-1}>
-              {children}
-            </main>
-          </div>
+          <AppShell>{children}</AppShell>
         </ConvexClerkProvider>
       </body>
     </html>

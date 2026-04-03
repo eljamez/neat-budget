@@ -1,14 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
-import { BarChart2, Tag, AlertTriangle, Sparkles, Zap, Shield, ArrowRight } from "lucide-react";
+import { LayoutDashboard, BarChart2, Tag, AlertTriangle, Sparkles, Zap, Shield, ArrowRight } from "lucide-react";
 import { LogoMark } from "@/components/LogoMark";
+import { HomeAccountHeader } from "@/components/HomeAccountHeader";
 
 export default async function Home() {
   const { userId } = await auth();
-  if (userId) redirect("/dashboard");
-  return <LandingPage />;
+  return <LandingPage isSignedIn={!!userId} />;
 }
 
 function AppMockup() {
@@ -119,7 +118,7 @@ function AppMockup() {
   );
 }
 
-function LandingPage() {
+function LandingPage({ isSignedIn }: { isSignedIn: boolean }) {
   return (
     <div className="-m-5 sm:-m-8 bg-slate-950 text-white overflow-x-hidden">
 
@@ -161,6 +160,8 @@ function LandingPage() {
           <span className="text-white font-bold text-xl tracking-tight">Neat Budget</span>
         </div>
 
+        <HomeAccountHeader isSignedIn={isSignedIn} />
+
         {/* Bottom-anchored content block */}
         <div className="relative z-10 max-w-5xl mx-auto w-full px-5 sm:px-8 pb-16 sm:pb-24 pt-20">
 
@@ -177,19 +178,32 @@ function LandingPage() {
 
           {/* CTA buttons */}
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <Link
-              href="/sign-up"
-              className="inline-flex items-center justify-center gap-2 bg-teal-600 text-white font-semibold px-7 py-3.5 rounded-xl hover:bg-teal-500 active:scale-[0.97] transition-all shadow-lg shadow-teal-900/50"
-            >
-              Get Started Free
-              <ArrowRight size={16} />
-            </Link>
-            <Link
-              href="/sign-in"
-              className="inline-flex items-center justify-center bg-white/15 text-white font-medium px-7 py-3.5 rounded-xl border border-white/25 backdrop-blur-sm hover:bg-white/25 transition-colors"
-            >
-              Sign In
-            </Link>
+            {isSignedIn ? (
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center gap-2 bg-teal-600 text-white font-semibold px-7 py-3.5 rounded-xl hover:bg-teal-500 active:scale-[0.97] transition-all shadow-lg shadow-teal-900/50"
+              >
+                <LayoutDashboard size={18} aria-hidden="true" />
+                Open dashboard
+                <ArrowRight size={16} />
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/sign-up"
+                  className="inline-flex items-center justify-center gap-2 bg-teal-600 text-white font-semibold px-7 py-3.5 rounded-xl hover:bg-teal-500 active:scale-[0.97] transition-all shadow-lg shadow-teal-900/50"
+                >
+                  Get Started Free
+                  <ArrowRight size={16} />
+                </Link>
+                <Link
+                  href="/sign-in"
+                  className="inline-flex items-center justify-center bg-white/15 text-white font-medium px-7 py-3.5 rounded-xl border border-white/25 backdrop-blur-sm hover:bg-white/25 transition-colors"
+                >
+                  Sign In
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -288,11 +302,20 @@ function LandingPage() {
             Join and start building better spending habits today — for free.
           </p>
           <Link
-            href="/sign-up"
+            href={isSignedIn ? "/dashboard" : "/sign-up"}
             className="inline-flex items-center justify-center gap-2 bg-teal-600 text-white font-semibold px-8 py-4 rounded-xl hover:bg-teal-500 active:scale-[0.97] transition-all shadow-lg shadow-teal-900/50 text-base"
           >
-            Get Started Free
-            <ArrowRight size={16} />
+            {isSignedIn ? (
+              <>
+                <LayoutDashboard size={18} aria-hidden="true" />
+                Open dashboard
+              </>
+            ) : (
+              <>
+                Get Started Free
+                <ArrowRight size={16} />
+              </>
+            )}
           </Link>
         </div>
       </section>

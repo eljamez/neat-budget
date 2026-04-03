@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { TransactionForm } from "@/components/TransactionForm";
+import { useTransactionModal } from "@/components/TransactionModalProvider";
 
 const CONFETTI_COLORS = [
   "#0d9488", "#14b8a6", "#3b82f6", "#f59e0b",
@@ -84,6 +85,7 @@ function SuccessBanner() {
 }
 
 export default function AddTransactionPage() {
+  const { openAddTransaction } = useTransactionModal();
   const [success, setSuccess] = useState(false);
 
   const handleSuccess = () => {
@@ -106,7 +108,17 @@ export default function AddTransactionPage() {
           Back to Dashboard
         </Link>
         <h1 className="text-2xl font-bold text-slate-900">Add Transaction</h1>
-        <p className="text-slate-500 text-sm mt-1">Log a new spending entry</p>
+        <p className="text-slate-500 text-sm mt-1">
+          Same fields as the quick modal.{" "}
+          <button
+            type="button"
+            onClick={openAddTransaction}
+            className="text-teal-600 font-medium hover:text-teal-700 underline-offset-2 hover:underline"
+          >
+            Open as modal
+          </button>
+          {" "}instead.
+        </p>
       </div>
 
       <div aria-live="polite" role="status" className="min-h-0">
