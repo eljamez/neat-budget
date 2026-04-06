@@ -53,6 +53,32 @@ export const list = query({
   },
 });
 
+/** Sum of positive payment amounts per debt for calendar month `monthKey` (`YYYY-MM`). */
+export const debtPaymentTotalsForMonth = query({
+  args: {
+    userId: v.string(),
+    monthKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const start = `${args.monthKey}-01`;
+    const end = `${args.monthKey}-31`;
+    const txs = await ctx.db
+      .query("transactions")
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", args.userId).gte("date", start).lte("date", end)
+      )
+      .collect();
+
+    const totals: Record<string, number> = {};
+    for (const t of txs) {
+      if (!t.debtId) continue;
+      const id = t.debtId as string;
+      totals[id] = (totals[id] ?? 0) + t.amount;
+    }
+    return totals;
+  },
+});
+
 export const listByDebt = query({
   args: { debtId: v.id("debts") },
   handler: async (ctx, args) => {

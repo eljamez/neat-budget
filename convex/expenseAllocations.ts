@@ -17,7 +17,6 @@ export const create = mutation({
   args: {
     userId: v.string(),
     budgetItemId: v.id("budgetItems"),
-    accountId: v.id("accounts"),
     amount: v.number(),
     monthKey: v.string(),
   },
@@ -28,10 +27,6 @@ export const create = mutation({
     const item = await ctx.db.get(args.budgetItemId);
     if (!item || item.userId !== args.userId) {
       throw new Error("Invalid expense");
-    }
-    const acct = await ctx.db.get(args.accountId);
-    if (!acct || acct.userId !== args.userId) {
-      throw new Error("Invalid account");
     }
     const existing = await ctx.db
       .query("expenseAllocations")
@@ -48,7 +43,6 @@ export const create = mutation({
     return await ctx.db.insert("expenseAllocations", {
       userId: args.userId,
       budgetItemId: args.budgetItemId,
-      accountId: args.accountId,
       amount: args.amount,
       monthKey: args.monthKey,
     });
@@ -63,5 +57,79 @@ export const remove = mutation({
       throw new Error("Not found");
     }
     await ctx.db.delete(args.id);
+  },
+});
+
+/** Delete every expense allocation row for this bill in the given calendar month. */
+export const removeAllForBudgetMonth = mutation({
+  args: {
+    userId: v.string(),
+    budgetItemId: v.id("budgetItems"),
+    monthKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (!/^\d{4}-\d{2}$/.test(args.monthKey)) {
+      throw new Error("Invalid month");
+    }
+    const item = await ctx.db.get(args.budgetItemId);
+    if (!item || item.userId !== args.userId) {
+      throw new Error("Not found");
+    }
+    const rows = await ctx.db
+      .query("expenseAllocations")
+      .withIndex("by_budget_month", (q) =>
+        q.eq("budgetItemId", args.budgetItemId).eq("monthKey", args.monthKey)
+      )
+      .collect();
+    for (const r of rows) {
+      if (r.userId !== args.userId) continue;
+      await ctx.db.delete(r._id);
+    }
+  },
+});
+
+/**
+ * Replace all allocations for this bill/month with a single row (total = `amount`).
+ * Capped at the expense's expected monthly amount, same as incremental `create`.
+ */
+export const setTotalForBudgetMonth = mutation({
+  args: {
+    userId: v.string(),
+    budgetItemId: v.id("budgetItems"),
+    monthKey: v.string(),
+    amount: v.number(),
+  },
+  handler: async (ctx, args) => {
+    if (!/^\d{4}-\d{2}$/.test(args.monthKey)) {
+      throw new Error("Invalid month");
+    }
+    if (args.amount < 0) {
+      throw new Error("Invalid amount");
+    }
+    const item = await ctx.db.get(args.budgetItemId);
+    if (!item || item.userId !== args.userId) {
+      throw new Error("Not found");
+    }
+    const rows = await ctx.db
+      .query("expenseAllocations")
+      .withIndex("by_budget_month", (q) =>
+        q.eq("budgetItemId", args.budgetItemId).eq("monthKey", args.monthKey)
+      )
+      .collect();
+    for (const r of rows) {
+      if (r.userId !== args.userId) continue;
+      await ctx.db.delete(r._id);
+    }
+    const cap = item.amount;
+    const toFund = Math.min(args.amount, cap);
+    if (toFund <= 0.005) {
+      return;
+    }
+    await ctx.db.insert("expenseAllocations", {
+      userId: args.userId,
+      budgetItemId: args.budgetItemId,
+      amount: toFund,
+      monthKey: args.monthKey,
+    });
   },
 });

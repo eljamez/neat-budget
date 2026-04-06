@@ -59,6 +59,11 @@ export default defineSchema({
     name: v.string(),
     /** Current amount owed. */
     balance: v.number(),
+    /**
+     * Original loan / starting principal when you began tracking (optional).
+     * Used for paydown % vs this amount; leave unset to estimate from balance + recorded payments.
+     */
+    originalLoanAmount: v.optional(v.number()),
     /** Annual interest rate (e.g. 19.99 = 19.99% APR). */
     aprPercent: v.optional(v.number()),
     debtType: debtTypeValidator,
@@ -149,6 +154,11 @@ export default defineSchema({
     accountId: v.optional(v.id("accounts")),
     /** When set, this payment reduces the linked debt's balance. */
     debtId: v.optional(v.id("debts")),
+    /**
+     * When set with `debtId`, this row was created by marking the debt paid on the Categories
+     * timeline for calendar month `YYYY-MM` (see `debts.setPaidForMonth`). Used to undo on uncheck.
+     */
+    debtMarkedPaidMonthKey: v.optional(v.string()),
     /** When set, this payment reduces the linked credit card balance. */
     creditCardId: v.optional(v.id("creditCards")),
   })
@@ -167,7 +177,8 @@ export default defineSchema({
   bucketMonthFundings: defineTable({
     userId: v.string(),
     bucketId: v.id("buckets"),
-    accountId: v.id("accounts"),
+    /** @deprecated Legacy rows only — month funding is budget-wide, not tied to an account. */
+    accountId: v.optional(v.id("accounts")),
     amount: v.number(),
     monthKey: v.string(),
   })
@@ -181,9 +192,23 @@ export default defineSchema({
   expenseAllocations: defineTable({
     userId: v.string(),
     budgetItemId: v.id("budgetItems"),
-    accountId: v.id("accounts"),
+    /** @deprecated Legacy rows only — funding is budget-wide, not taken from a specific account. */
+    accountId: v.optional(v.id("accounts")),
     amount: v.number(),
     monthKey: v.string(),
+  })
+    .index("by_user_month", ["userId", "monthKey"])
+    .index("by_budget_month", ["budgetItemId", "monthKey"]),
+
+  /**
+   * Per–calendar-month tweaks for a budget bill: actual cash paid can differ from the planned amount.
+   * `markedPaidForMonth` on the expense still drives paid vs unpaid on the timeline.
+   */
+  budgetItemMonthOverrides: defineTable({
+    userId: v.string(),
+    budgetItemId: v.id("budgetItems"),
+    monthKey: v.string(),
+    actualPaidAmount: v.optional(v.number()),
   })
     .index("by_user_month", ["userId", "monthKey"])
     .index("by_budget_month", ["budgetItemId", "monthKey"]),
@@ -201,7 +226,7 @@ export default defineSchema({
     /** When set, associate this bucket with a budget category (same ownership as user). */
     categoryId: v.optional(v.id("categories")),
     /**
-     * For monthly buckets: max cash to earmark per calendar month for this envelope.
+     * For monthly buckets: max cash to fund per calendar month for this envelope.
      * If unset, month funding is capped at `targetAmount`.
      */
     monthlyFillGoal: v.optional(v.number()),
@@ -229,9 +254,9 @@ export default defineSchema({
     paidFrom: v.optional(v.string()),
     /** When set to `YYYY-MM`, this expense was marked paid for that calendar month. */
     markedPaidForMonth: v.optional(v.string()),
-    /** Lifecycle: unfunded → funded (money reserved from fundedDate) → paid for markedPaidForMonth. */
+    /** Lifecycle: unfunded / paid via markedPaidForMonth. Legacy `funded` + fundedDate ignored for balance math. */
     status: v.optional(budgetExpenseStatusValidator),
-    /** When the expense was funded (ms); available balance counts this from this calendar day (UTC) onward. */
+    /** Legacy; reserve flow removed — balance uses expenseAllocations only. */
     fundedDate: v.optional(v.number()),
     /** When marked paid (ms), informational. */
     paidDate: v.optional(v.number()),

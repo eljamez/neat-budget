@@ -12,6 +12,7 @@ interface Debt {
   _id: Id<"debts">;
   name: string;
   balance: number;
+  originalLoanAmount?: number;
   debtType: string;
   aprPercent?: number;
   creditor?: string;
@@ -40,6 +41,10 @@ export function DebtManager({ editDebt, onSuccess, onCancel }: DebtManagerProps)
   const [form, setForm] = useState({
     name: editDebt?.name ?? "",
     balance: editDebt != null ? String(editDebt.balance) : "0",
+    originalLoanAmount:
+      editDebt?.originalLoanAmount != null && editDebt.originalLoanAmount > 0
+        ? String(editDebt.originalLoanAmount)
+        : "",
     debtType: (
       editDebt?.debtType &&
       editDebt.debtType !== "credit_card" &&
@@ -70,6 +75,11 @@ export function DebtManager({ editDebt, onSuccess, onCancel }: DebtManagerProps)
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const monthlyPlanFromMin =
+    form.debtType === "loan" ||
+    form.debtType === "personal" ||
+    form.debtType === "payment_plan";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,13 +122,27 @@ export function DebtManager({ editDebt, onSuccess, onCancel }: DebtManagerProps)
     }
 
     let planned: number | undefined;
-    if (form.plannedMonthlyPayment.trim()) {
+    if (!monthlyPlanFromMin && form.plannedMonthlyPayment.trim()) {
       const p = parseFloat(form.plannedMonthlyPayment);
       if (isNaN(p) || p < 0) {
         setError("Planned monthly payment must be valid");
         return;
       }
       planned = p;
+    }
+
+    let originalLoanAmountForCreate: number | undefined;
+    let originalLoanAmountForUpdate: number | null | undefined;
+    if (form.originalLoanAmount.trim()) {
+      const o = parseFloat(form.originalLoanAmount);
+      if (isNaN(o) || o < 0) {
+        setError("Original loan amount must be zero or more");
+        return;
+      }
+      originalLoanAmountForCreate = o;
+      originalLoanAmountForUpdate = o;
+    } else if (editDebt) {
+      originalLoanAmountForUpdate = null;
     }
 
     setLoading(true);
@@ -134,7 +158,6 @@ export function DebtManager({ editDebt, onSuccess, onCancel }: DebtManagerProps)
         notes: form.notes.trim() || undefined,
         minimumPayment: minPay,
         dueDayOfMonth: dueDay,
-        plannedMonthlyPayment: planned,
         isAutopay: form.isAutopay,
         color: form.color,
       };
@@ -144,13 +167,27 @@ export function DebtManager({ editDebt, onSuccess, onCancel }: DebtManagerProps)
           id: editDebt._id,
           userId: user.id,
           ...payload,
+          originalLoanAmount: originalLoanAmountForUpdate,
           paymentAccountId:
             form.paymentAccountId === "" ? null : (form.paymentAccountId as Id<"accounts">),
+          ...(monthlyPlanFromMin
+            ? { plannedMonthlyPayment: null }
+            : planned !== undefined
+              ? { plannedMonthlyPayment: planned }
+              : {}),
         });
       } else {
         await createDebt({
           userId: user.id,
           ...payload,
+          ...(originalLoanAmountForCreate !== undefined
+            ? { originalLoanAmount: originalLoanAmountForCreate }
+            : {}),
+          ...(monthlyPlanFromMin
+            ? {}
+            : planned !== undefined
+              ? { plannedMonthlyPayment: planned }
+              : {}),
           ...(form.paymentAccountId
             ? { paymentAccountId: form.paymentAccountId as Id<"accounts"> }
             : {}),
@@ -233,6 +270,26 @@ export function DebtManager({ editDebt, onSuccess, onCancel }: DebtManagerProps)
         </div>
       </div>
 
+      <div>
+        <label htmlFor="debt-original" className="block text-sm font-medium text-slate-600 mb-1.5">
+          Original loan amount ($) <span className="text-slate-400 font-normal">(optional)</span>
+        </label>
+        <input
+          id="debt-original"
+          type="number"
+          step="0.01"
+          min="0"
+          value={form.originalLoanAmount}
+          onChange={(e) => setForm({ ...form, originalLoanAmount: e.target.value })}
+          placeholder="Starting principal when the loan began"
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+        />
+        <p className="text-xs text-slate-400 mt-1.5">
+          Paydown progress uses this vs current balance. Leave blank to estimate from recorded payments
+          instead.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label htmlFor="debt-apr" className="block text-sm font-medium text-slate-600 mb-1.5">
@@ -252,7 +309,10 @@ export function DebtManager({ editDebt, onSuccess, onCancel }: DebtManagerProps)
         </div>
         <div>
           <label htmlFor="debt-min" className="block text-sm font-medium text-slate-600 mb-1.5">
-            Minimum payment/mo <span className="text-slate-400 font-normal">(optional)</span>
+            {monthlyPlanFromMin ? "Monthly payment ($)" : "Minimum payment/mo"}{" "}
+            <span className="text-slate-400 font-normal">
+              {monthlyPlanFromMin ? "" : "(optional)"}
+            </span>
           </label>
           <input
             id="debt-min"
@@ -264,6 +324,11 @@ export function DebtManager({ editDebt, onSuccess, onCancel }: DebtManagerProps)
             placeholder="0"
             className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
           />
+          {monthlyPlanFromMin ? (
+            <p className="text-xs text-slate-400 mt-1.5">
+              Used as your planned monthly paydown on the timeline and Categories (set the due day too).
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -356,21 +421,23 @@ export function DebtManager({ editDebt, onSuccess, onCancel }: DebtManagerProps)
         />
       </div>
 
-      <div>
-        <label htmlFor="debt-planned" className="block text-sm font-medium text-slate-600 mb-1.5">
-          Planned monthly paydown <span className="text-slate-400 font-normal">(optional)</span>
-        </label>
-        <input
-          id="debt-planned"
-          type="number"
-          step="0.01"
-          min="0"
-          value={form.plannedMonthlyPayment}
-          onChange={(e) => setForm({ ...form, plannedMonthlyPayment: e.target.value })}
-          placeholder="For budget planning"
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
-        />
-      </div>
+      {!monthlyPlanFromMin && (
+        <div>
+          <label htmlFor="debt-planned" className="block text-sm font-medium text-slate-600 mb-1.5">
+            Planned monthly paydown <span className="text-slate-400 font-normal">(optional)</span>
+          </label>
+          <input
+            id="debt-planned"
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.plannedMonthlyPayment}
+            onChange={(e) => setForm({ ...form, plannedMonthlyPayment: e.target.value })}
+            placeholder="For budget planning"
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+          />
+        </div>
+      )}
 
       <div>
         <label htmlFor="debt-notes" className="block text-sm font-medium text-slate-600 mb-1.5">

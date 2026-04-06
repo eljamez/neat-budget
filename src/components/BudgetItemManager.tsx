@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
-import { formatAccountType } from "@/lib/utils";
+import { formatAccountType, formatMonth } from "@/lib/utils";
 import { ExpenseLinkedTransactions } from "@/components/ExpenseLinkedTransactions";
 
 interface BudgetExpense {
@@ -45,6 +45,8 @@ export function BudgetItemManager({
   const { user } = useUser();
   const createItem = useMutation(api.budgetItems.create);
   const updateItem = useMutation(api.budgetItems.update);
+  const setFundingTotalForMonth = useMutation(api.expenseAllocations.setTotalForBudgetMonth);
+  const upsertActualPaid = useMutation(api.budgetItemMonthOverrides.upsertActualPaid);
   const accounts = useQuery(
     api.accounts.list,
     user ? { userId: user.id } : "skip"
@@ -63,12 +65,60 @@ export function BudgetItemManager({
     isAutopay: editItem?.isAutopay === true,
     note: editItem?.note ?? "",
   });
+  const monthAllocations = useQuery(
+    api.expenseAllocations.listByUserMonth,
+    user && editItem && transactionsMonthKey
+      ? { userId: user.id, monthKey: transactionsMonthKey }
+      : "skip"
+  );
+  const monthOverride = useQuery(
+    api.budgetItemMonthOverrides.getByBudgetMonth,
+    user && editItem && transactionsMonthKey
+      ? { userId: user.id, budgetItemId: editItem._id, monthKey: transactionsMonthKey }
+      : "skip"
+  );
+  const fundedThisMonth = useMemo(() => {
+    if (!monthAllocations || !editItem) return 0;
+    return monthAllocations
+      .filter((a) => a.budgetItemId === editItem._id)
+      .reduce((s, a) => s + a.amount, 0);
+  }, [monthAllocations, editItem]);
+
+  const [monthFundedStr, setMonthFundedStr] = useState("");
+  const [actualPaidStr, setActualPaidStr] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const monthEditorOpen = Boolean(editItem && transactionsMonthKey);
+  const monthDataReady =
+    !monthEditorOpen ||
+    (monthAllocations !== undefined && monthOverride !== undefined);
+
+  useEffect(() => {
+    if (!monthEditorOpen || !editItem || !monthDataReady) return;
+    setMonthFundedStr(fundedThisMonth.toFixed(2));
+    const predicted =
+      fundedThisMonth > 0.005 ? fundedThisMonth : editItem.amount;
+    const stored = monthOverride?.actualPaidAmount;
+    setActualPaidStr((stored ?? predicted).toFixed(2));
+  }, [
+    monthEditorOpen,
+    monthDataReady,
+    editItem?._id,
+    transactionsMonthKey,
+    fundedThisMonth,
+    monthOverride?.actualPaidAmount,
+    editItem?.amount,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    if (monthEditorOpen && !monthDataReady) {
+      setError("Still loading this month. Try again in a moment.");
+      return;
+    }
 
     const amount = parseFloat(form.amount);
     const dueDay = parseInt(form.paymentDayOfMonth, 10);
@@ -101,6 +151,32 @@ export function BudgetItemManager({
           isAutopay: form.isAutopay,
           note: form.note || undefined,
         });
+        if (transactionsMonthKey) {
+          const fundedRaw = parseFloat(monthFundedStr);
+          if (isNaN(fundedRaw) || fundedRaw < 0) {
+            setError("Please enter a valid funded amount for this month (0 or more).");
+            setLoading(false);
+            return;
+          }
+          await setFundingTotalForMonth({
+            userId: user.id,
+            budgetItemId: editItem._id,
+            monthKey: transactionsMonthKey,
+            amount: fundedRaw,
+          });
+          const actualRaw = parseFloat(actualPaidStr);
+          if (isNaN(actualRaw) || actualRaw <= 0) {
+            setError("Please enter the actual amount paid (greater than zero).");
+            setLoading(false);
+            return;
+          }
+          await upsertActualPaid({
+            userId: user.id,
+            budgetItemId: editItem._id,
+            monthKey: transactionsMonthKey,
+            actualPaidAmount: actualRaw,
+          });
+        }
       } else {
         await createItem({
           userId: user.id,
@@ -221,6 +297,62 @@ export function BudgetItemManager({
         </div>
       </div>
 
+      {monthEditorOpen ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 space-y-3">
+          <p className="text-xs font-semibold text-slate-700">
+            Timeline month · {formatMonth(transactionsMonthKey!)}
+          </p>
+          {!monthDataReady ? (
+            <p className="text-xs text-slate-500">Loading this month…</p>
+          ) : (
+            <>
+              <div>
+                <label
+                  htmlFor="item-month-funded"
+                  className="block text-xs font-medium text-slate-600 mb-1"
+                >
+                  Funded for this month ($)
+                </label>
+                <input
+                  id="item-month-funded"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={monthFundedStr}
+                  onChange={(e) => setMonthFundedStr(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white transition-colors"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Cash set aside for this bill in {formatMonth(transactionsMonthKey!)}. Cannot exceed
+                  the expected amount above.
+                </p>
+              </div>
+              <div>
+                <label
+                  htmlFor="item-actual-paid"
+                  className="block text-xs font-medium text-slate-600 mb-1"
+                >
+                  Actual amount paid ($)
+                </label>
+                <input
+                  id="item-actual-paid"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={actualPaidStr}
+                  onChange={(e) => setActualPaidStr(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white transition-colors"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Defaults to what you funded this month, or the expected bill if nothing is funded
+                  yet. Shown on the timeline when this bill is marked paid.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
+
       <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3">
         <input
           type="checkbox"
@@ -262,7 +394,7 @@ export function BudgetItemManager({
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || (monthEditorOpen && !monthDataReady)}
           className="flex-1 bg-teal-600 text-white rounded-xl py-2 text-sm font-semibold hover:bg-teal-700 active:scale-[0.97] disabled:opacity-50 transition-all"
         >
           {loading ? "Saving..." : editItem ? "Update expense" : "Add expense"}

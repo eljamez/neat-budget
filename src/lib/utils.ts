@@ -109,6 +109,31 @@ export type DebtTypeKey = keyof typeof DEBT_TYPE_LABELS;
 /** Values allowed when creating/editing a debt in the UI (not legacy `credit_card`). */
 export type WritableDebtTypeKey = Exclude<DebtTypeKey, "credit_card">;
 
+/**
+ * Monthly amount used for timeline, Categories, and pay-from math.
+ * Loans, personal loans, and payment plans use **minimum payment** as the planned monthly amount.
+ */
+export function debtPlannerMonthlyAmount(d: {
+  debtType?: string;
+  plannedMonthlyPayment?: number;
+  minimumPayment?: number;
+}): number {
+  const t = d.debtType;
+  if (t === "loan" || t === "personal") {
+    const min = d.minimumPayment ?? 0;
+    if (min > 0) return min;
+    return d.plannedMonthlyPayment ?? 0;
+  }
+  if (t === "payment_plan") {
+    const min = d.minimumPayment ?? 0;
+    if (min > 0) return min;
+    return d.plannedMonthlyPayment ?? 0;
+  }
+  const planned = d.plannedMonthlyPayment ?? 0;
+  if (planned > 0) return planned;
+  return d.minimumPayment ?? 0;
+}
+
 export function formatDebtType(type: string | undefined): string {
   if (!type) return "Debt";
   return DEBT_TYPE_LABELS[type as DebtTypeKey] ?? type;
@@ -263,7 +288,26 @@ export function expenseFundingLevel(
   return "partial";
 }
 
-/** Max cash earmarked per month for a monthly bucket (fill goal vs spending target). */
+/**
+ * Dollars still fundable for a bill in `monthKey` (one-shot “fund remainder”), or null if N/A.
+ */
+export function budgetBillFundRemainingForMonth(
+  budgetItemId: string,
+  billAmount: number,
+  markedPaidForMonth: string | undefined,
+  budgetMonth: string,
+  allocatedByBudgetId: Record<string, number>
+): number | null {
+  if (markedPaidForMonth === budgetMonth) return null;
+  if (billAmount <= 0.005) return null;
+  const aside = allocatedByBudgetId[budgetItemId] ?? 0;
+  if (aside > billAmount + 0.005) return null;
+  const remaining = billAmount - aside;
+  if (remaining <= 0.005) return null;
+  return remaining;
+}
+
+/** Max cash funded per month for a monthly bucket (fill goal vs spending target). */
 export function bucketMonthlyFundingCap(bucket: {
   targetAmount: number;
   monthlyFillGoal?: number | null;
@@ -274,7 +318,7 @@ export function bucketMonthlyFundingCap(bucket: {
 }
 
 /**
- * For one bank account: remaining cash to plan for the month — recurring bills (funded vs amount),
+ * For one bank account: remaining cash to plan for the month — recurring bills (bill amount minus funding),
  * plus planned debt/card payments not yet marked paid, when those use this account as pay-from.
  */
 export function sumLeftToFundFromAccountForMonth(
@@ -287,8 +331,10 @@ export function sumLeftToFundFromAccountForMonth(
   }[],
   allocatedByBudgetId: Record<string, number>,
   debts: {
+    debtType?: string;
     paymentAccountId?: string;
     plannedMonthlyPayment?: number;
+    minimumPayment?: number;
     markedPaidForMonth?: string;
   }[],
   creditCards: {
@@ -303,14 +349,12 @@ export function sumLeftToFundFromAccountForMonth(
   for (const item of budgetItems) {
     if (item.accountId !== accountId) continue;
     if (item.markedPaidForMonth === monthKey) continue;
-    const st = item.status ?? "unfunded";
-    if (st === "funded") continue;
     const alloc = allocatedByBudgetId[item._id] ?? 0;
     sum += Math.max(0, item.amount - alloc);
   }
   for (const d of debts) {
     if (d.paymentAccountId !== accountId) continue;
-    const planned = d.plannedMonthlyPayment ?? 0;
+    const planned = debtPlannerMonthlyAmount(d);
     if (planned <= 0) continue;
     if (d.markedPaidForMonth === monthKey) continue;
     sum += planned;

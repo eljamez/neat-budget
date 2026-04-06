@@ -9,7 +9,7 @@ import { formatCurrency, formatMonth, formatAccountType } from "@/lib/utils";
 type FundingRow = {
   _id: Id<"bucketMonthFundings">;
   bucketId: Id<"buckets">;
-  accountId: Id<"accounts">;
+  accountId?: Id<"accounts">;
   amount: number;
 };
 
@@ -26,13 +26,13 @@ interface BucketFundingModalProps {
   monthKey: string;
   bucketId: Id<"buckets">;
   bucketName: string;
-  /** Max cash earmarked for this bucket this month (monthly fill goal or spending target). */
+  /** Max cash funded for this bucket this month (monthly fill goal or spending target). */
   monthlyFundingCap: number;
   /** Spending allowance shown for context (target amount). */
   spendTarget: number;
-  defaultAccountId?: Id<"accounts"> | null;
   fundings: FundingRow[];
-  accounts: AccountOption[] | undefined;
+  /** Used only to label legacy funding rows that still store `accountId`. */
+  accounts?: AccountOption[];
 }
 
 export function BucketFundingModal({
@@ -44,46 +44,37 @@ export function BucketFundingModal({
   bucketName,
   monthlyFundingCap,
   spendTarget,
-  defaultAccountId,
   fundings,
   accounts,
 }: BucketFundingModalProps) {
   const createFunding = useMutation(api.bucketMonthFundings.create);
   const removeFunding = useMutation(api.bucketMonthFundings.remove);
+  const removeAllForMonth = useMutation(api.bucketMonthFundings.removeAllForBucketMonth);
 
-  const [accountId, setAccountId] = useState("");
   const [amountStr, setAmountStr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [clearAllLoading, setClearAllLoading] = useState(false);
   const [error, setError] = useState("");
 
   const lines = fundings.filter((f) => f.bucketId === bucketId);
   const totalFunded = lines.reduce((s, l) => s + l.amount, 0);
   const remaining = Math.max(0, monthlyFundingCap - totalFunded);
 
-  const accountsSorted = accounts
-    ? [...accounts].sort((a, b) => a.name.localeCompare(b.name))
-    : [];
-
   useEffect(() => {
     if (!open) return;
     setError("");
-    setAccountId(defaultAccountId ? String(defaultAccountId) : "");
     const tf = fundings
       .filter((f) => f.bucketId === bucketId)
       .reduce((s, l) => s + l.amount, 0);
     const rem = Math.max(0, monthlyFundingCap - tf);
     setAmountStr(monthlyFundingCap > 0 ? rem.toFixed(2) : "");
-  }, [open, bucketId, monthlyFundingCap, defaultAccountId, fundings]);
+  }, [open, bucketId, monthlyFundingCap, fundings]);
 
   if (!open) return null;
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const amt = parseFloat(amountStr);
-    if (!accountId) {
-      setError("Choose an account");
-      return;
-    }
     if (isNaN(amt) || amt <= 0) {
       setError("Enter a valid amount");
       return;
@@ -98,7 +89,6 @@ export function BucketFundingModal({
       await createFunding({
         userId,
         bucketId,
-        accountId: accountId as Id<"accounts">,
         amount: amt,
         monthKey,
       });
@@ -133,9 +123,10 @@ export function BucketFundingModal({
           ) : null}
         </p>
         <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
-          <strong className="text-slate-700">Funded</strong> means you have planned cash in a real
-          account for this envelope this month. It is separate from <strong className="text-slate-700">spent</strong>{" "}
-          (actual category activity).
+          <strong className="text-slate-700">Funded</strong> is cash you have planned in your{" "}
+          <strong className="text-slate-700">overall budget</strong> for this envelope this month. It is separate from{" "}
+          <strong className="text-slate-700">spent</strong> (actual category activity). Bank balances still follow
+          transactions only.
         </p>
 
         <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-2.5 mb-4">
@@ -147,22 +138,47 @@ export function BucketFundingModal({
           </p>
           {remaining > 0.005 && (
             <p className="text-[11px] text-indigo-900/80 mt-1">
-              Up to {formatCurrency(remaining)} more can be earmarked.
+              Up to {formatCurrency(remaining)} more can be funded.
             </p>
           )}
         </div>
 
         {lines.length > 0 && (
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              disabled={clearAllLoading}
+              onClick={async () => {
+                setClearAllLoading(true);
+                setError("");
+                try {
+                  await removeAllForMonth({ userId, bucketId, monthKey });
+                  onClose();
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Could not clear funding");
+                } finally {
+                  setClearAllLoading(false);
+                }
+              }}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50"
+            >
+              {clearAllLoading ? "Clearing…" : "Remove all funding for this bucket"}
+            </button>
+          </div>
+        )}
+
+        {lines.length > 0 && (
           <ul className="space-y-2 mb-4">
             {lines.map((line) => {
-              const acc = accounts?.find((a) => a._id === line.accountId);
+              const acc = line.accountId ? accounts?.find((a) => a._id === line.accountId) : undefined;
+              const label = acc ? `${acc.name} · ${formatCurrency(line.amount)}` : `Funding · ${formatCurrency(line.amount)}`;
               return (
                 <li
                   key={line._id}
                   className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2"
                 >
-                  <span className="text-sm text-slate-700 truncate min-w-0">
-                    {acc?.name ?? "Account"} · {formatCurrency(line.amount)}
+                  <span className="text-sm text-slate-700 truncate min-w-0" title={acc ? formatAccountType(acc.accountType) : undefined}>
+                    {label}
                   </span>
                   <button
                     type="button"
@@ -184,24 +200,6 @@ export function BucketFundingModal({
         )}
 
         <form onSubmit={handleAdd} className="space-y-3">
-          <div>
-            <label htmlFor="bucket-fund-account" className="block text-xs font-medium text-slate-600 mb-1">
-              From account
-            </label>
-            <select
-              id="bucket-fund-account"
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 bg-white"
-            >
-              <option value="">Select…</option>
-              {accountsSorted.map((a) => (
-                <option key={a._id} value={a._id}>
-                  {a.name} ({formatAccountType(a.accountType)})
-                </option>
-              ))}
-            </select>
-          </div>
           <div>
             <label htmlFor="bucket-fund-amt" className="block text-xs font-medium text-slate-600 mb-1">
               Amount ($)
@@ -225,7 +223,7 @@ export function BucketFundingModal({
           <div className="flex gap-2 pt-1">
             <button
               type="submit"
-              disabled={loading || accountsSorted.length === 0 || remaining <= 0.005}
+              disabled={loading || remaining <= 0.005}
               className="flex-1 bg-indigo-600 text-white rounded-xl py-2 text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
             >
               {loading ? "Saving…" : "Add funding"}
@@ -239,9 +237,6 @@ export function BucketFundingModal({
             </button>
           </div>
         </form>
-        {accountsSorted.length === 0 && (
-          <p className="text-xs text-slate-500 mt-3">Add an account under Accounts before funding buckets.</p>
-        )}
       </div>
     </div>
   );

@@ -176,7 +176,7 @@ export function BucketManager({ editBucket, onSuccess, onCancel }: BucketManager
             className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
           />
           <p className="text-xs text-slate-400 mt-1.5">
-            Max cash you plan to earmark from your accounts for this bucket each month. Can differ from
+            Max cash you plan to fund from your accounts for this bucket each month. Can differ from
             the spending target above.
           </p>
         </div>

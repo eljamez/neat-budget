@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -13,8 +13,10 @@ import {
   calendarDaysFromTo,
   dateInBudgetMonth,
   startOfLocalDay,
-  expenseFundingLevel,
   expenseHasPayFromAccount,
+  debtPlannerMonthlyAmount,
+  expenseFundingLevel,
+  budgetBillFundRemainingForMonth,
 } from "@/lib/utils";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
 import { BudgetItemManager } from "@/components/BudgetItemManager";
@@ -23,10 +25,10 @@ import { DebtManager } from "@/components/DebtManager";
 import {
   CheckCircle2,
   Circle,
+  CircleMinus,
   CreditCard,
   Landmark,
   MoreVertical,
-  PiggyBank,
 } from "lucide-react";
 
 export interface TimelineCategory {
@@ -83,6 +85,38 @@ export type PlannerCreditCardRow = {
 };
 
 export type PlannerRow = PlannerBudgetRow | PlannerDebtRow | PlannerCreditCardRow;
+
+type TimelineFundState = "waiting" | "funded" | "paid";
+
+function budgetRowFundState(isPaid: boolean, fundedTotal: number): TimelineFundState {
+  if (isPaid) return "paid";
+  if (fundedTotal > 0.005) return "funded";
+  return "waiting";
+}
+
+/** Debts/cards use pay-from + planned amount as “funded” when there is no allocation table. */
+function plannedPaymentRowFundState(
+  isPaid: boolean,
+  bankLinked: boolean,
+  plannedAmount: number
+): TimelineFundState {
+  if (isPaid) return "paid";
+  if (bankLinked && plannedAmount > 0.005) return "funded";
+  return "waiting";
+}
+
+function timelineRowSurfaceClasses(state: TimelineFundState): string {
+  switch (state) {
+    case "paid":
+      return "bg-emerald-50/55 border-emerald-200/85 ring-1 ring-emerald-200/45";
+    case "funded":
+      return "bg-amber-50/80 border-amber-200/90 ring-1 ring-amber-200/40";
+    case "waiting":
+      return "bg-rose-50/60 border-rose-200/90 ring-1 ring-rose-200/35";
+    default:
+      return "bg-white border-slate-100";
+  }
+}
 
 function rowKey(row: PlannerRow): string {
   if (row.rowKind === "budget") return `b:${row._id}`;
@@ -159,13 +193,19 @@ export function ExpenseTimeline({
   debts,
 }: ExpenseTimelineProps) {
   const archiveItem = useMutation(api.budgetItems.archive);
-  const updateBudgetItem = useMutation(api.budgetItems.update);
+  const archiveDebt = useMutation(api.debts.archive);
   const setBudgetPaidForMonth = useMutation(api.budgetItems.setPaidForMonth);
-  const fundExpenseMutation = useMutation(api.budgetItems.fundExpense);
   const setDebtPaidForMonth = useMutation(api.debts.setPaidForMonth);
   const setCreditCardPaidForMonth = useMutation(api.creditCards.setPaidForMonth);
+  const createExpenseAllocation = useMutation(api.expenseAllocations.create);
+  const removeAllBillFunding = useMutation(api.expenseAllocations.removeAllForBudgetMonth);
 
   const allocations = useQuery(api.expenseAllocations.listByUserMonth, {
+    userId,
+    monthKey: budgetMonth,
+  });
+
+  const budgetMonthOverrides = useQuery(api.budgetItemMonthOverrides.listByUserMonth, {
     userId,
     monthKey: budgetMonth,
   });
@@ -179,6 +219,17 @@ export function ExpenseTimeline({
     }
     return m;
   }, [allocations]);
+
+  const actualPaidByBudgetId = useMemo(() => {
+    const m: Record<string, number> = {};
+    if (!budgetMonthOverrides) return m;
+    for (const o of budgetMonthOverrides) {
+      const k = o.budgetItemId as string;
+      const a = o.actualPaidAmount;
+      if (a != null && a > 0.005) m[k] = a;
+    }
+    return m;
+  }, [budgetMonthOverrides]);
 
   const accounts = useQuery(api.accounts.list, { userId });
   const accountMap = useMemo((): Record<string, { name: string }> => {
@@ -217,13 +268,231 @@ export function ExpenseTimeline({
   const [editTarget, setEditTarget] = useState<TimelineExpense | null>(null);
   const [editDebtId, setEditDebtId] = useState<Id<"debts"> | null>(null);
   const [archivePendingId, setArchivePendingId] = useState<Id<"budgetItems"> | null>(null);
+  const [archiveDebtPendingId, setArchiveDebtPendingId] = useState<Id<"debts"> | null>(
+    null
+  );
   const [paidTogglePendingKey, setPaidTogglePendingKey] = useState<string | null>(null);
-  const [autopayTogglePendingId, setAutopayTogglePendingId] =
-    useState<Id<"budgetItems"> | null>(null);
-  const [allocationTarget, setAllocationTarget] = useState<TimelineExpense | null>(null);
-  const [fundExpensePendingId, setFundExpensePendingId] =
-    useState<Id<"budgetItems"> | null>(null);
+  const [fundAdjustTarget, setFundAdjustTarget] =
+    useState<TimelineExpense | null>(null);
   const [rowMenuKey, setRowMenuKey] = useState<string | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(() => new Set());
+  const [bulkFundRunning, setBulkFundRunning] = useState(false);
+  const [bulkClearFundingRunning, setBulkClearFundingRunning] = useState(false);
+  const [fundQuickPendingId, setFundQuickPendingId] = useState<Id<"budgetItems"> | null>(
+    null
+  );
+  const [fundClearPendingId, setFundClearPendingId] = useState<Id<"budgetItems"> | null>(
+    null
+  );
+  const [actionBanner, setActionBanner] = useState<{
+    kind: "success" | "error" | "info";
+    message: string;
+  } | null>(null);
+
+  const budgetRowKeys = useMemo(
+    () => items.filter((i): i is PlannerBudgetRow => i.rowKind === "budget").map((i) => rowKey(i)),
+    [items]
+  );
+
+  const toggleRowSelected = useCallback((key: string) => {
+    setSelectedRowKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const selectAllBudgetRows = useCallback(() => {
+    setSelectedRowKeys(new Set(budgetRowKeys));
+  }, [budgetRowKeys]);
+
+  const clearRowSelection = useCallback(() => setSelectedRowKeys(new Set()), []);
+
+  useEffect(() => {
+    setSelectedRowKeys(new Set());
+  }, [budgetMonth]);
+
+  const fundBudgetBill = useCallback(
+    async (item: PlannerBudgetRow) => {
+      const remaining = budgetBillFundRemainingForMonth(
+        item._id as string,
+        item.amount,
+        item.markedPaidForMonth,
+        budgetMonth,
+        allocatedByBudgetId
+      );
+      if (remaining == null) return;
+      await createExpenseAllocation({
+        userId,
+        budgetItemId: item._id,
+        amount: remaining,
+        monthKey: budgetMonth,
+      });
+    },
+    [allocatedByBudgetId, budgetMonth, createExpenseAllocation, userId]
+  );
+
+  const handleBulkFund = useCallback(async () => {
+    setActionBanner(null);
+    setBulkFundRunning(true);
+    let done = 0;
+    let skipped = 0;
+    try {
+      for (const item of items) {
+        if (item.rowKind !== "budget") continue;
+        if (!selectedRowKeys.has(rowKey(item))) continue;
+        const rem = budgetBillFundRemainingForMonth(
+          item._id as string,
+          item.amount,
+          item.markedPaidForMonth,
+          budgetMonth,
+          allocatedByBudgetId
+        );
+        if (rem == null) {
+          skipped++;
+          continue;
+        }
+        await createExpenseAllocation({
+          userId,
+          budgetItemId: item._id,
+          amount: rem,
+          monthKey: budgetMonth,
+        });
+        done++;
+      }
+      if (done > 0) {
+        setSelectedRowKeys(new Set());
+        setActionBanner({
+          kind: "success",
+          message:
+            skipped > 0
+              ? `Funded ${done} bill${done === 1 ? "" : "s"}. Skipped ${skipped} (paid, already fully funded, or needs Adjust funding).`
+              : `Funded ${done} bill${done === 1 ? "" : "s"}.`,
+        });
+      } else if ([...selectedRowKeys].some((k) => k.startsWith("b:"))) {
+        setActionBanner({
+          kind: "info",
+          message:
+            "No funding added — selected bills aren’t unpaid for this month, are already fully funded, or need Adjust funding.",
+        });
+      } else {
+        setActionBanner({
+          kind: "info",
+          message: "Bulk fund applies to expense bills. Select budget rows (or use Select all bills).",
+        });
+      }
+    } catch (e) {
+      setActionBanner({
+        kind: "error",
+        message: e instanceof Error ? e.message : "Could not fund",
+      });
+    } finally {
+      setBulkFundRunning(false);
+    }
+  }, [
+    allocatedByBudgetId,
+    budgetMonth,
+    createExpenseAllocation,
+    items,
+    selectedRowKeys,
+    userId,
+  ]);
+
+  const handleBulkClearFunding = useCallback(async () => {
+    setActionBanner(null);
+    setBulkClearFundingRunning(true);
+    let done = 0;
+    let skipped = 0;
+    try {
+      for (const item of items) {
+        if (item.rowKind !== "budget") continue;
+        if (!selectedRowKeys.has(rowKey(item))) continue;
+        const setAside = allocatedByBudgetId[item._id] ?? 0;
+        if (setAside <= 0.005) {
+          skipped++;
+          continue;
+        }
+        await removeAllBillFunding({
+          userId,
+          budgetItemId: item._id,
+          monthKey: budgetMonth,
+        });
+        done++;
+      }
+      if (done > 0) {
+        setSelectedRowKeys(new Set());
+        setActionBanner({
+          kind: "success",
+          message:
+            skipped > 0
+              ? `Cleared funding on ${done} bill${done === 1 ? "" : "s"}. Skipped ${skipped} with nothing funded.`
+              : `Cleared funding on ${done} bill${done === 1 ? "" : "s"}.`,
+        });
+      } else if ([...selectedRowKeys].some((k) => k.startsWith("b:"))) {
+        setActionBanner({
+          kind: "info",
+          message: "No funding cleared — selected bills have no funded amount this month.",
+        });
+      } else {
+        setActionBanner({
+          kind: "info",
+          message: "Clear funding applies to expense bills. Select budget rows (or use Select all bills).",
+        });
+      }
+    } catch (e) {
+      setActionBanner({
+        kind: "error",
+        message: e instanceof Error ? e.message : "Could not clear funding",
+      });
+    } finally {
+      setBulkClearFundingRunning(false);
+    }
+  }, [
+    allocatedByBudgetId,
+    budgetMonth,
+    items,
+    removeAllBillFunding,
+    selectedRowKeys,
+    userId,
+  ]);
+
+  const bulkFundEligibleCount = useMemo(() => {
+    let n = 0;
+    for (const item of items) {
+      if (item.rowKind !== "budget") continue;
+      if (!selectedRowKeys.has(rowKey(item))) continue;
+      if (
+        budgetBillFundRemainingForMonth(
+          item._id as string,
+          item.amount,
+          item.markedPaidForMonth,
+          budgetMonth,
+          allocatedByBudgetId
+        ) != null
+      )
+        n++;
+    }
+    return n;
+  }, [allocatedByBudgetId, budgetMonth, items, selectedRowKeys]);
+
+  const bulkClearFundingEligibleCount = useMemo(() => {
+    let n = 0;
+    for (const item of items) {
+      if (item.rowKind !== "budget") continue;
+      if (!selectedRowKeys.has(rowKey(item))) continue;
+      if ((allocatedByBudgetId[item._id] ?? 0) > 0.005) n++;
+    }
+    return n;
+  }, [allocatedByBudgetId, items, selectedRowKeys]);
+
+  const selectedBudgetCount = useMemo(() => {
+    let n = 0;
+    for (const item of items) {
+      if (item.rowKind === "budget" && selectedRowKeys.has(rowKey(item))) n++;
+    }
+    return n;
+  }, [items, selectedRowKeys]);
 
   useEffect(() => {
     if (rowMenuKey == null) return;
@@ -241,6 +510,11 @@ export function ExpenseTimeline({
     setArchivePendingId(null);
   };
 
+  const handleArchiveDebt = async (id: Id<"debts">) => {
+    await archiveDebt({ id, userId });
+    setArchiveDebtPendingId(null);
+  };
+
   if (items.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-10 text-center">
@@ -255,8 +529,96 @@ export function ExpenseTimeline({
   const DEBTS_SECTION_COLOR = "#475569";
   const CREDIT_CARDS_SECTION_COLOR = "#4f46e5";
 
+  const timelineCheckboxClass =
+    "h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-teal-600 focus:ring-teal-500 focus:ring-offset-0";
+
   return (
     <div className="relative w-full min-w-0">
+      {actionBanner ? (
+        <div
+          className={`mb-3 flex items-start justify-between gap-2 rounded-xl border px-3 py-2 text-sm ${
+            actionBanner.kind === "error"
+              ? "border-rose-200 bg-rose-50 text-rose-900"
+              : actionBanner.kind === "success"
+                ? "border-teal-200 bg-teal-50/90 text-teal-950"
+                : "border-slate-200 bg-slate-50 text-slate-800"
+          }`}
+        >
+          <p className="min-w-0 leading-snug">{actionBanner.message}</p>
+          <button
+            type="button"
+            onClick={() => setActionBanner(null)}
+            className="shrink-0 rounded-md px-1.5 py-0.5 text-xs font-semibold text-slate-500 hover:bg-black/5 hover:text-slate-800"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+
+      {selectedRowKeys.size > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur-sm">
+          <p className="text-sm text-slate-700">
+            <span className="font-semibold tabular-nums">{selectedRowKeys.size}</span> selected
+            {selectedBudgetCount > 0 ? (
+              <span className="text-slate-500">
+                {" "}
+                ({selectedBudgetCount} bill{selectedBudgetCount === 1 ? "" : "s"})
+              </span>
+            ) : null}
+          </p>
+          <button
+            type="button"
+            disabled={bulkFundRunning || bulkFundEligibleCount === 0}
+            onClick={() => void handleBulkFund()}
+            className="rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+            title={
+              bulkFundEligibleCount === 0
+                ? "No selected bills can be funded (not paid for month, or already fully funded)"
+                : `Fund remainder for ${bulkFundEligibleCount} bill${bulkFundEligibleCount === 1 ? "" : "s"}`
+            }
+          >
+            {bulkFundRunning
+              ? "Funding…"
+              : bulkFundEligibleCount > 0
+                ? `Fund ${bulkFundEligibleCount} bill${bulkFundEligibleCount === 1 ? "" : "s"}`
+                : "Fund bills"}
+          </button>
+          <button
+            type="button"
+            disabled={bulkClearFundingRunning || bulkClearFundingEligibleCount === 0}
+            onClick={() => void handleBulkClearFunding()}
+            className="rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+            title={
+              bulkClearFundingEligibleCount === 0
+                ? "No selected bills have funding to clear"
+                : `Clear all funding on ${bulkClearFundingEligibleCount} bill${bulkClearFundingEligibleCount === 1 ? "" : "s"}`
+            }
+          >
+            {bulkClearFundingRunning
+              ? "Clearing…"
+              : bulkClearFundingEligibleCount > 0
+                ? `Clear funding (${bulkClearFundingEligibleCount} bill${bulkClearFundingEligibleCount === 1 ? "" : "s"})`
+                : "Clear funding"}
+          </button>
+          {budgetRowKeys.length > 0 ? (
+            <button
+              type="button"
+              onClick={selectAllBudgetRows}
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Select all bills
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={clearRowSelection}
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Clear
+          </button>
+        </div>
+      ) : null}
+
       <div className="absolute left-[8px] sm:left-[11px] top-3 bottom-3 w-px bg-slate-200" aria-hidden="true" />
 
       <ol className="space-y-6 w-full min-w-0">
@@ -329,6 +691,11 @@ export function ExpenseTimeline({
                       paymentAccountId: item.paymentAccountId,
                     });
                     const isPaidForMonth = item.markedPaidForMonth === budgetMonth;
+                    const fundState = plannedPaymentRowFundState(
+                      isPaidForMonth,
+                      bankLinked,
+                      item.amount
+                    );
                     const paymentStart = dateInBudgetMonth(budgetMonth, item.paymentDayOfMonth);
                     const deltaPayment = calendarDaysFromTo(todayStart, paymentStart);
                     const isDuePast = !isPaidForMonth && deltaPayment < 0;
@@ -360,15 +727,18 @@ export function ExpenseTimeline({
                     return (
                       <li key={rk} className="w-full min-w-0">
                         <div
-                          className={`group/row flex w-full min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border py-1 pl-1 pr-1.5 sm:pr-2 shadow-sm transition-colors ${
-                            isPaidForMonth
-                              ? "bg-teal-50/45 border-teal-100/90"
-                              : !bankLinked
-                              ? "bg-white border-amber-100/90"
-                              : "bg-white border-slate-100"
-                          }`}
+                          className={`group/row flex w-full min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border py-1 pl-1 pr-1.5 sm:pr-2 shadow-sm transition-colors ${timelineRowSurfaceClasses(
+                            fundState
+                          )}`}
                           style={{ borderLeftWidth: 3, borderLeftColor: color }}
                         >
+                          <input
+                            type="checkbox"
+                            checked={selectedRowKeys.has(rk)}
+                            onChange={() => toggleRowSelected(rk)}
+                            className={timelineCheckboxClass}
+                            aria-label={`Select ${item.name} for bulk actions`}
+                          />
                           <button
                             type="button"
                             onClick={async () => {
@@ -398,7 +768,7 @@ export function ExpenseTimeline({
                             }
                             className={`shrink-0 rounded-md p-0.5 transition-colors disabled:opacity-50 ${
                               isPaidForMonth
-                                ? "text-teal-600 hover:bg-teal-100/80"
+                                ? "text-emerald-600 hover:bg-emerald-100/80"
                                 : "text-slate-300 hover:text-teal-600 hover:bg-teal-50"
                             }`}
                           >
@@ -462,6 +832,11 @@ export function ExpenseTimeline({
                       paymentAccountId: item.paymentAccountId,
                     });
                     const isPaidForMonth = item.markedPaidForMonth === budgetMonth;
+                    const fundState = plannedPaymentRowFundState(
+                      isPaidForMonth,
+                      bankLinked,
+                      item.amount
+                    );
                     const paymentStart = dateInBudgetMonth(budgetMonth, item.paymentDayOfMonth);
                     const deltaPayment = calendarDaysFromTo(todayStart, paymentStart);
                     const isDuePast = !isPaidForMonth && deltaPayment < 0;
@@ -473,7 +848,6 @@ export function ExpenseTimeline({
                       item.hasConfiguredDueDay === false
                         ? `Due ${ordinal(item.paymentDayOfMonth)} (placeholder — set on Debts)`
                         : null,
-                      item.isAutopay ? "Autopay" : null,
                       payFromDebt,
                       item.amount <= 0.005 ? "Add planned paydown ($)" : null,
                     ].filter(Boolean);
@@ -486,19 +860,24 @@ export function ExpenseTimeline({
                       .filter(Boolean)
                       .join(" · ");
                     const debtEditable = debts?.some((d) => d._id === item.debtId);
+                    const debtDoc = debts?.find((d) => d._id === item.debtId);
+                    const balance = debtDoc?.balance ?? 0;
 
                     return (
                       <li key={rk} className="w-full min-w-0">
                         <div
-                          className={`group/row flex w-full min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border py-1 pl-1 pr-1.5 sm:pr-2 shadow-sm transition-colors ${
-                            isPaidForMonth
-                              ? "bg-teal-50/45 border-teal-100/90"
-                              : !bankLinked
-                              ? "bg-white border-amber-100/90"
-                              : "bg-white border-slate-100"
-                          }`}
+                          className={`group/row flex w-full min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border py-1 pl-1 pr-1.5 sm:pr-2 shadow-sm transition-colors ${timelineRowSurfaceClasses(
+                            fundState
+                          )}`}
                           style={{ borderLeftWidth: 3, borderLeftColor: color }}
                         >
+                          <input
+                            type="checkbox"
+                            checked={selectedRowKeys.has(rk)}
+                            onChange={() => toggleRowSelected(rk)}
+                            className={timelineCheckboxClass}
+                            aria-label={`Select ${item.name} for bulk actions`}
+                          />
                           <button
                             type="button"
                             onClick={async () => {
@@ -528,7 +907,7 @@ export function ExpenseTimeline({
                             }
                             className={`shrink-0 rounded-md p-0.5 transition-colors disabled:opacity-50 ${
                               isPaidForMonth
-                                ? "text-teal-600 hover:bg-teal-100/80"
+                                ? "text-emerald-600 hover:bg-emerald-100/80"
                                 : "text-slate-300 hover:text-teal-600 hover:bg-teal-50"
                             }`}
                           >
@@ -551,20 +930,26 @@ export function ExpenseTimeline({
                             />
                           </div>
 
-                          <div className="min-w-0 flex-1 overflow-hidden">
-                            <div className="truncate text-xs font-medium text-slate-800 sm:text-sm">
+                          <div className="flex min-w-0 flex-1 flex-col gap-0 overflow-hidden">
+                            <div className="min-w-0 truncate text-xs font-medium text-slate-800 sm:text-sm">
                               {item.name}
                               <span className="font-normal text-slate-400"> · payment</span>
                             </div>
                             {debtSubline ? (
-                              <p className="truncate text-[10px] leading-snug text-slate-500" title={debtSubline}>
+                              <p
+                                className="truncate text-[10px] leading-snug text-slate-500"
+                                title={debtSubline}
+                              >
                                 {debtSubline}
                               </p>
                             ) : null}
                           </div>
 
-                          <span className="shrink-0 tabular-nums text-xs sm:text-sm font-semibold text-slate-800">
-                            {formatCurrency(item.amount)}
+                          <span
+                            className="shrink-0 tabular-nums text-xs sm:text-sm font-semibold text-slate-800"
+                            title="Current balance owed"
+                          >
+                            {formatCurrency(balance)}
                           </span>
 
                           <TimelineRowActionsMenu
@@ -593,8 +978,45 @@ export function ExpenseTimeline({
                             >
                               Debts page
                             </Link>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="block w-full px-3 py-1.5 text-left text-sm font-medium text-rose-600 hover:bg-rose-50"
+                              onClick={() => {
+                                setArchiveDebtPendingId(
+                                  archiveDebtPendingId === item.debtId ? null : item.debtId
+                                );
+                                setRowMenuKey(null);
+                              }}
+                            >
+                              Remove
+                            </button>
                           </TimelineRowActionsMenu>
                         </div>
+
+                        {archiveDebtPendingId === item.debtId && (
+                          <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
+                            <p className="text-xs text-rose-700">
+                              Remove <strong>{item.name}</strong>? Balances are unchanged.
+                            </p>
+                            <div className="flex shrink-0 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleArchiveDebt(item.debtId)}
+                                className="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700"
+                              >
+                                Remove
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setArchiveDebtPendingId(null)}
+                                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </li>
                     );
                   }
@@ -611,12 +1033,10 @@ export function ExpenseTimeline({
                   const deltaPayment = calendarDaysFromTo(todayStart, paymentStart);
                   const isDuePast = !isPaidForMonth && deltaPayment < 0;
                   const setAsideTotal = allocatedByBudgetId[item._id] ?? 0;
-                  const earmarkLevel = expenseFundingLevel(item.amount, setAsideTotal);
                   const accountFunded = expenseHasPayFromAccount(item);
                   const isOverAllocated =
                     item.amount > 0.005 && setAsideTotal > item.amount + 0.005;
-                  const isReserved =
-                    item.status === "funded" && !isPaidForMonth;
+                  const fundState = budgetRowFundState(isPaidForMonth, setAsideTotal);
 
                   const paidFromResolved = budgetItemPaidFromLabel(item, accountMap);
                   const metaLine = [
@@ -629,31 +1049,43 @@ export function ExpenseTimeline({
                   const budgetSubline = [
                     !accountFunded ? "No bank linked" : null,
                     metaLine || null,
-                    isReserved ? "Reserved" : null,
-                    earmarkLevel === "full" && !isPaidForMonth && !isReserved ? "Earmarked" : null,
-                    earmarkLevel === "partial" && !isPaidForMonth ? "Partly funded" : null,
                     isOverAllocated && !isPaidForMonth ? "Over-funded" : null,
                     isDuePast ? "Past due" : null,
                   ]
                     .filter(Boolean)
                     .join(" · ");
+                  const quickFundRemaining = budgetBillFundRemainingForMonth(
+                    item._id as string,
+                    item.amount,
+                    item.markedPaidForMonth,
+                    budgetMonth,
+                    allocatedByBudgetId
+                  );
+                  const fundingLevel = expenseFundingLevel(item.amount, setAsideTotal);
+                  const displayAmount =
+                    isPaidForMonth &&
+                    actualPaidByBudgetId[item._id as string] != null &&
+                    actualPaidByBudgetId[item._id as string]! > 0.005
+                      ? actualPaidByBudgetId[item._id as string]!
+                      : item.amount;
 
                   return (
                     <li key={rk} className="w-full min-w-0">
                       <div
                         className={`group/row flex w-full min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border py-1 pl-1 pr-1.5 sm:pr-2 shadow-sm transition-colors ${
-                          isPaidForMonth
-                            ? "bg-emerald-50/55 border-emerald-200/85 ring-1 ring-emerald-200/45"
-                            : isReserved
-                            ? "bg-emerald-50/40 border-emerald-200/80 ring-1 ring-emerald-200/35"
-                            : isOverAllocated
-                            ? "bg-white border-slate-100 ring-2 ring-amber-400/65 ring-offset-2 ring-offset-white"
-                            : !accountFunded
-                            ? "bg-white border-amber-100/90"
-                            : "bg-white border-slate-100"
+                          isOverAllocated && !isPaidForMonth
+                            ? `${timelineRowSurfaceClasses(fundState)} ring-2 ring-amber-500/50 ring-offset-2 ring-offset-white`
+                            : timelineRowSurfaceClasses(fundState)
                         }`}
                         style={{ borderLeftWidth: 3, borderLeftColor: color }}
                       >
+                        <input
+                          type="checkbox"
+                          checked={selectedRowKeys.has(rk)}
+                          onChange={() => toggleRowSelected(rk)}
+                          className={timelineCheckboxClass}
+                          aria-label={`Select ${item.name} for bulk actions`}
+                        />
                         <button
                           type="button"
                           onClick={async () => {
@@ -709,64 +1141,8 @@ export function ExpenseTimeline({
                         </div>
 
                         <div className="flex min-w-0 flex-1 flex-col gap-0 overflow-hidden">
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-800 sm:text-sm">
-                              {item.name}
-                            </span>
-                            {(() => {
-                              const aside = allocatedByBudgetId[item._id] ?? 0;
-                              const overFunded = item.amount > 0.005 && aside > item.amount + 0.005;
-                              return (
-                                <span className="inline-flex shrink-0 items-center gap-0.5">
-                                  <button
-                                    type="button"
-                                    title={
-                                      overFunded
-                                        ? "Earmark exceeds this bill (remove or adjust lines)"
-                                        : "Earmark — plan cash from an account toward this bill this month"
-                                    }
-                                    onClick={() => setAllocationTarget(item)}
-                                    className={`inline-flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[10px] font-semibold border sm:text-[11px] ${
-                                      overFunded
-                                        ? "border-amber-300 bg-amber-50/95 text-amber-900"
-                                        : aside > 0.005
-                                        ? "border-teal-200 bg-teal-50/90 text-teal-800"
-                                        : "border-slate-200 bg-white text-slate-600 hover:border-teal-200 hover:text-teal-700"
-                                    }`}
-                                  >
-                                    <PiggyBank className="w-3 h-3 shrink-0" aria-hidden="true" />
-                                    {aside > 0.005 ? (
-                                      <span className="tabular-nums">
-                                        {formatCurrency(aside)} / {formatCurrency(item.amount)}
-                                      </span>
-                                    ) : (
-                                      <span>Earmark</span>
-                                    )}
-                                  </button>
-                                  {accountFunded && !isPaidForMonth && item.status !== "funded" && (
-                                    <button
-                                      type="button"
-                                      title="Reserve the full bill amount against Available from today (no split lines)"
-                                      disabled={fundExpensePendingId === item._id}
-                                      onClick={async () => {
-                                        setFundExpensePendingId(item._id);
-                                        try {
-                                          await fundExpenseMutation({
-                                            id: item._id,
-                                            userId,
-                                          });
-                                        } finally {
-                                          setFundExpensePendingId(null);
-                                        }
-                                      }}
-                                      className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50/90 px-1 py-0.5 text-[10px] font-semibold text-emerald-900 hover:bg-emerald-100/90 disabled:opacity-50 sm:text-[11px]"
-                                    >
-                                      Reserve
-                                    </button>
-                                  )}
-                                </span>
-                              );
-                            })()}
+                          <div className="min-w-0 truncate text-xs font-medium text-slate-800 sm:text-sm">
+                            {item.name}
                           </div>
                           {budgetSubline ? (
                             <p
@@ -778,44 +1154,148 @@ export function ExpenseTimeline({
                           ) : null}
                         </div>
 
-                        <span className="shrink-0 tabular-nums text-xs sm:text-sm font-semibold text-slate-800">
-                          {formatCurrency(item.amount)}
-                        </span>
-
-                        <label
-                          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-slate-100 bg-slate-50/90 px-1.5 py-0.5 sm:px-2"
-                          title="Auto-pay with payee"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={item.isAutopay === true}
-                            disabled={autopayTogglePendingId === item._id}
-                            onChange={async (e) => {
-                              e.stopPropagation();
-                              setAutopayTogglePendingId(item._id);
-                              try {
-                                await updateBudgetItem({
-                                  id: item._id,
-                                  isAutopay: e.target.checked,
-                                });
-                              } finally {
-                                setAutopayTogglePendingId(null);
-                              }
+                        {setAsideTotal > 0.005 && !isPaidForMonth ? (
+                          <button
+                            type="button"
+                            disabled={fundClearPendingId === item._id}
+                            title={`Clear all funding for this bill (${formatCurrency(setAsideTotal)})`}
+                            aria-label={`Clear funding for ${item.name}`}
+                            onClick={() => {
+                              void (async () => {
+                                setFundClearPendingId(item._id);
+                                try {
+                                  await removeAllBillFunding({
+                                    userId,
+                                    budgetItemId: item._id,
+                                    monthKey: budgetMonth,
+                                  });
+                                  setActionBanner({
+                                    kind: "success",
+                                    message: `Cleared funding for ${item.name}.`,
+                                  });
+                                } catch (e) {
+                                  setActionBanner({
+                                    kind: "error",
+                                    message:
+                                      e instanceof Error ? e.message : "Could not clear funding",
+                                  });
+                                } finally {
+                                  setFundClearPendingId(null);
+                                }
+                              })();
                             }}
-                            className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 disabled:opacity-50"
-                            aria-label={`Auto-pay for ${item.name}`}
-                          />
-                          <span className="text-[10px] font-medium text-slate-600 sm:text-[11px]">
-                            Auto
-                          </span>
-                        </label>
+                            className="shrink-0 rounded-md p-1 text-rose-600 transition-colors hover:bg-rose-100/80 disabled:opacity-50"
+                          >
+                            <CircleMinus className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
+                          </button>
+                        ) : null}
+                        {!isPaidForMonth && item.amount > 0.005 ? (
+                          quickFundRemaining != null ? (
+                            <button
+                              type="button"
+                              disabled={fundQuickPendingId === item._id}
+                              title={`Fund ${formatCurrency(quickFundRemaining)} toward this bill`}
+                              aria-label={
+                                fundingLevel === "none"
+                                  ? `Fund ${item.name} — add set-aside for this month`
+                                  : `Finish funding ${item.name} (${formatCurrency(quickFundRemaining)} left)`
+                              }
+                              onClick={() => {
+                                void (async () => {
+                                  setFundQuickPendingId(item._id);
+                                  try {
+                                    await fundBudgetBill(item);
+                                  } catch (e) {
+                                    setActionBanner({
+                                      kind: "error",
+                                      message:
+                                        e instanceof Error ? e.message : "Could not fund",
+                                    });
+                                  } finally {
+                                    setFundQuickPendingId(null);
+                                  }
+                                })();
+                              }}
+                              className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors disabled:opacity-50 sm:text-[11px] ${
+                                fundingLevel === "none"
+                                  ? "border border-rose-200/90 bg-rose-100 text-rose-900 hover:bg-rose-200/50"
+                                  : "border border-amber-200/90 bg-amber-50 text-amber-950 hover:bg-amber-100/90"
+                              }`}
+                            >
+                              {fundQuickPendingId === item._id
+                                ? "…"
+                                : fundingLevel === "none"
+                                  ? "Waiting"
+                                  : "Partly funded"}
+                            </button>
+                          ) : fundingLevel === "full" ? (
+                            <span
+                              className="shrink-0 rounded-md border border-amber-200/90 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-950 sm:text-[11px]"
+                              title="Bill amount fully funded this month"
+                            >
+                              Funded
+                            </span>
+                          ) : null
+                        ) : null}
+
+                        <span
+                          className="shrink-0 tabular-nums text-xs sm:text-sm font-semibold text-slate-800"
+                          title={
+                            isPaidForMonth && displayAmount !== item.amount
+                              ? `Planned ${formatCurrency(item.amount)} · paid ${formatCurrency(displayAmount)}`
+                              : undefined
+                          }
+                        >
+                          {formatCurrency(displayAmount)}
+                        </span>
 
                         <TimelineRowActionsMenu
                           rowKey={rk}
                           menuOpenKey={rowMenuKey}
                           setMenuOpenKey={setRowMenuKey}
                         >
+                          {setAsideTotal > 0.005 && !isPaidForMonth ? (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="block w-full px-3 py-1.5 text-left text-sm font-medium text-rose-700 hover:bg-rose-50"
+                              onClick={() => {
+                                setRowMenuKey(null);
+                                void (async () => {
+                                  try {
+                                    await removeAllBillFunding({
+                                      userId,
+                                      budgetItemId: item._id,
+                                      monthKey: budgetMonth,
+                                    });
+                                    setActionBanner({
+                                      kind: "success",
+                                      message: `Cleared funding for ${item.name}.`,
+                                    });
+                                  } catch (e) {
+                                    setActionBanner({
+                                      kind: "error",
+                                      message:
+                                        e instanceof Error ? e.message : "Could not clear funding",
+                                    });
+                                  }
+                                })();
+                              }}
+                            >
+                              Clear all funding
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="block w-full px-3 py-1.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            onClick={() => {
+                              setFundAdjustTarget(item);
+                              setRowMenuKey(null);
+                            }}
+                          >
+                            Fund / adjust amount
+                          </button>
                           <button
                             type="button"
                             role="menuitem"
@@ -875,16 +1355,15 @@ export function ExpenseTimeline({
         })}
       </ol>
 
-      {allocationTarget && (
+      {fundAdjustTarget && (
         <BudgetAllocationModal
           open
-          onClose={() => setAllocationTarget(null)}
+          onClose={() => setFundAdjustTarget(null)}
           userId={userId}
           monthKey={budgetMonth}
-          budgetItemId={allocationTarget._id}
-          expenseName={allocationTarget.name}
-          expenseAmount={allocationTarget.amount}
-          defaultAccountId={allocationTarget.accountId ?? null}
+          budgetItemId={fundAdjustTarget._id}
+          expenseName={fundAdjustTarget.name}
+          expenseAmount={fundAdjustTarget.amount}
           allocations={allocations ?? []}
           accounts={accounts?.map((a) => ({
             _id: a._id,
@@ -972,9 +1451,7 @@ function clampPlannerDueDay(d: number | undefined | null): { day: number; config
 }
 
 function debtPlannerAmount(d: Doc<"debts">): number {
-  const planned = d.plannedMonthlyPayment ?? 0;
-  if (planned > 0) return planned;
-  return d.minimumPayment ?? 0;
+  return debtPlannerMonthlyAmount(d);
 }
 
 function cardPlannerAmount(c: Doc<"creditCards">): number {

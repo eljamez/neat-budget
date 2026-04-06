@@ -1,11 +1,12 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { BudgetCard } from "@/components/BudgetCard";
 import { ExpenseTimeline, buildPlannerRows } from "@/components/ExpenseTimeline";
 import {
+  cn,
   formatCurrency,
   formatMonth,
   formatShortDate,
@@ -19,13 +20,15 @@ import {
   formatAccountType,
   bucketMonthlyFundingCap,
   asOfDateForBudgetView,
+  debtPlannerMonthlyAmount,
 } from "@/lib/utils";
 import { BucketFundingModal } from "@/components/BucketFundingModal";
+import { MonthFundingModal } from "@/components/MonthFundingModal";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
 import { useTransactionModal } from "@/components/TransactionModalProvider";
 import Link from "next/link";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { redirect } from "next/navigation";
 import {
   CheckCircle2,
@@ -38,6 +41,8 @@ import {
   Landmark,
   Receipt,
   Boxes,
+  Info,
+  Sparkles,
 } from "lucide-react";
 import type { Bucket } from "@/types/bucket";
 
@@ -56,16 +61,23 @@ function getTimeOfDay() {
   return "evening";
 }
 
-function getBudgetSubtitle(
-  totalBudget: number,
+/**
+ * Short status beside the greeting. Spending % uses cash on hand when available,
+ * otherwise planned category totals (alert strip handles category overspend).
+ */
+function getHeaderMoodMessage(
+  cashBudget: number,
+  categoryPlannedTotal: number,
   totalSpent: number,
   overBudgetCount: number,
   categoriesLoaded: boolean,
   selectedMonth: string,
 ) {
-  if (!categoriesLoaded || totalBudget === 0) return null;
-  if (overBudgetCount > 0) return null; // alert strip handles this
-  const pct = totalSpent / totalBudget;
+  if (!categoriesLoaded) return null;
+  if (overBudgetCount > 0) return null;
+  const denom = cashBudget > 0.005 ? cashBudget : categoryPlannedTotal;
+  if (denom < 0.005) return null;
+  const pct = totalSpent / denom;
   const isCalendarMonth = selectedMonth === getCurrentMonth();
   const monthLabel = formatMonth(selectedMonth);
   if (totalSpent === 0) {
@@ -75,18 +87,18 @@ function getBudgetSubtitle(
   }
   if (pct < 0.5) {
     return isCalendarMonth
-      ? `You've used ${Math.round(pct * 100)}% of your budget — looking good.`
-      : `${Math.round(pct * 100)}% of your ${monthLabel} budget used — looking good.`;
+      ? `${Math.round(pct * 100)}% of cash spent — looking good.`
+      : `${Math.round(pct * 100)}% of ${monthLabel} cash spent — looking good.`;
   }
   if (pct < 0.8) {
     return isCalendarMonth
-      ? `${Math.round(pct * 100)}% of your budget used. Staying on track.`
-      : `${Math.round(pct * 100)}% of your ${monthLabel} budget used. Staying on track.`;
+      ? `${Math.round(pct * 100)}% of cash spent — staying on track.`
+      : `${Math.round(pct * 100)}% of ${monthLabel} cash — staying on track.`;
   }
   if (pct < 1) {
     return isCalendarMonth
-      ? `${Math.round(pct * 100)}% used — keep a close eye this month.`
-      : `${Math.round(pct * 100)}% of ${monthLabel} budget used — keep a close eye.`;
+      ? `${Math.round(pct * 100)}% of cash spent — keep a close eye.`
+      : `${Math.round(pct * 100)}% of ${monthLabel} cash — keep a close eye.`;
   }
   return null;
 }
@@ -100,8 +112,12 @@ export default function DashboardPage() {
     name: string;
     monthlyFundingCap: number;
     spendTarget: number;
-    defaultAccountId: Id<"accounts"> | null;
   } | null>(null);
+  const [monthFundingOpen, setMonthFundingOpen] = useState(false);
+  const [autoFundPending, setAutoFundPending] = useState(false);
+  const [fundingNotice, setFundingNotice] = useState<string | null>(null);
+
+  const autoFundMonth = useMutation(api.autoFundMonth.run);
 
   const categories = useQuery(
     api.categories.list,
@@ -141,16 +157,6 @@ export default function DashboardPage() {
     api.budgetItems.getAvailableBalance,
     user ? { userId: user.id, date: asOfDate } : "skip"
   );
-
-  const availByAccountId = useMemo(() => {
-    if (!availability?.byAccount) return {};
-    return Object.fromEntries(
-      availability.byAccount.map((a) => [
-        a.accountId as string,
-        { funded: a.funded, available: a.available },
-      ])
-    );
-  }, [availability]);
 
   const buckets = useQuery(api.buckets.getBuckets, user ? { userId: user.id } : "skip");
 
@@ -208,6 +214,20 @@ export default function DashboardPage() {
     return [...buckets].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
   }, [buckets]);
 
+  const cashAccounts = useMemo(() => {
+    if (!accounts) return [];
+    return accounts.filter((a) => accountIsAssetForAvailability(a.accountType));
+  }, [accounts]);
+
+  const totalCashAccountBalance = useMemo(
+    () => cashAccounts.reduce((sum, a) => sum + a.balance, 0),
+    [cashAccounts]
+  );
+
+  useEffect(() => {
+    setFundingNotice(null);
+  }, [selectedMonth]);
+
   const categoryBudgetCap = (categoryId: string) =>
     plannedByCategory[categoryId] ?? 0;
 
@@ -228,11 +248,33 @@ export default function DashboardPage() {
         (spendingByCategory?.[c._id] ?? 0) > categoryBudgetCap(c._id)
     ).length ?? 0;
 
-  const overallPercent = totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0;
+  const cashBudgetAmount =
+    accounts !== undefined
+      ? availability !== undefined
+        ? availability.totalCash
+        : totalCashAccountBalance
+      : null;
+  const headerTotalFunded =
+    availability !== undefined ? availability.totalFunded : null;
+  const headerAvailableToFund =
+    cashBudgetAmount !== null && availability !== undefined
+      ? availability.availableToFund
+      : null;
+  const headerOverFunded =
+    headerAvailableToFund !== null && headerAvailableToFund < -0.005;
+
+  const cashPercentUsed =
+    cashBudgetAmount !== null && cashBudgetAmount > 0.005
+      ? (totalSpent / cashBudgetAmount) * 100
+      : 0;
+  const cashOverallPercent = Math.min(cashPercentUsed, 100);
+  const cashAfterSpent =
+    cashBudgetAmount !== null ? cashBudgetAmount - totalSpent : null;
 
   const categoriesLoaded = categories !== undefined;
   const allOnTrack = categoriesLoaded && (categories?.length ?? 0) > 0 && overBudgetCount === 0 && totalSpent > 0;
-  const budgetSubtitle = getBudgetSubtitle(
+  const headerMood = getHeaderMoodMessage(
+    cashBudgetAmount ?? 0,
     totalBudget,
     totalSpent,
     overBudgetCount,
@@ -246,196 +288,238 @@ export default function DashboardPage() {
 
   return (
     <div className="w-full space-y-6 lg:space-y-8">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl lg:text-2xl font-bold text-slate-900">
-            Good {getTimeOfDay()}, {user.firstName ?? "there"}
-          </h1>
-          {budgetSubtitle
-            ? <p className="text-slate-500 text-sm mt-0.5">{budgetSubtitle}</p>
-            : <p className="text-slate-500 text-sm mt-0.5">{formatMonth(selectedMonth)}</p>
-          }
-        </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <div className="flex items-center rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setSelectedMonth((m) => shiftMonth(m, -1))}
-              className="p-2.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors border-r border-slate-100"
-              aria-label="Previous month"
-            >
-              <ChevronLeft className="w-5 h-5" aria-hidden="true" />
-            </button>
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              aria-label="Select month"
-              className="min-w-0 flex-1 sm:w-38 border-0 bg-transparent px-2 py-2 text-sm text-slate-700 text-center focus:ring-0 focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => setSelectedMonth((m) => shiftMonth(m, 1))}
-              className="p-2.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors border-l border-slate-100"
-              aria-label="Next month"
-            >
-              <ChevronRight className="w-5 h-5" aria-hidden="true" />
-            </button>
-          </div>
-          {!viewingCalendarMonth && (
-            <button
-              type="button"
-              onClick={() => setSelectedMonth(getCurrentMonth())}
-              className="text-sm font-medium text-teal-600 hover:text-teal-700 px-2 py-1 rounded-lg hover:bg-teal-50 transition-colors"
-            >
-              This month
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={openAddTransaction}
-            className="inline-flex items-center gap-1.5 bg-teal-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-teal-700 transition-colors shadow-sm whitespace-nowrap"
-          >
-            <Plus size={14} aria-hidden="true" />
-            Add
-          </button>
-        </div>
-      </div>
-
-      {/* Accounts: hero balance + funded vs still available to earmark (detail lives under Accounts) */}
-      {accounts !== undefined && accounts.length > 0 && (
-        <div className="rounded-2xl border border-slate-200/80 bg-linear-to-br from-slate-50/95 via-white to-teal-50/35 shadow-sm p-5 sm:p-6">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-6">
-            <div>
-              <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-slate-900">Your accounts</h2>
-              <p className="text-sm text-slate-500 mt-1 max-w-2xl leading-snug">
-                Balances for {formatMonth(selectedMonth)}.{" "}
-                <span className="text-slate-600 font-medium">Funded</span> is cash you&apos;ve earmarked from that account
-                (bills + buckets).{" "}
-                <span className="text-slate-600 font-medium">Available</span> is what&apos;s still unassigned in that
-                balance.
-              </p>
+      <header className="-mx-5 px-5 lg:-mx-8 lg:px-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between w-full">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-slate-900">
+                  Good {getTimeOfDay()}, {user.firstName ?? "there"}
+                </h1>
+                {headerMood ? (
+                  <span className="text-base sm:text-lg text-slate-500 font-medium leading-snug max-w-prose">
+                    {headerMood}
+                  </span>
+                ) : null}
+              </div>
             </div>
-            <Link
-              href="/accounts"
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal-700 hover:text-teal-800 shrink-0 rounded-lg px-2 py-1 -mr-2 hover:bg-teal-50/80 transition-colors"
-            >
-              All accounts <ArrowRight size={15} aria-hidden="true" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-            {accounts.map((acc) => {
-              const av = availByAccountId[acc._id];
-              const funded = av?.funded ?? 0;
-              const isAsset = accountIsAssetForAvailability(acc.accountType);
-              const unallocated =
-                isAsset && av?.available != null ? av.available : isAsset ? acc.balance - funded : null;
-              const pctOfBalance =
-                isAsset && acc.balance > 0.005
-                  ? Math.min(100, (funded / acc.balance) * 100)
-                  : isAsset && acc.balance <= 0.005 && funded > 0.005
-                    ? 100
-                    : 0;
-              return (
-                <div
-                  key={acc._id}
-                  className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white px-5 py-5 shadow-[0_1px_0_rgba(15,23,42,0.04)] transition-shadow hover:shadow-md hover:border-slate-300/90"
+            <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
+              <div className="flex items-center rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setSelectedMonth((m) => shiftMonth(m, -1))}
+                  className="p-2.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors border-r border-slate-100"
+                  aria-label="Previous month"
                 >
-                  <div className="flex items-start justify-between gap-3 mb-4">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-800 truncate text-base">{acc.name}</p>
-                      <p className="text-xs text-slate-500 mt-0.5 font-medium uppercase tracking-wide">
-                        {formatAccountType(acc.accountType)}
-                      </p>
-                    </div>
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-700 ring-1 ring-teal-600/10">
-                      <Landmark className="h-5 w-5" aria-hidden="true" />
-                    </div>
-                  </div>
+                  <ChevronLeft className="w-5 h-5" aria-hidden="true" />
+                </button>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  aria-label="Select month"
+                  className="min-w-0 flex-1 sm:w-38 border-0 bg-transparent px-2 py-2.5 text-base text-slate-700 text-center focus:ring-0 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSelectedMonth((m) => shiftMonth(m, 1))}
+                  className="p-2.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors border-l border-slate-100"
+                  aria-label="Next month"
+                >
+                  <ChevronRight className="w-5 h-5" aria-hidden="true" />
+                </button>
+              </div>
+              {!viewingCalendarMonth && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedMonth(getCurrentMonth())}
+                  className="text-base font-medium text-teal-600 hover:text-teal-700 px-2 py-1 rounded-lg hover:bg-teal-50 transition-colors"
+                >
+                  This month
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
 
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Balance</p>
-                  <p className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 tabular-nums leading-none">
-                    {formatCurrency(acc.balance)}
-                  </p>
-
-                  {isAsset && unallocated !== null ? (
-                    <>
-                      <div className="mt-5 h-2 rounded-full bg-slate-100 overflow-hidden ring-1 ring-slate-200/60">
-                        <div
-                          className="h-full rounded-full bg-linear-to-r from-teal-500 to-teal-400 transition-[width] duration-500 ease-out"
-                          style={{ width: `${pctOfBalance}%` }}
-                          title={`${Math.round(pctOfBalance)}% of balance is funded`}
-                        />
-                      </div>
-                      <div className="mt-4 grid grid-cols-2 gap-3">
-                        <div className="rounded-xl bg-teal-50/80 border border-teal-100/90 px-3.5 py-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-teal-800/80">Funded</p>
-                          <p className="mt-1 text-lg font-bold tabular-nums text-teal-950">{formatCurrency(funded)}</p>
-                          <p className="text-[10px] text-teal-700/80 mt-1 leading-snug">
-                            Earmarked (bills from funded date + buckets)
-                          </p>
-                        </div>
-                        <div
-                          className={`rounded-xl border px-3.5 py-3 ${
-                            unallocated < -0.005
-                              ? "bg-rose-50/90 border-rose-100"
-                              : "bg-emerald-50/80 border-emerald-100/90"
-                          }`}
-                        >
-                          <p
-                            className={`text-[11px] font-semibold uppercase tracking-wide ${
-                              unallocated < -0.005 ? "text-rose-800/85" : "text-emerald-800/80"
-                            }`}
-                          >
-                            Available
-                          </p>
-                          <p
-                            className={`mt-1 text-lg font-bold tabular-nums ${
-                              unallocated < -0.005 ? "text-rose-950" : "text-emerald-950"
-                            }`}
-                          >
-                            {formatCurrency(unallocated)}
-                          </p>
-                          <p
-                            className={`text-[10px] mt-1 leading-snug ${
-                              unallocated < -0.005 ? "text-rose-700/85" : "text-emerald-700/80"
-                            }`}
-                          >
-                            {unallocated < -0.005 ? "Over-earmarked vs balance" : "Left to assign"}
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="mt-5 text-sm text-slate-500 leading-relaxed">
-                      Liability balance — funding math applies to cash accounts. Use{" "}
-                      <Link href="/accounts" className="font-medium text-teal-700 hover:text-teal-800 underline-offset-2 hover:underline">
-                        Accounts
-                      </Link>{" "}
-                      to edit details.
+      <section
+        className="w-full min-w-0"
+        aria-labelledby="dashboard-budget-summary-heading"
+      >
+        <h2 id="dashboard-budget-summary-heading" className="sr-only">
+          Budget, funded, and left to fund
+        </h2>
+        <div className="-mx-5 px-5 pb-3 mb-1 border-b border-slate-200/90 bg-slate-50/95 lg:-mx-8 lg:px-8">
+          <div
+            className={cn(
+              "w-full rounded-xl border bg-white/80 shadow-sm px-4 py-4 sm:px-5 sm:py-5",
+              headerOverFunded
+                ? "border-rose-300/90 ring-1 ring-rose-200/60"
+                : "border-emerald-200/80 ring-1 ring-emerald-100/50"
+            )}
+          >
+            {cashBudgetAmount === null ? (
+              <p className="text-slate-400 italic text-base">Loading account balances…</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-0 sm:divide-x sm:divide-slate-100">
+                  <div className="min-w-0 sm:pr-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Budget</p>
+                    <p className="text-3xl sm:text-4xl font-bold tabular-nums text-emerald-600">
+                      {formatCurrency(cashBudgetAmount)}
                     </p>
-                  )}
+                    <p className="text-sm text-slate-500 mt-1.5">
+                      {cashAccounts.length} {cashAccounts.length === 1 ? "account" : "accounts"}
+                    </p>
+                  </div>
+                  <div className="min-w-0 sm:px-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Funded</p>
+                    <p
+                      className={cn(
+                        "text-3xl sm:text-4xl font-bold tabular-nums",
+                        headerTotalFunded === null
+                          ? "text-slate-400"
+                          : headerOverFunded
+                            ? "text-rose-600"
+                            : "text-emerald-600"
+                      )}
+                    >
+                      {headerTotalFunded === null ? "…" : formatCurrency(headerTotalFunded)}
+                    </p>
+                    <p className="text-sm text-slate-500 mt-1.5">bills &amp; buckets (not paid yet)</p>
+                  </div>
+                  <div className="min-w-0 sm:pl-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                      Left to fund
+                    </p>
+                    <p
+                      className={cn(
+                        "text-3xl sm:text-4xl font-bold tabular-nums",
+                        headerAvailableToFund === null
+                          ? "text-slate-400"
+                          : headerOverFunded
+                            ? "text-rose-600"
+                            : "text-emerald-600"
+                      )}
+                    >
+                      {headerAvailableToFund === null ? "…" : formatCurrency(headerAvailableToFund)}
+                    </p>
+                    <p className="text-sm text-slate-500 mt-1.5">
+                      {headerAvailableToFund === null
+                        ? "Loading funding…"
+                        : headerOverFunded
+                          ? "Over-funded vs cash"
+                          : "Still unassigned"}
+                    </p>
+                  </div>
                 </div>
-              );
-            })}
+                {fundingNotice ? (
+                  <p className="mt-3 text-sm text-teal-900 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
+                    {fundingNotice}
+                  </p>
+                ) : null}
+                <div className="mt-4 pt-4 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={autoFundPending || !user}
+                      onClick={() => {
+                        if (!user) return;
+                        setFundingNotice(null);
+                        setAutoFundPending(true);
+                        void (async () => {
+                          try {
+                            const r = await autoFundMonth({
+                              userId: user.id,
+                              monthKey: selectedMonth,
+                            });
+                            if (r.message) {
+                              setFundingNotice(r.message);
+                            } else if (r.totalAdded > 0.005) {
+                              const parts: string[] = [];
+                              if (r.billsTouched > 0) {
+                                parts.push(
+                                  `${r.billsTouched} bill${r.billsTouched === 1 ? "" : "s"}`
+                                );
+                              }
+                              if (r.bucketsTouched > 0) {
+                                parts.push(
+                                  `${r.bucketsTouched} bucket${r.bucketsTouched === 1 ? "" : "s"}`
+                                );
+                              }
+                              setFundingNotice(
+                                `Auto-funded ${formatCurrency(r.totalAdded)} (${parts.join(", ")}). Remaining to assign: ${formatCurrency(Math.max(0, r.remainingAvailable))}.`
+                              );
+                            } else {
+                              setFundingNotice(
+                                "Nothing was added — you may already be fully funded for this month, or there is no cash left to assign."
+                              );
+                            }
+                          } catch (e) {
+                            setFundingNotice(
+                              e instanceof Error ? e.message : "Could not auto-fund this month."
+                            );
+                          } finally {
+                            setAutoFundPending(false);
+                          }
+                        })();
+                      }}
+                      className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50/90 px-3 py-2 text-sm font-semibold text-teal-900 shadow-sm hover:bg-teal-100/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Sparkles className="w-4 h-4 shrink-0" aria-hidden="true" />
+                      {autoFundPending ? "Funding…" : "Auto-fund month"}
+                    </button>
+                    <span className="text-xs text-slate-500 max-w-xs leading-snug">
+                      Fills bills (by due date) then monthly buckets, up to cash on hand. Does not mark anything paid.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMonthFundingOpen(true)}
+                    className="text-base font-semibold text-teal-700 hover:text-teal-800 rounded-lg px-1 sm:ml-auto py-1 hover:bg-teal-50/80 transition-colors text-left sm:text-right"
+                  >
+                    View &amp; remove funding for {formatMonth(selectedMonth)} →
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
-      )}
+      </section>
 
       {categories !== undefined && categories.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6 items-start">
           <div className="lg:col-span-2 w-full min-w-0 space-y-4">
-            <div className="rounded-xl border border-teal-100 bg-linear-to-r from-teal-50/90 to-slate-50/80 px-4 py-3 text-sm shadow-sm">
-              <p className="font-semibold text-teal-950 tracking-tight">{formatMonth(selectedMonth)}</p>
-              <p className="text-slate-600 text-xs mt-1 leading-relaxed">
-                Bills are ordered by <strong className="font-semibold text-slate-700">when funds must be ready</strong>.{" "}
-                <strong className="font-semibold text-slate-700">Bank ✓</strong> = pay-from account set.{" "}
-                <strong className="font-semibold text-slate-700">Reserved</strong> = marked funded (counts against Available from that date).{" "}
-                <strong className="font-semibold text-slate-700">Earmarked</strong> = cash lines toward the bill this month.{" "}
-                <strong className="font-semibold text-slate-700">Paid</strong> = settled (checkmark).
-                Card and loan rows are planned payments — fund from cash, then mark paid when done.
-              </p>
+            <div className="rounded-xl border border-teal-100 bg-linear-to-r from-teal-50/90 to-slate-50/80 px-4 py-3.5 sm:px-5 sm:py-4 shadow-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-teal-950">
+                  {formatMonth(selectedMonth)}
+                </h2>
+                <span className="relative shrink-0 group z-10">
+                  <button
+                    type="button"
+                    className="rounded-full p-1 text-teal-700/70 hover:text-teal-900 hover:bg-teal-100/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                    aria-label="How the bill timeline works"
+                  >
+                    <Info className="w-5 h-5 sm:w-[1.35rem] sm:h-[1.35rem]" aria-hidden="true" />
+                  </button>
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute left-0 top-full mt-1.5 w-[min(22rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20"
+                  >
+                    Bills are ordered by{" "}
+                    <span className="font-semibold text-white">when funds must be ready</span>. Row colors:{" "}
+                    <span className="font-semibold text-rose-300">red</span> = waiting (not funded),{" "}
+                    <span className="font-semibold text-amber-200">yellow</span> = funded or ready,{" "}
+                    <span className="font-semibold text-emerald-300">green</span> = paid.{" "}
+                    <span className="font-semibold text-teal-200">Bank ✓</span> = pay-from account set. Select rows to fund
+                    many bills at once, or tap{" "}
+                    <span className="font-semibold text-white">Waiting</span> /{" "}
+                    <span className="font-semibold text-white">Partly funded</span> on a row to fund the remainder, or clear funding with the toolbar or the{" "}
+                    <span className="font-semibold text-white">minus</span> icon on each row. Row menu →{" "}
+                    <span className="font-semibold text-white">Fund / adjust amount</span> for custom amounts. Funding is separate from marking paid.
+                  </span>
+                </span>
+              </div>
             </div>
             {allBudgetItems === undefined || debts === undefined || creditCards === undefined ? (
               <div className="space-y-3">
@@ -455,21 +539,37 @@ export default function DashboardPage() {
           </div>
 
           <aside className="lg:col-span-1 w-full min-w-0">
-            <div className="rounded-2xl border border-slate-100 bg-white shadow-sm p-4 sticky top-4">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <h2 className="font-semibold text-slate-800 text-sm">Buckets</h2>
+            <div className="rounded-2xl border border-slate-100 bg-white shadow-sm p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-2 mb-4">
+                <div className="flex items-center gap-2 min-w-0">
+                  <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900">Buckets</h2>
+                  <span className="relative shrink-0 group z-10">
+                    <button
+                      type="button"
+                      className="rounded-full p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                      aria-label="How buckets work this month"
+                    >
+                      <Info className="w-5 h-5 sm:w-[1.35rem] sm:h-[1.35rem]" aria-hidden="true" />
+                    </button>
+                    <span
+                      role="tooltip"
+                      className="pointer-events-none absolute right-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white text-left shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20"
+                    >
+                      Spending vs targets for{" "}
+                      <span className="font-semibold text-white">{formatMonth(selectedMonth)}</span>. Set a monthly fill
+                      amount on each bucket to cap how much you fund;{" "}
+                      <span className="font-semibold text-teal-200">funded</span> is separate from spent. Link a category to
+                      track spend.
+                    </span>
+                  </span>
+                </div>
                 <Link
                   href="/buckets"
-                  className="inline-flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium shrink-0"
+                  className="inline-flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 font-semibold shrink-0 rounded-lg px-1.5 py-1 hover:bg-teal-50/80 transition-colors"
                 >
-                  Manage <ArrowRight size={12} aria-hidden="true" />
+                  Manage <ArrowRight size={14} aria-hidden="true" />
                 </Link>
               </div>
-              <p className="text-[11px] text-slate-500 leading-snug mb-3">
-                Spending vs targets for {formatMonth(selectedMonth)}. Set a monthly fill amount on each bucket to cap how
-                much you earmark; <span className="font-medium text-slate-600">funded</span> is separate from spent. Link a
-                category to track spend.
-              </p>
               {buckets === undefined ? (
                 <div className="space-y-2">
                   {[1, 2, 3].map((i) => (
@@ -497,32 +597,33 @@ export default function DashboardPage() {
                     const isMonthly = b.period === "monthly";
                     const fundedEnvelope = fundedByBucketId[b._id] ?? 0;
                     const fillCap = bucketMonthlyFundingCap(b);
-                    const envelopeLeft =
-                      isMonthly && fillCap > 0.005
-                        ? Math.max(0, fillCap - fundedEnvelope)
-                        : null;
-                    const remaining = isMonthly ? b.targetAmount - spent : null;
-                    const pct =
-                      isMonthly && b.targetAmount > 0
-                        ? Math.min((spent / b.targetAmount) * 100, 100)
-                        : 0;
-                    const over = isMonthly && remaining !== null && remaining < 0;
+                    const inBucketNow = Math.max(0, fundedEnvelope - spent);
+                    const canMonthFund = isMonthly && fillCap > 0.005;
+                    const fundedForMonth =
+                      canMonthFund && fundedEnvelope + 0.005 >= fillCap;
+                    const notFundedYet = canMonthFund && !fundedForMonth;
                     const openBucketFund = () => {
-                      const firstChecking = accounts?.find((x) => x.accountType === "checking");
-                      const firstAsset = accounts?.find((x) => accountIsAssetForAvailability(x.accountType));
-                      const def = firstChecking ?? firstAsset;
                       setBucketFundOpen({
                         id: b._id,
                         name: b.name,
                         monthlyFundingCap: fillCap,
                         spendTarget: b.targetAmount,
-                        defaultAccountId: b.paymentAccountId ?? def?._id ?? null,
                       });
                     };
+                    const cardTint = isMonthly
+                      ? fundedForMonth
+                        ? "border-emerald-200/90 bg-emerald-50/90"
+                        : notFundedYet
+                          ? "border-amber-200/90 bg-amber-50/85"
+                          : "border-slate-100 bg-slate-50/90"
+                      : "border-slate-100 bg-slate-50/90";
                     return (
                       <li
                         key={b._id}
-                        className="rounded-xl border border-slate-100 bg-slate-50/90 px-3 py-2.5"
+                        className={cn(
+                          "rounded-xl border px-3 py-2.5 transition-colors",
+                          cardTint
+                        )}
                         style={{ borderLeft: `3px solid ${accent}` }}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -532,57 +633,52 @@ export default function DashboardPage() {
                           </span>
                         </div>
                         {!b.categoryId ? (
-                          <p className="text-[11px] text-amber-700/90 mt-1.5">
-                            Link a category to see spending for this month.
+                          <p className="text-[11px] text-amber-800/90 mt-1.5">
+                            Link a category to subtract spending from funded cash.
                           </p>
                         ) : null}
-                        <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
-                          <span className="text-slate-500">Spent</span>
-                          <span className="text-slate-900 font-semibold tabular-nums text-right">
-                            {formatCurrency(spent)}
-                          </span>
-                          <span className="text-slate-500">Target</span>
-                          <span className="text-slate-700 font-medium tabular-nums text-right">
-                            {formatCurrency(b.targetAmount)}
-                          </span>
-                          {isMonthly ? (
-                            <>
+                        {isMonthly ? (
+                          <>
+                            <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                              In bucket
+                            </p>
+                            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">
+                              {formatCurrency(inBucketNow)}
+                            </p>
+                            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                              <span className="text-slate-500">Monthly target</span>
+                              <span className="text-slate-800 font-medium tabular-nums text-right">
+                                {formatCurrency(b.targetAmount)}
+                              </span>
                               <span className="text-slate-500">Funded</span>
-                              <span className="text-indigo-800 font-semibold tabular-nums text-right">
+                              <span className="text-slate-800 font-semibold tabular-nums text-right">
                                 {formatCurrency(fundedEnvelope)}
                               </span>
-                              <span className="text-slate-500">Fill cap (mo)</span>
-                              <span className="text-slate-700 font-medium tabular-nums text-right">
-                                {formatCurrency(fillCap)}
-                              </span>
-                              <span className="text-slate-500">Left to fund</span>
-                              <span
-                                className={`font-semibold tabular-nums text-right ${
-                                  envelopeLeft !== null && envelopeLeft > 0.005
-                                    ? "text-amber-700"
-                                    : "text-emerald-700"
-                                }`}
-                              >
-                                {formatCurrency(envelopeLeft ?? 0)}
-                              </span>
-                              <span className="text-slate-500">Left (vs spend)</span>
-                              <span
-                                className={`font-semibold tabular-nums text-right ${
-                                  over ? "text-rose-600" : "text-emerald-700"
-                                }`}
-                              >
-                                {formatCurrency(remaining!)}
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-slate-500 col-span-2 text-[10px] leading-snug pt-0.5">
-                                Month funding applies to monthly buckets only; spend shown is this calendar month.
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        {isMonthly && fillCap > 0.005 ? (
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                              Target
+                            </p>
+                            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">
+                              {formatCurrency(b.targetAmount)}
+                            </p>
+                            {b.categoryId ? (
+                              <p className="mt-2 text-xs text-slate-600">
+                                Spent this month{" "}
+                                <span className="font-semibold tabular-nums text-slate-900">
+                                  {formatCurrency(spent)}
+                                </span>
+                              </p>
+                            ) : (
+                              <p className="mt-2 text-[11px] text-slate-500 leading-snug">
+                                Month funding applies to monthly buckets only.
+                              </p>
+                            )}
+                          </>
+                        )}
+                        {canMonthFund ? (
                           <button
                             type="button"
                             onClick={openBucketFund}
@@ -590,16 +686,6 @@ export default function DashboardPage() {
                           >
                             Fund bucket
                           </button>
-                        ) : null}
-                        {isMonthly && b.targetAmount > 0 ? (
-                          <div className="mt-2 h-1.5 rounded-full bg-slate-200 overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${
-                                pct >= 100 ? "bg-rose-500" : pct >= 80 ? "bg-amber-400" : "bg-teal-500"
-                              }`}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
                         ) : null}
                       </li>
                     );
@@ -611,46 +697,145 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Hero Stats */}
+      {/* Accounts: below timeline; balances + link to Accounts page */}
+      {accounts !== undefined && accounts.length > 0 && (
+        <div className="rounded-2xl border border-slate-200/80 bg-linear-to-br from-slate-50/95 via-white to-teal-50/35 shadow-sm p-5 sm:p-6 w-full">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-6">
+            <div className="flex items-start gap-2 min-w-0">
+              <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-slate-900">Your accounts</h2>
+              <span className="relative shrink-0 group z-10">
+                <button
+                  type="button"
+                  className="rounded-full p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                  aria-label="How account balances work with your budget"
+                >
+                  <Info className="w-4 h-4" aria-hidden="true" />
+                </button>
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute left-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20"
+                >
+                  Balances update when you log transactions. The dashboard <span className="font-semibold text-teal-200">budget</span>{" "}
+                  is the sum of these asset balances. <span className="font-semibold text-teal-200">Funding</span> for{" "}
+                  <span className="font-semibold text-white">{formatMonth(selectedMonth)}</span> is capped by that total.
+                </span>
+              </span>
+            </div>
+            <Link
+              href="/accounts"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal-700 hover:text-teal-800 shrink-0 rounded-lg px-2 py-1 -mr-2 hover:bg-teal-50/80 transition-colors"
+            >
+              All accounts <ArrowRight size={15} aria-hidden="true" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+            {accounts.map((acc) => {
+              const isAsset = accountIsAssetForAvailability(acc.accountType);
+              return (
+                <div
+                  key={acc._id}
+                  className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_1px_0_rgba(15,23,42,0.04)] transition-shadow hover:shadow-md hover:border-slate-300/90"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-800 truncate text-sm sm:text-base">{acc.name}</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5 font-medium uppercase tracking-wide">
+                        {formatAccountType(acc.accountType)}
+                      </p>
+                    </div>
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-700 ring-1 ring-teal-600/10">
+                      <Landmark className="h-4 w-4" aria-hidden="true" />
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Balance</p>
+                  <p className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 tabular-nums leading-none">
+                    {formatCurrency(acc.balance)}
+                  </p>
+
+                  {!isAsset ? (
+                    <p className="mt-2 text-[11px] text-slate-500">
+                      <Link href="/accounts" className="font-medium text-teal-700 hover:text-teal-800 underline-offset-2 hover:underline">
+                        Accounts
+                      </Link>
+                      <span className="text-slate-400"> · liability</span>
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Hero Stats — cash budget vs spending; category targets live in Budget Categories below */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
-        {/* Monthly Budget */}
-        <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm" style={{ borderLeft: "3px solid #0d9488" }}>
-          <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-3">Monthly Budget</p>
-          <p className="text-3xl font-bold text-slate-900">{formatCurrency(totalBudget)}</p>
+        <div className="rounded-2xl bg-white border border-slate-100 p-5 sm:p-6 shadow-sm" style={{ borderLeft: "3px solid #059669" }}>
+          <p className="text-slate-400 text-sm font-semibold uppercase tracking-widest mb-3">Cash budget</p>
+          <p className="text-4xl sm:text-5xl font-bold tracking-tight text-emerald-600 tabular-nums">
+            {cashBudgetAmount !== null ? formatCurrency(cashBudgetAmount) : "—"}
+          </p>
+          <p className="text-sm text-slate-500 mt-2">
+            Same as header: combined asset account balances.
+          </p>
           <div className="mt-4">
-            <div className="flex justify-between text-xs text-slate-400 mb-1.5">
-              <span>{Math.round(overallPercent)}% used</span>
-              <span>{formatCurrency(totalBudget - totalSpent)} left</span>
+            <div className="flex justify-between text-sm text-slate-400 mb-1.5">
+              <span>
+                {cashBudgetAmount !== null && cashBudgetAmount > 0.005
+                  ? `${Math.round(cashPercentUsed)}% of cash spent`
+                  : "—"}
+              </span>
+              <span>
+                {cashAfterSpent !== null
+                  ? `${formatCurrency(cashAfterSpent)} cash left`
+                  : "—"}
+              </span>
             </div>
             <div className="w-full bg-slate-100 rounded-full h-1.5">
               <div
-                className="h-1.5 rounded-full bg-teal-500 transition-all duration-500"
-                style={{ width: `${overallPercent}%` }}
+                className="h-1.5 rounded-full bg-emerald-500 transition-all duration-500"
+                style={{ width: `${cashOverallPercent}%` }}
               />
             </div>
           </div>
         </div>
 
-        {/* Total Spent */}
-        <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
-          <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-3">Total Spent</p>
-          <p className="text-3xl font-bold text-slate-900">{formatCurrency(totalSpent)}</p>
-          <p className="text-sm text-slate-400 mt-3">
+        <div className="rounded-2xl bg-white border border-slate-100 p-5 sm:p-6 shadow-sm">
+          <p className="text-slate-400 text-sm font-semibold uppercase tracking-widest mb-3">Total Spent</p>
+          <p className="text-4xl sm:text-5xl font-bold tracking-tight text-emerald-600 tabular-nums">
+            {formatCurrency(totalSpent)}
+          </p>
+          <p className="text-base text-slate-400 mt-3">
             across {categories?.length ?? 0} categories
           </p>
         </div>
 
-        {/* Remaining */}
         <div
-          className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm"
-          style={{ borderLeft: `3px solid ${totalBudget - totalSpent < 0 ? "#f43f5e" : "#10b981"}` }}
+          className="rounded-2xl bg-white border border-slate-100 p-5 sm:p-6 shadow-sm"
+          style={{
+            borderLeft: `3px solid ${
+              cashAfterSpent !== null && cashAfterSpent < -0.005 ? "#f43f5e" : "#10b981"
+            }`,
+          }}
         >
-          <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-3">Remaining</p>
-          <p className={`text-3xl font-bold ${totalBudget - totalSpent < 0 ? "text-rose-600" : "text-emerald-600"}`}>
-            {formatCurrency(Math.abs(totalBudget - totalSpent))}
+          <p className="text-slate-400 text-sm font-semibold uppercase tracking-widest mb-3">Cash after spending</p>
+          <p
+            className={`text-4xl sm:text-5xl font-bold tracking-tight tabular-nums ${
+              cashAfterSpent !== null && cashAfterSpent < -0.005 ? "text-rose-600" : "text-emerald-600"
+            }`}
+          >
+            {cashAfterSpent !== null ? formatCurrency(Math.abs(cashAfterSpent)) : "—"}
           </p>
-          <p className={`text-sm mt-3 ${totalBudget - totalSpent < 0 ? "text-rose-400" : "text-emerald-400"}`}>
-            {totalBudget - totalSpent < 0 ? "over budget" : "available to spend"}
+          <p
+            className={`text-base mt-3 ${
+              cashAfterSpent !== null && cashAfterSpent < -0.005 ? "text-rose-400" : "text-emerald-400"
+            }`}
+          >
+            {cashAfterSpent === null
+              ? "—"
+              : cashAfterSpent < -0.005
+                ? "spent more than cash on hand"
+                : "left in accounts this month"}
           </p>
         </div>
       </div>
@@ -712,6 +897,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {debts.map((d) => {
               const apr = formatAprPercent(d.aprPercent);
+              const planMo = debtPlannerMonthlyAmount(d);
               return (
                 <div
                   key={d._id}
@@ -724,9 +910,9 @@ export default function DashboardPage() {
                     {formatCurrency(d.balance)}
                   </p>
                   {apr && <p className="text-xs text-slate-500 mt-1">{apr}</p>}
-                  {d.plannedMonthlyPayment != null && d.plannedMonthlyPayment > 0 && (
+                  {planMo > 0 && (
                     <p className="text-xs text-slate-500 mt-1">
-                      Plan {formatCurrency(d.plannedMonthlyPayment)}/mo
+                      Plan {formatCurrency(planMo)}/mo
                     </p>
                   )}
                 </div>
@@ -928,13 +1114,21 @@ export default function DashboardPage() {
           bucketName={bucketFundOpen.name}
           monthlyFundingCap={bucketFundOpen.monthlyFundingCap}
           spendTarget={bucketFundOpen.spendTarget}
-          defaultAccountId={bucketFundOpen.defaultAccountId}
           fundings={bucketFundingsMonth ?? []}
           accounts={accounts?.map((a) => ({
             _id: a._id,
             name: a.name,
             accountType: a.accountType,
           }))}
+        />
+      ) : null}
+
+      {user ? (
+        <MonthFundingModal
+          open={monthFundingOpen}
+          onClose={() => setMonthFundingOpen(false)}
+          userId={user.id}
+          monthKey={selectedMonth}
         />
       ) : null}
     </div>

@@ -76,7 +76,7 @@ function QuickLinkCard({
           href={row.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="absolute inset-0 z-0 flex flex-col justify-end bg-linear-to-br from-teal-600/12 via-slate-50 to-slate-100 bg-cover bg-center outline-none ring-offset-2 ring-teal-500/50 focus-visible:ring-2"
+          className="absolute inset-0 z-0 flex flex-col justify-end bg-linear-to-br from-green-950 via-teal-900 to-emerald-800 bg-cover bg-center outline-none ring-offset-2 ring-teal-500/50 focus-visible:ring-2"
           style={
             hasImage
               ? {
@@ -86,18 +86,18 @@ function QuickLinkCard({
           }
         >
           {!hasImage && (
-            <div className="absolute top-3 left-3 w-9 h-9 rounded-lg bg-white/85 backdrop-blur-sm flex items-center justify-center shadow-sm border border-white/60">
-              <ExternalLink className="w-4 h-4 text-teal-600" aria-hidden />
+            <div className="absolute top-3 left-3 w-9 h-9 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20">
+              <ExternalLink className="w-4 h-4 text-white/70" aria-hidden />
             </div>
           )}
           <div className="relative p-4 pt-12 z-1 pointer-events-none">
             <p
-              className={`font-semibold truncate ${hasImage ? "text-white drop-shadow-md" : "text-slate-800"}`}
+              className="font-semibold truncate text-white drop-shadow-md"
             >
               {row.label}
             </p>
             <p
-              className={`text-xs truncate mt-0.5 ${hasImage ? "text-white/90 drop-shadow" : "text-teal-700"}`}
+              className="text-xs truncate mt-0.5 text-white/80 drop-shadow"
             >
               {host}
             </p>

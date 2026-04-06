@@ -10,7 +10,7 @@ import { ExpenseLinkedTransactions } from "@/components/ExpenseLinkedTransaction
 type AllocationRow = {
   _id: Id<"expenseAllocations">;
   budgetItemId: Id<"budgetItems">;
-  accountId: Id<"accounts">;
+  accountId?: Id<"accounts">;
   amount: number;
 };
 
@@ -28,10 +28,9 @@ interface BudgetAllocationModalProps {
   budgetItemId: Id<"budgetItems">;
   expenseName: string;
   expenseAmount: number;
-  /** Pre-fills "From account" from the expense row when set */
-  defaultAccountId?: Id<"accounts"> | null;
   allocations: AllocationRow[];
-  accounts: AccountOption[] | undefined;
+  /** Used only to label legacy allocation rows that still store `accountId`. */
+  accounts?: AccountOption[];
 }
 
 export function BudgetAllocationModal({
@@ -42,44 +41,32 @@ export function BudgetAllocationModal({
   budgetItemId,
   expenseName,
   expenseAmount,
-  defaultAccountId,
   allocations,
   accounts,
 }: BudgetAllocationModalProps) {
   const createAlloc = useMutation(api.expenseAllocations.create);
   const removeAlloc = useMutation(api.expenseAllocations.remove);
-  const updateBudgetItem = useMutation(api.budgetItems.update);
-  const fundExpense = useMutation(api.budgetItems.fundExpense);
-
-  const [accountId, setAccountId] = useState("");
+  const removeAllForMonth = useMutation(api.expenseAllocations.removeAllForBudgetMonth);
   const [amountStr, setAmountStr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [clearAllLoading, setClearAllLoading] = useState(false);
   const [error, setError] = useState("");
 
   const lines = allocations.filter((a) => a.budgetItemId === budgetItemId);
   const totalSetAside = lines.reduce((s, l) => s + l.amount, 0);
   const remaining = Math.max(0, expenseAmount - totalSetAside);
 
-  const accountsSorted = accounts
-    ? [...accounts].sort((a, b) => a.name.localeCompare(b.name))
-    : [];
-
   useEffect(() => {
     if (!open) return;
     setError("");
-    setAccountId(defaultAccountId ? String(defaultAccountId) : "");
     setAmountStr(expenseAmount > 0 ? expenseAmount.toFixed(2) : "");
-  }, [open, budgetItemId, expenseAmount, defaultAccountId]);
+  }, [open, budgetItemId, expenseAmount]);
 
   if (!open) return null;
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const amt = parseFloat(amountStr);
-    if (!accountId) {
-      setError("Choose an account");
-      return;
-    }
     if (isNaN(amt) || amt <= 0) {
       setError("Enter a valid amount");
       return;
@@ -94,18 +81,9 @@ export function BudgetAllocationModal({
       await createAlloc({
         userId,
         budgetItemId,
-        accountId: accountId as Id<"accounts">,
         amount: amt,
         monthKey,
       });
-      await updateBudgetItem({
-        id: budgetItemId,
-        accountId: accountId as Id<"accounts">,
-      });
-      const newTotal = totalSetAside + amt;
-      if (newTotal + 0.005 >= expenseAmount) {
-        await fundExpense({ id: budgetItemId, userId });
-      }
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
@@ -127,17 +105,18 @@ export function BudgetAllocationModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="alloc-modal-title" className="font-semibold text-slate-800 mb-1">
-          Fund this expense
+          Fund this bill
         </h2>
         <p className="text-xs text-slate-500 mb-4">
           <span className="font-medium text-slate-700">{expenseName}</span> · {formatMonth(monthKey)} · Bill{" "}
           {formatCurrency(expenseAmount)}
         </p>
         <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
-          This adds <strong className="text-slate-700">earmarked</strong> cash toward the bill for{" "}
-          <strong className="text-slate-700">{formatMonth(monthKey)}</strong>. When lines here reach the full bill
-          amount, the expense is marked <strong className="text-slate-700">funded</strong> and reduces Available from
-          that day onward until you mark it paid.
+          This sets aside part of your <strong className="text-slate-700">overall budget cash</strong> for this bill in{" "}
+          <strong className="text-slate-700">{formatMonth(monthKey)}</strong>. It does not change any bank
+          balance — those update when you log transactions. Use{" "}
+          <strong className="text-slate-700">Adjust funding</strong> to add or remove lines; mark the bill{" "}
+          <strong className="text-slate-700">paid</strong> on the timeline when it settles.
         </p>
 
         <div className="rounded-xl border border-teal-100 bg-teal-50/60 px-3 py-2.5 mb-4">
@@ -149,7 +128,7 @@ export function BudgetAllocationModal({
           </p>
           {remaining > 0.005 && (
             <p className="text-[11px] text-teal-800/80 mt-1">
-              Up to {formatCurrency(remaining)} more can be earmarked from your accounts.
+              Up to {formatCurrency(remaining)} more can be funded.
             </p>
           )}
         </div>
@@ -157,16 +136,41 @@ export function BudgetAllocationModal({
         <ExpenseLinkedTransactions budgetItemId={budgetItemId} monthKey={monthKey} className="mb-4" />
 
         {lines.length > 0 && (
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              disabled={clearAllLoading}
+              onClick={async () => {
+                setClearAllLoading(true);
+                setError("");
+                try {
+                  await removeAllForMonth({ userId, budgetItemId, monthKey });
+                  onClose();
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Could not clear funding");
+                } finally {
+                  setClearAllLoading(false);
+                }
+              }}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50"
+            >
+              {clearAllLoading ? "Clearing…" : "Remove all funding for this bill"}
+            </button>
+          </div>
+        )}
+
+        {lines.length > 0 && (
           <ul className="space-y-2 mb-4">
             {lines.map((line) => {
-              const acc = accounts?.find((a) => a._id === line.accountId);
+              const acc = line.accountId ? accounts?.find((a) => a._id === line.accountId) : undefined;
+              const label = acc ? `${acc.name} · ${formatCurrency(line.amount)}` : `Funding · ${formatCurrency(line.amount)}`;
               return (
                 <li
                   key={line._id}
                   className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2"
                 >
-                  <span className="text-sm text-slate-700 truncate min-w-0">
-                    {acc?.name ?? "Account"} · {formatCurrency(line.amount)}
+                  <span className="text-sm text-slate-700 truncate min-w-0" title={acc ? formatAccountType(acc.accountType) : undefined}>
+                    {label}
                   </span>
                   <button
                     type="button"
@@ -188,24 +192,6 @@ export function BudgetAllocationModal({
         )}
 
         <form onSubmit={handleAdd} className="space-y-3">
-          <div>
-            <label htmlFor="alloc-account" className="block text-xs font-medium text-slate-600 mb-1">
-              From account
-            </label>
-            <select
-              id="alloc-account"
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 bg-white"
-            >
-              <option value="">Select…</option>
-              {accountsSorted.map((a) => (
-                <option key={a._id} value={a._id}>
-                  {a.name} ({formatAccountType(a.accountType)})
-                </option>
-              ))}
-            </select>
-          </div>
           <div>
             <label htmlFor="alloc-amt" className="block text-xs font-medium text-slate-600 mb-1">
               Amount ($)
@@ -229,7 +215,7 @@ export function BudgetAllocationModal({
           <div className="flex gap-2 pt-1">
             <button
               type="submit"
-              disabled={loading || accountsSorted.length === 0}
+              disabled={loading || remaining <= 0.005}
               className="flex-1 bg-teal-600 text-white rounded-xl py-2 text-sm font-semibold hover:bg-teal-700 disabled:opacity-50"
             >
               {loading ? "Saving…" : "Add funding"}
@@ -243,11 +229,6 @@ export function BudgetAllocationModal({
             </button>
           </div>
         </form>
-        {accountsSorted.length === 0 && (
-          <p className="text-xs text-slate-500 mt-3">
-            Add an account under Accounts before setting cash aside.
-          </p>
-        )}
       </div>
     </div>
   );

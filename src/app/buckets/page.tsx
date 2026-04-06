@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -63,9 +64,12 @@ export default function BucketsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Buckets</h1>
           <p className="text-slate-400 text-sm mt-1">
-            Discretionary envelopes (groceries, fun money, and so on). Set a target per period and
-            optionally link a category to align with transactions. Rollover is stored for when you
-            build spending views.
+            Discretionary envelopes (groceries, fun money, and so on). Targets and category links are
+            always-on setup—monthly funding and spend in context live on the{" "}
+            <Link href="/dashboard" className="text-teal-600 font-medium hover:text-teal-700">
+              dashboard
+            </Link>
+            .
           </p>
         </div>
         {!showForm && (

@@ -1,7 +1,8 @@
 import { mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { balanceDeltaForSpend } from "./accountBalance";
 
 async function assertPaymentAccount(
   ctx: MutationCtx,
@@ -38,6 +39,7 @@ export const create = mutation({
     userId: v.string(),
     name: v.string(),
     balance: v.number(),
+    originalLoanAmount: v.optional(v.number()),
     debtType: debtTypeForWrite,
     aprPercent: v.optional(v.number()),
     creditor: v.optional(v.string()),
@@ -58,6 +60,9 @@ export const create = mutation({
       userId: args.userId,
       name: args.name,
       balance: args.balance,
+      ...(args.originalLoanAmount !== undefined
+        ? { originalLoanAmount: args.originalLoanAmount }
+        : {}),
       debtType: args.debtType,
       aprPercent: args.aprPercent,
       creditor: args.creditor,
@@ -65,7 +70,9 @@ export const create = mutation({
       notes: args.notes,
       minimumPayment: args.minimumPayment,
       dueDayOfMonth: args.dueDayOfMonth,
-      plannedMonthlyPayment: args.plannedMonthlyPayment,
+      ...(args.plannedMonthlyPayment !== undefined
+        ? { plannedMonthlyPayment: args.plannedMonthlyPayment }
+        : {}),
       isAutopay: args.isAutopay,
       color: args.color,
       paymentAccountId: args.paymentAccountId,
@@ -80,6 +87,7 @@ export const update = mutation({
     userId: v.string(),
     name: v.optional(v.string()),
     balance: v.optional(v.number()),
+    originalLoanAmount: v.optional(v.union(v.number(), v.null())),
     debtType: v.optional(debtTypeForWrite),
     aprPercent: v.optional(v.number()),
     creditor: v.optional(v.string()),
@@ -87,7 +95,7 @@ export const update = mutation({
     notes: v.optional(v.string()),
     minimumPayment: v.optional(v.number()),
     dueDayOfMonth: v.optional(v.number()),
-    plannedMonthlyPayment: v.optional(v.number()),
+    plannedMonthlyPayment: v.optional(v.union(v.number(), v.null())),
     isAutopay: v.optional(v.boolean()),
     color: v.optional(v.string()),
     paymentAccountId: v.optional(v.union(v.id("accounts"), v.null())),
@@ -97,10 +105,25 @@ export const update = mutation({
     if (!doc || doc.userId !== args.userId) {
       throw new Error("Debt not found");
     }
-    const { id, userId, paymentAccountId, ...rest } = args;
+    const {
+      id,
+      userId,
+      paymentAccountId,
+      originalLoanAmount,
+      plannedMonthlyPayment,
+      ...rest
+    } = args;
     const patch: Record<string, unknown> = Object.fromEntries(
       Object.entries(rest).filter(([, val]) => val !== undefined)
     );
+    if (originalLoanAmount !== undefined) {
+      patch.originalLoanAmount =
+        originalLoanAmount === null ? undefined : originalLoanAmount;
+    }
+    if (plannedMonthlyPayment !== undefined) {
+      patch.plannedMonthlyPayment =
+        plannedMonthlyPayment === null ? undefined : plannedMonthlyPayment;
+    }
     if (paymentAccountId !== undefined) {
       if (paymentAccountId === null) {
         patch.paymentAccountId = undefined;
@@ -131,6 +154,44 @@ export const archive = mutation({
   },
 });
 
+const PAY_EPSILON = 0.005;
+const MONTH_KEY_RE = /^\d{4}-\d{2}$/;
+
+function plannerPaymentAmount(doc: Doc<"debts">): number {
+  const t = doc.debtType;
+  if (t === "loan" || t === "personal") {
+    const min = doc.minimumPayment ?? 0;
+    if (min > 0) return min;
+    return doc.plannedMonthlyPayment ?? 0;
+  }
+  if (t === "payment_plan") {
+    const min = doc.minimumPayment ?? 0;
+    if (min > 0) return min;
+    return doc.plannedMonthlyPayment ?? 0;
+  }
+  const planned = doc.plannedMonthlyPayment ?? 0;
+  if (planned > 0) return planned;
+  return doc.minimumPayment ?? 0;
+}
+
+function isoDateInBudgetMonth(monthKey: string, dayOfMonth: number): string {
+  const [ys, ms] = monthKey.split("-");
+  const y = Number(ys);
+  const m = Number(ms);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) {
+    return `${monthKey}-01`;
+  }
+  const lastDay = new Date(y, m, 0).getDate();
+  const d = Math.min(Math.max(1, dayOfMonth), lastDay);
+  return `${monthKey}-${String(d).padStart(2, "0")}`;
+}
+
+function dueDayForPaymentDate(doc: Doc<"debts">): number {
+  const d = doc.dueDayOfMonth;
+  if (d != null && d >= 1 && d <= 31) return d;
+  return 28;
+}
+
 /** Mark or unmark planned monthly payment as paid for a calendar month (`YYYY-MM`). */
 export const setPaidForMonth = mutation({
   args: {
@@ -140,16 +201,102 @@ export const setPaidForMonth = mutation({
     paid: v.boolean(),
   },
   handler: async (ctx, args) => {
+    if (!MONTH_KEY_RE.test(args.monthKey)) {
+      throw new Error("Invalid month");
+    }
+
     const doc = await ctx.db.get(args.id);
     if (!doc || doc.userId !== args.userId) {
       throw new Error("Debt not found");
     }
-    if (args.paid) {
+
+    if (!args.paid) {
+      const debtTxs = await ctx.db
+        .query("transactions")
+        .withIndex("by_debt", (q) => q.eq("debtId", args.id))
+        .collect();
+
+      const autoTx = debtTxs.find(
+        (t) =>
+          t.debtMarkedPaidMonthKey === args.monthKey && t.date.startsWith(args.monthKey)
+      );
+
+      if (autoTx) {
+        if (autoTx.accountId) {
+          const acc = await ctx.db.get(autoTx.accountId);
+          if (acc && acc.userId === args.userId) {
+            const delta = balanceDeltaForSpend(acc.accountType, autoTx.amount);
+            await ctx.db.patch(autoTx.accountId, { balance: acc.balance - delta });
+          }
+        }
+        const debtAfter = await ctx.db.get(args.id);
+        if (debtAfter && debtAfter.userId === args.userId) {
+          await ctx.db.patch(args.id, {
+            balance: debtAfter.balance + autoTx.amount,
+          });
+        }
+        await ctx.db.delete(autoTx._id);
+      }
+
+      if (doc.markedPaidForMonth === args.monthKey) {
+        await ctx.db.patch(args.id, { markedPaidForMonth: undefined });
+      }
+      return;
+    }
+
+    const debtTxs = await ctx.db
+      .query("transactions")
+      .withIndex("by_debt", (q) => q.eq("debtId", args.id))
+      .collect();
+
+    const inMonth = debtTxs.filter((t) => t.date.startsWith(args.monthKey));
+    const existingAuto = inMonth.find((t) => t.debtMarkedPaidMonthKey === args.monthKey);
+
+    if (existingAuto) {
       await ctx.db.patch(args.id, { markedPaidForMonth: args.monthKey });
       return;
     }
-    if (doc.markedPaidForMonth === args.monthKey) {
-      await ctx.db.patch(args.id, { markedPaidForMonth: undefined });
+
+    const planned = plannerPaymentAmount(doc);
+    const paidSoFar = inMonth.reduce((s, t) => s + t.amount, 0);
+    let amountToCreate = planned - paidSoFar;
+
+    if (amountToCreate <= PAY_EPSILON) {
+      await ctx.db.patch(args.id, { markedPaidForMonth: args.monthKey });
+      return;
     }
+
+    amountToCreate = Math.min(amountToCreate, doc.balance);
+    if (amountToCreate <= PAY_EPSILON) {
+      await ctx.db.patch(args.id, { markedPaidForMonth: args.monthKey });
+      return;
+    }
+
+    const payDate = isoDateInBudgetMonth(args.monthKey, dueDayForPaymentDate(doc));
+    const description = `Loan payment · ${doc.name}`;
+
+    await ctx.db.insert("transactions", {
+      userId: args.userId,
+      amount: amountToCreate,
+      description,
+      date: payDate,
+      note: "Marked paid from Categories timeline",
+      accountId: doc.paymentAccountId,
+      debtId: args.id,
+      debtMarkedPaidMonthKey: args.monthKey,
+    });
+
+    if (doc.paymentAccountId) {
+      const acc = await ctx.db.get(doc.paymentAccountId);
+      if (acc && acc.userId === args.userId) {
+        const delta = balanceDeltaForSpend(acc.accountType, amountToCreate);
+        await ctx.db.patch(doc.paymentAccountId, { balance: acc.balance + delta });
+      }
+    }
+
+    await ctx.db.patch(args.id, {
+      balance: Math.max(0, doc.balance - amountToCreate),
+      markedPaidForMonth: args.monthKey,
+    });
   },
 });

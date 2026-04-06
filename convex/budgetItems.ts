@@ -7,10 +7,6 @@ const expenseStatusValidator = v.union(
   v.literal("paid")
 );
 
-function utcYmdFromMs(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
-}
-
 const ASSET_TYPES = new Set([
   "checking",
   "savings",
@@ -135,29 +131,6 @@ export const archive = mutation({
   },
 });
 
-/**
- * Mark a recurring expense as funded: money is reserved from `fundedDate` (today) for available-balance math.
- * Requires a pay-from `accountId`. Clears paid flags so you can start a new month after paying.
- */
-export const fundExpense = mutation({
-  args: { id: v.id("budgetItems"), userId: v.string() },
-  handler: async (ctx, args) => {
-    const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
-      throw new Error("Not found");
-    }
-    if (!doc.accountId) {
-      throw new Error("Choose a pay-from account for this expense before funding");
-    }
-    await ctx.db.patch(args.id, {
-      status: "funded",
-      fundedDate: Date.now(),
-      paidDate: undefined,
-      markedPaidForMonth: undefined,
-    });
-  },
-});
-
 /** Mark the expense paid for a calendar month (`YYYY-MM`). Sets `status: paid` and `paidDate`. */
 export const markExpensePaid = mutation({
   args: {
@@ -182,9 +155,9 @@ export const markExpensePaid = mutation({
 });
 
 /**
- * Cash still available per bank account after earmarks: funded expenses (from `fundedDate`), monthly
- * allocation lines (legacy / partial), and bucket fundings for the month of `date`.
- * `date` is `YYYY-MM-DD`. Uses stored `accounts.balance`; funded expenses use UTC calendar day from `fundedDate`.
+ * Funding for `date`'s calendar month (`expenseAllocations` + `bucketMonthFundings`) vs total cash in asset accounts.
+ * Account rows are balances only — funding is budget-wide and does not adjust per-account display.
+ * `date` is `YYYY-MM-DD`. Uses stored `accounts.balance`.
  */
 export const getAvailableBalance = query({
   args: { userId: v.string(), date: v.string() },
@@ -219,61 +192,37 @@ export const getAvailableBalance = query({
       )
       .collect();
 
-    const itemById = Object.fromEntries(budgetItems.map((i) => [i._id, i]));
+    const itemIds = new Set(budgetItems.map((i) => i._id as string));
 
-    const fundedExpenseByAccount: Record<string, number> = {};
-    for (const item of budgetItems) {
-      if (item.status !== "funded") continue;
-      if (!item.accountId || item.fundedDate == null) continue;
-      if (utcYmdFromMs(item.fundedDate) > date) continue;
-      const accId = item.accountId as string;
-      fundedExpenseByAccount[accId] =
-        (fundedExpenseByAccount[accId] ?? 0) + item.amount;
-    }
-
-    const fundedFromAllocations: Record<string, number> = {};
+    let totalFunded = 0;
     for (const a of allocations) {
-      const item = itemById[a.budgetItemId];
-      if (!item) continue;
-      if (
-        item.status === "funded" &&
-        item.fundedDate != null &&
-        utcYmdFromMs(item.fundedDate) <= date
-      ) {
-        continue;
-      }
-      const accId = a.accountId as string;
-      fundedFromAllocations[accId] =
-        (fundedFromAllocations[accId] ?? 0) + a.amount;
+      if (!itemIds.has(a.budgetItemId as string)) continue;
+      totalFunded += a.amount;
     }
-
-    const fundedFromBuckets: Record<string, number> = {};
     for (const f of bucketFundings) {
-      const accId = f.accountId as string;
-      fundedFromBuckets[accId] =
-        (fundedFromBuckets[accId] ?? 0) + f.amount;
+      totalFunded += f.amount;
     }
 
-    let totalAvailable = 0;
+    let totalCash = 0;
     const byAccount = accounts.map((acc) => {
-      const id = acc._id as string;
-      const funded =
-        (fundedExpenseByAccount[id] ?? 0) +
-        (fundedFromAllocations[id] ?? 0) +
-        (fundedFromBuckets[id] ?? 0);
       const isAsset = ASSET_TYPES.has(acc.accountType);
-      const available = isAsset ? acc.balance - funded : null;
-      if (isAsset && available != null) totalAvailable += available;
+      if (isAsset) totalCash += acc.balance;
       return {
         accountId: acc._id,
         balance: acc.balance,
-        funded,
-        available,
         isAsset,
       };
     });
 
-    return { date, byAccount, totalAvailable };
+    const availableToFund = totalCash - totalFunded;
+
+    return {
+      date,
+      totalCash,
+      totalFunded,
+      availableToFund,
+      byAccount,
+    };
   },
 });
 
@@ -323,7 +272,8 @@ export const setPaidForMonth = mutation({
       await ctx.db.patch(args.id, {
         markedPaidForMonth: undefined,
         paidDate: undefined,
-        status: doc.fundedDate != null ? "funded" : "unfunded",
+        status: "unfunded",
+        fundedDate: undefined,
       });
     }
   },

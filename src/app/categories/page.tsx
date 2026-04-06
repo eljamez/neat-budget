@@ -11,16 +11,9 @@ import { CategoryManager } from "@/components/CategoryManager";
 import { BudgetItemManager } from "@/components/BudgetItemManager";
 import {
   formatCurrency,
-  formatMonth,
-  getCurrentMonth,
   sumBudgetItemsByCategory,
-  CREDIT_CARD_USAGE_LABELS,
   budgetItemPaidFromLabel,
   formatAccountType,
-  calendarDaysFromTo,
-  dateInBudgetMonth,
-  startOfLocalDay,
-  expenseFundingLevel,
   expenseHasPayFromAccount,
 } from "@/lib/utils";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
@@ -30,13 +23,8 @@ import {
   ChevronRight,
   Plus,
   Calendar,
-  Clock,
   GripVertical,
   CreditCard,
-  CheckCircle2,
-  Circle,
-  Landmark,
-  Star,
 } from "lucide-react";
 
 interface Category {
@@ -54,10 +42,6 @@ interface BudgetExpense {
   paymentDayOfMonth: number;
   accountId?: Id<"accounts">;
   paidFrom?: string;
-  markedPaidForMonth?: string;
-  status?: "unfunded" | "funded" | "paid";
-  fundedDate?: number;
-  paidDate?: number;
   isAutopay?: boolean;
   note?: string;
 }
@@ -76,40 +60,32 @@ function ordinal(n: number) {
 function CategoryExpensesSection({
   category,
   color,
-  budgetMonth,
   dragState,
   onExpenseDragStart,
   onExpenseDragEnd,
 }: {
   category: Category;
   color: string;
-  budgetMonth: string;
   dragState: ExpenseDragState | null;
   onExpenseDragStart: (itemId: Id<"budgetItems">, fromCategoryId: Id<"categories">) => void;
   onExpenseDragEnd: () => void;
 }) {
   const { user } = useUser();
   const archiveItem = useMutation(api.budgetItems.archive);
-  const setPaidForMonth = useMutation(api.budgetItems.setPaidForMonth);
-  const fundExpense = useMutation(api.budgetItems.fundExpense);
   const updateExpenseRow = useMutation(api.budgetItems.update);
   const expenses = useQuery(api.budgetItems.listByCategory, {
     categoryId: category._id,
   });
   const accounts = useQuery(api.accounts.list, user ? { userId: user.id } : "skip");
-  const allocations = useQuery(
-    api.expenseAllocations.listByUserMonth,
-    user ? { userId: user.id, monthKey: budgetMonth } : "skip"
-  );
-  const allocatedByBudgetId = useMemo(() => {
-    if (!allocations) return {};
-    const m: Record<string, number> = {};
-    for (const a of allocations) {
-      const k = a.budgetItemId as string;
-      m[k] = (m[k] ?? 0) + a.amount;
-    }
-    return m;
-  }, [allocations]);
+  const expensesSortedByDueDay = useMemo(() => {
+    if (!expenses) return [];
+    return [...expenses].sort((a, b) => {
+      if (a.paymentDayOfMonth !== b.paymentDayOfMonth) {
+        return a.paymentDayOfMonth - b.paymentDayOfMonth;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [expenses]);
   const accountsSorted = useMemo(
     () =>
       accounts ? [...accounts].sort((a, b) => a.name.localeCompare(b.name)) : [],
@@ -122,15 +98,10 @@ function CategoryExpensesSection({
   const [showForm, setShowForm] = useState(false);
   const [editExpense, setEditExpense] = useState<BudgetExpense | null>(null);
   const [archivePendingId, setArchivePendingId] = useState<Id<"budgetItems"> | null>(null);
-  const [paidTogglePendingId, setPaidTogglePendingId] = useState<Id<"budgetItems"> | null>(null);
   const [autopayTogglePendingId, setAutopayTogglePendingId] =
     useState<Id<"budgetItems"> | null>(null);
   const [accountSelectPendingId, setAccountSelectPendingId] =
     useState<Id<"budgetItems"> | null>(null);
-  const [fundExpensePendingId, setFundExpensePendingId] =
-    useState<Id<"budgetItems"> | null>(null);
-
-  const todayStart = startOfLocalDay(new Date());
 
   const handleArchive = async (id: Id<"budgetItems">) => {
     await archiveItem({ id });
@@ -154,20 +125,10 @@ function CategoryExpensesSection({
           )}
 
           <div className="space-y-1 py-1">
-            {expenses.map((item) => {
-              const dueStart = dateInBudgetMonth(budgetMonth, item.paymentDayOfMonth);
-              const daysUntilDue = calendarDaysFromTo(todayStart, dueStart);
-              const isUrgent = daysUntilDue >= 0 && daysUntilDue <= 3;
+            {expensesSortedByDueDay.map((item) => {
               const isDragging = dragState?.itemId === item._id;
-              const isPaidForMonth = item.markedPaidForMonth === budgetMonth;
-              const isPast = !isPaidForMonth && daysUntilDue < 0;
               const paidFromLabel = budgetItemPaidFromLabel(item, accountMap);
-              const setAsideTotal = allocatedByBudgetId[item._id] ?? 0;
-              const earmarkLevel = expenseFundingLevel(item.amount, setAsideTotal);
               const accountFunded = expenseHasPayFromAccount(item);
-              const isOverAllocated =
-                item.amount > 0.005 && setAsideTotal > item.amount + 0.005;
-              const isReserved = item.status === "funded" && !isPaidForMonth;
 
               return (
                 <div key={item._id}>
@@ -180,53 +141,10 @@ function CategoryExpensesSection({
                       onExpenseDragStart(item._id, category._id);
                     }}
                     onDragEnd={onExpenseDragEnd}
-                    className={`flex items-center gap-1.5 rounded-xl px-2 py-2 border group transition-colors cursor-grab active:cursor-grabbing select-none ${
-                      isPaidForMonth
-                        ? "bg-emerald-50/60 border-emerald-200/85 ring-1 ring-emerald-200/40 hover:border-emerald-300/90"
-                        : isReserved
-                        ? "bg-emerald-50/45 border-emerald-200/80 ring-1 ring-emerald-200/35 hover:border-emerald-300/85"
-                        : isOverAllocated
-                        ? "bg-white border-slate-100 hover:border-slate-200 ring-2 ring-amber-400/65 ring-offset-2 ring-offset-white"
-                        : !accountFunded
-                        ? "bg-white border-amber-100/90 hover:border-amber-200/90"
-                        : "bg-white border-slate-100 hover:border-slate-200"
-                    } ${isDragging ? "opacity-60 ring-2 ring-teal-300" : ""}`}
+                    className={`flex items-center gap-1.5 rounded-xl px-2 py-2 border border-slate-100 bg-white hover:border-slate-200/90 group transition-colors cursor-grab active:cursor-grabbing select-none ${
+                      isDragging ? "opacity-60 ring-2 ring-teal-300" : ""
+                    }`}
                   >
-                    <button
-                      type="button"
-                      draggable={false}
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        setPaidTogglePendingId(item._id);
-                        try {
-                          await setPaidForMonth({
-                            id: item._id,
-                            monthKey: budgetMonth,
-                            paid: !isPaidForMonth,
-                          });
-                        } finally {
-                          setPaidTogglePendingId(null);
-                        }
-                      }}
-                      disabled={paidTogglePendingId === item._id}
-                      aria-pressed={isPaidForMonth}
-                      aria-label={
-                        isPaidForMonth
-                          ? `Mark ${item.name} not paid for ${formatMonth(budgetMonth)}`
-                          : `Mark ${item.name} paid for ${formatMonth(budgetMonth)}`
-                      }
-                      className={`flex-shrink-0 p-1 rounded-lg transition-colors disabled:opacity-50 ${
-                        isPaidForMonth
-                          ? "text-emerald-600 hover:bg-emerald-100/80"
-                          : "text-slate-300 hover:text-teal-600 hover:bg-teal-50"
-                      }`}
-                    >
-                      {isPaidForMonth ? (
-                        <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
-                      ) : (
-                        <Circle className="w-5 h-5" aria-hidden="true" />
-                      )}
-                    </button>
                     <GripVertical
                       className="w-4 h-4 text-slate-300 flex-shrink-0 group-hover:text-slate-400"
                       aria-hidden="true"
@@ -237,16 +155,6 @@ function CategoryExpensesSection({
                         <span className="text-sm font-semibold text-slate-600">
                           {formatCurrency(item.amount)}
                         </span>
-                        {isUrgent && !isPast && (
-                          <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md">
-                            Needed soon
-                          </span>
-                        )}
-                        {isPast && (
-                          <span className="text-[10px] font-semibold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md">
-                            Due date passed
-                          </span>
-                        )}
                         {accountFunded ? (
                           <span
                             className="text-[10px] font-semibold bg-slate-100 text-slate-800 border border-slate-200/90 px-1.5 py-0.5 rounded-md"
@@ -260,64 +168,6 @@ function CategoryExpensesSection({
                             title="Choose a bank account in the dropdown on this row"
                           >
                             No bank
-                          </span>
-                        )}
-                        {isReserved && (
-                          <span
-                            className="text-[10px] font-semibold bg-emerald-200/90 text-emerald-950 px-1.5 py-0.5 rounded-md"
-                            title="Marked funded — reduces Available from funded date until paid"
-                          >
-                            Reserved
-                          </span>
-                        )}
-                        {accountFunded &&
-                          !isPaidForMonth &&
-                          item.status !== "funded" &&
-                          user && (
-                            <button
-                              type="button"
-                              draggable={false}
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                setFundExpensePendingId(item._id);
-                                try {
-                                  await fundExpense({ id: item._id, userId: user.id });
-                                } finally {
-                                  setFundExpensePendingId(null);
-                                }
-                              }}
-                              disabled={fundExpensePendingId === item._id}
-                              title="Reserve the full bill amount from today"
-                              className="text-[10px] font-semibold bg-emerald-50 text-emerald-900 border border-emerald-200 px-1.5 py-0.5 rounded-md hover:bg-emerald-100/90 disabled:opacity-50"
-                            >
-                              Reserve
-                            </button>
-                          )}
-                        {earmarkLevel === "full" && !isPaidForMonth && !isReserved && (
-                          <span
-                            className="text-[10px] font-semibold bg-sky-100 text-sky-900 px-1.5 py-0.5 rounded-md"
-                            title="Bill amount fully earmarked this month"
-                          >
-                            Earmarked
-                          </span>
-                        )}
-                        {earmarkLevel === "partial" && !isPaidForMonth && (
-                          <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/90 px-1.5 py-0.5 rounded-md">
-                            Partly earmarked
-                          </span>
-                        )}
-                        {isPaidForMonth && (
-                          <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded-md">
-                            <Star
-                              className="h-3 w-3 fill-emerald-500 text-emerald-600"
-                              aria-hidden="true"
-                            />
-                            Paid
-                          </span>
-                        )}
-                        {isOverAllocated && !isPaidForMonth && (
-                          <span className="text-[10px] font-semibold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded-md">
-                            Over-earmarked
                           </span>
                         )}
                         {item.isAutopay && (
@@ -461,7 +311,6 @@ function CategoryExpensesSection({
                 key={editExpense?._id ?? "new"}
                 categoryId={category._id}
                 editItem={editExpense}
-                transactionsMonthKey={budgetMonth}
                 onSuccess={() => {
                   setShowForm(false);
                   setEditExpense(null);
@@ -488,371 +337,6 @@ function CategoryExpensesSection({
   );
 }
 
-const DEBTS_PLANNER_COLOR = "#475569";
-const CREDIT_CARDS_PLANNER_COLOR = "#4f46e5";
-
-interface CreditCardListDoc {
-  _id: Id<"creditCards">;
-  name: string;
-  plannedMonthlyPayment?: number;
-  dueDayOfMonth?: number;
-  markedPaidForMonth?: string;
-  color?: string;
-  isAutopay?: boolean;
-  usageMode: string;
-}
-
-function CreditCardsMonthlySection({
-  cards,
-  budgetMonth,
-  userId,
-}: {
-  cards: CreditCardListDoc[] | undefined;
-  budgetMonth: string;
-  userId: string;
-}) {
-  const setCardPaidForMonth = useMutation(api.creditCards.setPaidForMonth);
-  const [paidTogglePendingId, setPaidTogglePendingId] = useState<Id<"creditCards"> | null>(
-    null
-  );
-  const todayStart = startOfLocalDay(new Date());
-
-  const planned = (cards ?? []).filter(
-    (c) =>
-      (c.plannedMonthlyPayment ?? 0) > 0 &&
-      c.dueDayOfMonth != null &&
-      c.dueDayOfMonth >= 1 &&
-      c.dueDayOfMonth <= 31
-  );
-
-  if (cards === undefined) {
-    return (
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mt-2.5">
-        <div className="h-20 animate-pulse bg-slate-50 m-3 rounded-xl" />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mt-2.5"
-      style={{ borderLeft: `3px solid ${CREDIT_CARDS_PLANNER_COLOR}` }}
-    >
-      <div className="px-4 py-3.5 flex items-center gap-3 border-b border-slate-50">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ backgroundColor: `${CREDIT_CARDS_PLANNER_COLOR}18` }}
-        >
-          <CreditCard
-            className="w-5 h-5"
-            style={{ color: CREDIT_CARDS_PLANNER_COLOR }}
-            aria-hidden="true"
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-slate-800">Credit cards</p>
-          <p className="text-sm text-slate-500">
-            Planned payments from your card list. Mark each card as paying off vs using for bills on the
-            Cards page.
-          </p>
-        </div>
-      </div>
-      <div className="px-4 pb-4 pt-3">
-        {planned.length === 0 ? (
-          <p className="text-xs text-slate-400 py-2">
-            No planned card payments yet. On{" "}
-            <Link href="/credit-cards" className="text-teal-600 font-medium hover:underline">
-              Credit cards
-            </Link>
-            , set payment amount and due day.
-          </p>
-        ) : (
-          <ul className="space-y-1.5">
-            {planned.map((c) => {
-              const color = c.color ?? CREDIT_CARDS_PLANNER_COLOR;
-              const isPaidForMonth = c.markedPaidForMonth === budgetMonth;
-              const dueDay = c.dueDayOfMonth ?? 1;
-              const daysUntilPayment = calendarDaysFromTo(
-                todayStart,
-                dateInBudgetMonth(budgetMonth, dueDay)
-              );
-              const isPast = !isPaidForMonth && daysUntilPayment < 0;
-              const isUrgent = daysUntilPayment >= 0 && daysUntilPayment <= 3;
-              const usageShort =
-                c.usageMode === "paying_off"
-                  ? CREDIT_CARD_USAGE_LABELS.paying_off
-                  : CREDIT_CARD_USAGE_LABELS.active_use;
-
-              return (
-                <li key={c._id}>
-                  <div
-                    className={`flex items-center gap-2 rounded-xl px-2 py-2 border ${
-                      isPaidForMonth
-                        ? "bg-teal-50/60 border-teal-100/80"
-                        : "bg-white border-slate-100"
-                    } select-none`}
-                    style={{ borderLeftWidth: 3, borderLeftColor: color }}
-                  >
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setPaidTogglePendingId(c._id);
-                        try {
-                          await setCardPaidForMonth({
-                            id: c._id,
-                            userId,
-                            monthKey: budgetMonth,
-                            paid: !isPaidForMonth,
-                          });
-                        } finally {
-                          setPaidTogglePendingId(null);
-                        }
-                      }}
-                      disabled={paidTogglePendingId === c._id}
-                      aria-pressed={isPaidForMonth}
-                      className={`shrink-0 p-1 rounded-lg transition-colors disabled:opacity-50 ${
-                        isPaidForMonth
-                          ? "text-teal-600 hover:bg-teal-100/80"
-                          : "text-slate-300 hover:text-teal-600 hover:bg-teal-50"
-                      }`}
-                    >
-                      {isPaidForMonth ? (
-                        <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
-                      ) : (
-                        <Circle className="w-5 h-5" aria-hidden="true" />
-                      )}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-slate-800">{c.name}</span>
-                        <span className="text-sm font-semibold text-slate-600">
-                          {formatCurrency(c.plannedMonthlyPayment ?? 0)}
-                        </span>
-                        <span
-                          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
-                            c.usageMode === "paying_off"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-indigo-100 text-indigo-800"
-                          }`}
-                        >
-                          {usageShort}
-                        </span>
-                        {c.isAutopay && (
-                          <span className="text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-md">
-                            Auto-pay
-                          </span>
-                        )}
-                        {isUrgent && !isPast && (
-                          <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md">
-                            Due soon
-                          </span>
-                        )}
-                        {isPast && (
-                          <span className="text-[10px] font-semibold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md">
-                            Due date passed
-                          </span>
-                        )}
-                        {isPaidForMonth && (
-                          <span className="text-[10px] font-semibold bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded-md">
-                            Paid
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                        <span className="flex items-center gap-1 text-xs text-slate-400">
-                          <Clock className="w-3 h-3" aria-hidden="true" />
-                          Due {ordinal(c.dueDayOfMonth ?? 0)}
-                        </span>
-                        <Link
-                          href="/credit-cards"
-                          className="text-xs text-teal-600 font-medium hover:underline"
-                        >
-                          Edit on Credit cards
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
-
-interface DebtListDoc {
-  _id: Id<"debts">;
-  name: string;
-  plannedMonthlyPayment?: number;
-  dueDayOfMonth?: number;
-  markedPaidForMonth?: string;
-  color?: string;
-  isAutopay?: boolean;
-}
-
-function DebtsMonthlySection({
-  debts,
-  budgetMonth,
-  userId,
-}: {
-  debts: DebtListDoc[] | undefined;
-  budgetMonth: string;
-  userId: string;
-}) {
-  const setDebtPaidForMonth = useMutation(api.debts.setPaidForMonth);
-  const [paidTogglePendingId, setPaidTogglePendingId] = useState<Id<"debts"> | null>(null);
-  const todayStart = startOfLocalDay(new Date());
-
-  const planned = (debts ?? []).filter(
-    (d) =>
-      (d.plannedMonthlyPayment ?? 0) > 0 &&
-      d.dueDayOfMonth != null &&
-      d.dueDayOfMonth >= 1 &&
-      d.dueDayOfMonth <= 31
-  );
-
-  if (debts === undefined) {
-    return (
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mt-2.5">
-        <div className="h-20 animate-pulse bg-slate-50 m-3 rounded-xl" />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mt-2.5"
-      style={{ borderLeft: `3px solid ${DEBTS_PLANNER_COLOR}` }}
-    >
-      <div className="px-4 py-3.5 flex items-center gap-3 border-b border-slate-50">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: `${DEBTS_PLANNER_COLOR}18` }}
-        >
-          <Landmark className="w-5 h-5" style={{ color: DEBTS_PLANNER_COLOR }} aria-hidden="true" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-slate-800">Debts</p>
-          <p className="text-sm text-slate-500">
-            Planned monthly payments from your loans list (not budget categories).
-          </p>
-        </div>
-      </div>
-      <div className="px-4 pb-4 pt-3">
-        {planned.length === 0 ? (
-          <p className="text-xs text-slate-400 py-2">
-            No planned payments yet. On the{" "}
-            <Link href="/debts" className="text-teal-600 font-medium hover:underline">
-              Debts
-            </Link>{" "}
-            page, set <strong className="font-semibold text-slate-600">planned monthly paydown</strong> and a{" "}
-            <strong className="font-semibold text-slate-600">due day</strong> for each loan.
-          </p>
-        ) : (
-          <ul className="space-y-1.5">
-            {planned.map((d) => {
-              const color = d.color ?? DEBTS_PLANNER_COLOR;
-              const isPaidForMonth = d.markedPaidForMonth === budgetMonth;
-              const dueDay = d.dueDayOfMonth ?? 1;
-              const daysUntilPayment = calendarDaysFromTo(
-                todayStart,
-                dateInBudgetMonth(budgetMonth, dueDay)
-              );
-              const isPast = !isPaidForMonth && daysUntilPayment < 0;
-              const isUrgent = daysUntilPayment >= 0 && daysUntilPayment <= 3;
-
-              return (
-                <li key={d._id}>
-                  <div
-                    className={`flex items-center gap-2 rounded-xl px-2 py-2 border ${
-                      isPaidForMonth
-                        ? "bg-teal-50/60 border-teal-100/80"
-                        : "bg-white border-slate-100"
-                    } select-none`}
-                    style={{ borderLeftWidth: 3, borderLeftColor: color }}
-                  >
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setPaidTogglePendingId(d._id);
-                        try {
-                          await setDebtPaidForMonth({
-                            id: d._id,
-                            userId,
-                            monthKey: budgetMonth,
-                            paid: !isPaidForMonth,
-                          });
-                        } finally {
-                          setPaidTogglePendingId(null);
-                        }
-                      }}
-                      disabled={paidTogglePendingId === d._id}
-                      aria-pressed={isPaidForMonth}
-                      className={`flex-shrink-0 p-1 rounded-lg transition-colors disabled:opacity-50 ${
-                        isPaidForMonth
-                          ? "text-teal-600 hover:bg-teal-100/80"
-                          : "text-slate-300 hover:text-teal-600 hover:bg-teal-50"
-                      }`}
-                    >
-                      {isPaidForMonth ? (
-                        <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
-                      ) : (
-                        <Circle className="w-5 h-5" aria-hidden="true" />
-                      )}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-slate-800">{d.name}</span>
-                        <span className="text-sm font-semibold text-slate-600">
-                          {formatCurrency(d.plannedMonthlyPayment ?? 0)}
-                        </span>
-                        {d.isAutopay && (
-                          <span className="text-[10px] font-semibold uppercase tracking-wide bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-md">
-                            Auto-pay
-                          </span>
-                        )}
-                        {isUrgent && !isPast && (
-                          <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md">
-                            Due soon
-                          </span>
-                        )}
-                        {isPast && (
-                          <span className="text-[10px] font-semibold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md">
-                            Due date passed
-                          </span>
-                        )}
-                        {isPaidForMonth && (
-                          <span className="text-[10px] font-semibold bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded-md">
-                            Paid
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                        <span className="flex items-center gap-1 text-xs text-slate-400">
-                          <Clock className="w-3 h-3" aria-hidden="true" />
-                          Due {ordinal(d.dueDayOfMonth ?? 0)}
-                        </span>
-                        <Link
-                          href="/debts"
-                          className="text-xs text-teal-600 font-medium hover:underline"
-                        >
-                          Edit on Debts
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function CategoriesPage() {
   const { user } = useUser();
   const categories = useQuery(
@@ -863,8 +347,6 @@ export default function CategoriesPage() {
     api.budgetItems.listByUser,
     user ? { userId: user.id } : "skip"
   );
-  const debts = useQuery(api.debts.list, user ? { userId: user.id } : "skip");
-  const creditCards = useQuery(api.creditCards.list, user ? { userId: user.id } : "skip");
   const archiveCategory = useMutation(api.categories.archive);
   const updateExpense = useMutation(api.budgetItems.update);
 
@@ -881,8 +363,6 @@ export default function CategoriesPage() {
   const [newExpenseCategoryId, setNewExpenseCategoryId] = useState<Id<"categories"> | null>(
     null
   );
-
-  const budgetMonth = getCurrentMonth();
 
   const handleCategoryDragOver = (e: DragEvent<HTMLDivElement>, catId: Id<"categories">) => {
     if (!expenseDrag) return;
@@ -999,11 +479,12 @@ export default function CategoriesPage() {
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-slate-900">Categories</h1>
           <p className="text-slate-400 text-sm mt-1">
-            Manage budget groups and recurring expenses. Drag an expense onto another category to move it.{" "}
+            Your budget groups and recurring bills—amounts and due days apply every month. Drag an expense onto
+            another category to move it. Use the{" "}
             <Link href="/dashboard" className="text-teal-600 font-medium hover:text-teal-700">
-              Dashboard
+              dashboard
             </Link>{" "}
-            has the month timeline, set-asides, and account availability.
+            to pick a month, fund bills, and work the timeline (including cards and loans).
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:items-end shrink-0">
@@ -1036,21 +517,6 @@ export default function CategoriesPage() {
           )}
         </div>
       </div>
-
-      {categories !== undefined && categories.length > 0 && (
-        <div className="rounded-xl border border-teal-100 bg-linear-to-r from-teal-50/90 to-slate-50/80 px-4 py-3 text-sm shadow-sm">
-          <p className="font-semibold text-teal-950 tracking-tight">{formatMonth(budgetMonth)}</p>
-          <p className="text-slate-600 text-xs mt-1 leading-relaxed">
-            Recurring expenses below are for this month; <strong className="font-semibold text-slate-700">Credit cards</strong>{" "}
-            and <strong className="font-semibold text-slate-700">Debts</strong> at the bottom list planned
-            payments. Tap the circle when you&apos;ve paid—checkmarks reset next calendar month. Open the{" "}
-            <Link href="/dashboard" className="text-teal-700 font-semibold hover:underline">
-              dashboard
-            </Link>{" "}
-            for the bill timeline and cash set-asides.
-          </p>
-        </div>
-      )}
 
       {/* Create/Edit Form */}
       {showForm && (
@@ -1168,7 +634,6 @@ export default function CategoriesPage() {
                       <CategoryExpensesSection
                         category={cat}
                         color={color}
-                        budgetMonth={budgetMonth}
                         dragState={expenseDrag}
                         onExpenseDragStart={handleExpenseDragStart}
                         onExpenseDragEnd={handleExpenseDragEnd}
@@ -1205,12 +670,6 @@ export default function CategoriesPage() {
               </div>
             );
           })}
-          <CreditCardsMonthlySection
-            cards={creditCards}
-            budgetMonth={budgetMonth}
-            userId={user.id}
-          />
-          <DebtsMonthlySection debts={debts} budgetMonth={budgetMonth} userId={user.id} />
         </div>
       )}
 
