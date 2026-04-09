@@ -14,6 +14,7 @@ import {
   dateInBudgetMonth,
   getCurrentMonth,
   getProgressColor,
+  ACCENT_COLOR_FALLBACK,
 } from "@/lib/utils";
 import { CreditCard } from "lucide-react";
 
@@ -114,7 +115,7 @@ export default function CreditCardsPage() {
       ) : (
         <ul className="space-y-2">
           {sortedCards.map((c) => {
-            const color = c.color ?? "#4f46e5";
+            const color = c.color ?? ACCENT_COLOR_FALLBACK.creditCard;
             const apr = formatAprPercent(c.aprPercent);
             const limit = c.creditLimit != null && c.creditLimit > 0 ? c.creditLimit : null;
             const utilizationPct =
@@ -215,7 +216,7 @@ export default function CreditCardsPage() {
                         onClick={() => setArchiveId(archiveId === c._id ? null : c._id)}
                         className="text-xs sm:text-sm text-slate-500 hover:text-rose-600 px-2.5 py-1.5 rounded-lg hover:bg-rose-50 border border-slate-100 sm:border-transparent"
                       >
-                        Remove
+                        Archive
                       </button>
                     </div>
                   </div>
@@ -224,7 +225,8 @@ export default function CreditCardsPage() {
                 {archiveId === c._id && (
                   <div className="mt-1.5 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2.5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                     <p className="text-sm text-rose-700">
-                      Remove <strong>{c.name}</strong>? Balances are unchanged.
+                      Archive <strong>{c.name}</strong>? It will be hidden from active planning. Balances
+                      are unchanged.
                     </p>
                     <div className="flex gap-2 shrink-0">
                       <button
@@ -235,7 +237,7 @@ export default function CreditCardsPage() {
                           setArchiveId(null);
                         }}
                       >
-                        Remove
+                        Archive
                       </button>
                       <button
                         type="button"

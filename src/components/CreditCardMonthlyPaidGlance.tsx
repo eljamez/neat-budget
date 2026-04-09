@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useQuery } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { formatShortDate } from "@/lib/utils";
@@ -12,7 +13,11 @@ const GLANCE_MONTHS = 8;
  * Latest logged payment date per calendar month (recent months first), for a quick on-card glance.
  */
 export function CreditCardMonthlyPaidGlance({ creditCardId }: { creditCardId: Id<"creditCards"> }) {
-  const txs = useQuery(api.transactions.listByCreditCard, { creditCardId });
+  const { user } = useUser();
+  const txs = useQuery(
+    api.transactions.listByCreditCard,
+    user ? { userId: user.id, creditCardId } : "skip"
+  );
 
   const phrase = useMemo(() => {
     if (!txs) return null;

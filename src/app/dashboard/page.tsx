@@ -21,6 +21,7 @@ import {
   bucketMonthlyFundingCap,
   asOfDateForBudgetView,
   debtPlannerMonthlyAmount,
+  ACCENT_COLOR_FALLBACK,
 } from "@/lib/utils";
 import { BucketFundingModal } from "@/components/BucketFundingModal";
 import { MonthFundingModal } from "@/components/MonthFundingModal";
@@ -116,6 +117,9 @@ export default function DashboardPage() {
   const [monthFundingOpen, setMonthFundingOpen] = useState(false);
   const [autoFundPending, setAutoFundPending] = useState(false);
   const [fundingNotice, setFundingNotice] = useState<string | null>(null);
+  const [openHelpTooltip, setOpenHelpTooltip] = useState<"timeline" | "buckets" | "accounts" | null>(
+    null
+  );
 
   const autoFundMonth = useMutation(api.autoFundMonth.run);
 
@@ -497,14 +501,24 @@ export default function DashboardPage() {
                 <span className="relative shrink-0 group z-10">
                   <button
                     type="button"
+                    onClick={() =>
+                      setOpenHelpTooltip((prev) => (prev === "timeline" ? null : "timeline"))
+                    }
                     className="rounded-full p-1 text-teal-700/70 hover:text-teal-900 hover:bg-teal-100/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
                     aria-label="How the bill timeline works"
+                    aria-describedby="timeline-help-tooltip"
+                    aria-expanded={openHelpTooltip === "timeline"}
+                    aria-controls="timeline-help-tooltip"
                   >
                     <Info className="w-5 h-5 sm:w-[1.35rem] sm:h-[1.35rem]" aria-hidden="true" />
                   </button>
                   <span
+                    id="timeline-help-tooltip"
                     role="tooltip"
-                    className="pointer-events-none absolute left-0 top-full mt-1.5 w-[min(22rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20"
+                    className={cn(
+                      "pointer-events-none absolute left-0 top-full mt-1.5 w-[min(22rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
+                      openHelpTooltip === "timeline" && "opacity-100 visible translate-y-0"
+                    )}
                   >
                     Bills are ordered by{" "}
                     <span className="font-semibold text-white">when funds must be ready</span>. Row colors:{" "}
@@ -546,14 +560,24 @@ export default function DashboardPage() {
                   <span className="relative shrink-0 group z-10">
                     <button
                       type="button"
+                      onClick={() =>
+                        setOpenHelpTooltip((prev) => (prev === "buckets" ? null : "buckets"))
+                      }
                       className="rounded-full p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
                       aria-label="How buckets work this month"
+                      aria-describedby="buckets-help-tooltip"
+                      aria-expanded={openHelpTooltip === "buckets"}
+                      aria-controls="buckets-help-tooltip"
                     >
                       <Info className="w-5 h-5 sm:w-[1.35rem] sm:h-[1.35rem]" aria-hidden="true" />
                     </button>
                     <span
+                      id="buckets-help-tooltip"
                       role="tooltip"
-                      className="pointer-events-none absolute right-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white text-left shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20"
+                      className={cn(
+                        "pointer-events-none absolute right-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white text-left shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
+                        openHelpTooltip === "buckets" && "opacity-100 visible translate-y-0"
+                      )}
                     >
                       Spending vs targets for{" "}
                       <span className="font-semibold text-white">{formatMonth(selectedMonth)}</span>. Set a monthly fill
@@ -591,7 +615,7 @@ export default function DashboardPage() {
               ) : (
                 <ul className="space-y-2.5 max-h-[min(70vh,36rem)] overflow-y-auto pr-0.5 -mr-0.5">
                   {sortedBuckets.map((b) => {
-                    const accent = b.color ?? "#0d9488";
+                    const accent = b.color ?? ACCENT_COLOR_FALLBACK.category;
                     const spent =
                       b.categoryId != null ? (spendingByCategory?.[b.categoryId] ?? 0) : 0;
                     const isMonthly = b.period === "monthly";
@@ -706,14 +730,24 @@ export default function DashboardPage() {
               <span className="relative shrink-0 group z-10">
                 <button
                   type="button"
+                  onClick={() =>
+                    setOpenHelpTooltip((prev) => (prev === "accounts" ? null : "accounts"))
+                  }
                   className="rounded-full p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
                   aria-label="How account balances work with your budget"
+                  aria-describedby="accounts-help-tooltip"
+                  aria-expanded={openHelpTooltip === "accounts"}
+                  aria-controls="accounts-help-tooltip"
                 >
                   <Info className="w-4 h-4" aria-hidden="true" />
                 </button>
                 <span
+                  id="accounts-help-tooltip"
                   role="tooltip"
-                  className="pointer-events-none absolute left-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20"
+                  className={cn(
+                    "pointer-events-none absolute left-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
+                    openHelpTooltip === "accounts" && "opacity-100 visible translate-y-0"
+                  )}
                 >
                   Balances update when you log transactions. The dashboard <span className="font-semibold text-teal-200">budget</span>{" "}
                   is the sum of these asset balances. <span className="font-semibold text-teal-200">Funding</span> for{" "}
@@ -770,7 +804,7 @@ export default function DashboardPage() {
 
       {/* Hero Stats — cash budget vs spending; category targets live in Budget Categories below */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
-        <div className="rounded-2xl bg-white border border-slate-100 p-5 sm:p-6 shadow-sm" style={{ borderLeft: "3px solid #059669" }}>
+        <div className="rounded-2xl bg-white border border-slate-100 p-5 sm:p-6 shadow-sm" style={{ borderLeft: `3px solid ${ACCENT_COLOR_FALLBACK.successStrong}` }}>
           <p className="text-slate-400 text-sm font-semibold uppercase tracking-widest mb-3">Cash budget</p>
           <p className="text-4xl sm:text-5xl font-bold tracking-tight text-emerald-600 tabular-nums">
             {cashBudgetAmount !== null ? formatCurrency(cashBudgetAmount) : "—"}
@@ -814,7 +848,9 @@ export default function DashboardPage() {
           className="rounded-2xl bg-white border border-slate-100 p-5 sm:p-6 shadow-sm"
           style={{
             borderLeft: `3px solid ${
-              cashAfterSpent !== null && cashAfterSpent < -0.005 ? "#f43f5e" : "#10b981"
+              cashAfterSpent !== null && cashAfterSpent < -0.005
+                ? ACCENT_COLOR_FALLBACK.danger
+                : ACCENT_COLOR_FALLBACK.success
             }`,
           }}
         >
@@ -861,7 +897,7 @@ export default function DashboardPage() {
                 <div
                   key={c._id}
                   className="rounded-xl border border-slate-100 bg-slate-50/90 px-4 py-3"
-                  style={{ borderLeft: `3px solid ${c.color ?? "#4f46e5"}` }}
+                  style={{ borderLeft: `3px solid ${c.color ?? ACCENT_COLOR_FALLBACK.creditCard}` }}
                 >
                   <p className="text-xs text-slate-500 font-medium truncate">{c.name}</p>
                   <p className="text-[11px] text-slate-400 mt-0.5">
@@ -902,7 +938,7 @@ export default function DashboardPage() {
                 <div
                   key={d._id}
                   className="rounded-xl border border-slate-100 bg-slate-50/90 px-4 py-3"
-                  style={{ borderLeft: `3px solid ${d.color ?? "#64748b"}` }}
+                  style={{ borderLeft: `3px solid ${d.color ?? ACCENT_COLOR_FALLBACK.debtCard}` }}
                 >
                   <p className="text-xs text-slate-500 font-medium truncate">{d.name}</p>
                   <p className="text-[11px] text-slate-400 mt-0.5">{formatDebtType(d.debtType)}</p>
@@ -1033,7 +1069,12 @@ export default function DashboardPage() {
                 const cardOnly = !cat && tx.creditCardId;
                 const debtOnly = !cat && tx.debtId;
                 const accentColor =
-                  cat?.color ?? (cardOnly ? "#4f46e5" : debtOnly ? "#475569" : "#0d9488");
+                  cat?.color ??
+                  (cardOnly
+                    ? ACCENT_COLOR_FALLBACK.creditCard
+                    : debtOnly
+                      ? ACCENT_COLOR_FALLBACK.debt
+                      : ACCENT_COLOR_FALLBACK.category);
                 const accentBg = `${accentColor}18`;
                 return (
                   <button
@@ -1054,7 +1095,7 @@ export default function DashboardPage() {
                           (() => {
                             const iconName = cat.icon;
                             const IconComp = iconName ? CATEGORY_ICON_MAP[iconName] : null;
-                            const color = cat.color ?? "#0d9488";
+                            const color = cat.color ?? ACCENT_COLOR_FALLBACK.category;
                             return IconComp
                               ? <IconComp className="w-4 h-4" style={{ color }} />
                               : <span className="text-sm">{iconName ?? "💰"}</span>;

@@ -3,6 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { balanceDeltaForSpend } from "./accountBalance";
+import { getEffectiveUserId } from "./authUser";
 
 async function assertPaymentAccount(
   ctx: MutationCtx,
@@ -24,11 +25,12 @@ const debtTypeForWrite = v.union(
 );
 
 export const list = query({
-  args: { userId: v.string() },
+  args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     return await ctx.db
       .query("debts")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.neq(q.field("isArchived"), true))
       .collect();
   },
@@ -36,7 +38,7 @@ export const list = query({
 
 export const create = mutation({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     name: v.string(),
     balance: v.number(),
     originalLoanAmount: v.optional(v.number()),
@@ -53,11 +55,12 @@ export const create = mutation({
     paymentAccountId: v.optional(v.id("accounts")),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     if (args.paymentAccountId) {
-      await assertPaymentAccount(ctx, args.userId, args.paymentAccountId);
+      await assertPaymentAccount(ctx, userId, args.paymentAccountId);
     }
     return await ctx.db.insert("debts", {
-      userId: args.userId,
+      userId,
       name: args.name,
       balance: args.balance,
       ...(args.originalLoanAmount !== undefined
@@ -84,7 +87,7 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("debts"),
-    userId: v.string(),
+    userId: v.optional(v.string()),
     name: v.optional(v.string()),
     balance: v.optional(v.number()),
     originalLoanAmount: v.optional(v.union(v.number(), v.null())),
@@ -101,20 +104,20 @@ export const update = mutation({
     paymentAccountId: v.optional(v.union(v.id("accounts"), v.null())),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Debt not found");
     }
     const {
       id,
-      userId,
       paymentAccountId,
       originalLoanAmount,
       plannedMonthlyPayment,
       ...rest
     } = args;
     const patch: Record<string, unknown> = Object.fromEntries(
-      Object.entries(rest).filter(([, val]) => val !== undefined)
+      Object.entries(rest).filter(([key, val]) => key !== "userId" && val !== undefined)
     );
     if (originalLoanAmount !== undefined) {
       patch.originalLoanAmount =
@@ -137,10 +140,11 @@ export const update = mutation({
 });
 
 export const archive = mutation({
-  args: { id: v.id("debts"), userId: v.string() },
+  args: { id: v.id("debts"), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Debt not found");
     }
     const lines = await ctx.db
@@ -156,6 +160,41 @@ export const archive = mutation({
 
 const PAY_EPSILON = 0.005;
 const MONTH_KEY_RE = /^\d{4}-\d{2}$/;
+
+function monthDateRange(monthKey: string): { start: string; endExclusive: string } {
+  if (!MONTH_KEY_RE.test(monthKey)) {
+    throw new Error("Invalid month");
+  }
+  const [yearStr, monthStr] = monthKey.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    throw new Error("Invalid month");
+  }
+  const nextYear = month === 12 ? year + 1 : year;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  return {
+    start: `${monthKey}-01`,
+    endExclusive: `${String(nextYear).padStart(4, "0")}-${String(nextMonth).padStart(2, "0")}-01`,
+  };
+}
+
+async function debtTransactionsForMonth(
+  ctx: MutationCtx,
+  userId: string,
+  debtId: Id<"debts">,
+  monthKey: string
+) {
+  const { start, endExclusive } = monthDateRange(monthKey);
+  const monthTxs = await ctx.db
+    .query("transactions")
+    .withIndex("by_user_date", (q) =>
+      q.eq("userId", userId).gte("date", start).lt("date", endExclusive)
+    )
+    .filter((q) => q.eq(q.field("debtId"), debtId))
+    .collect();
+  return monthTxs;
+}
 
 function plannerPaymentAmount(doc: Doc<"debts">): number {
   const t = doc.debtType;
@@ -196,41 +235,36 @@ function dueDayForPaymentDate(doc: Doc<"debts">): number {
 export const setPaidForMonth = mutation({
   args: {
     id: v.id("debts"),
-    userId: v.string(),
+    userId: v.optional(v.string()),
     monthKey: v.string(),
     paid: v.boolean(),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     if (!MONTH_KEY_RE.test(args.monthKey)) {
       throw new Error("Invalid month");
     }
+    const monthKey = args.monthKey;
 
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Debt not found");
     }
 
     if (!args.paid) {
-      const debtTxs = await ctx.db
-        .query("transactions")
-        .withIndex("by_debt", (q) => q.eq("debtId", args.id))
-        .collect();
-
-      const autoTx = debtTxs.find(
-        (t) =>
-          t.debtMarkedPaidMonthKey === args.monthKey && t.date.startsWith(args.monthKey)
-      );
+      const monthTxs = await debtTransactionsForMonth(ctx, userId, args.id, monthKey);
+      const autoTx = monthTxs.find((t) => t.debtMarkedPaidMonthKey === monthKey);
 
       if (autoTx) {
         if (autoTx.accountId) {
           const acc = await ctx.db.get(autoTx.accountId);
-          if (acc && acc.userId === args.userId) {
+          if (acc && acc.userId === userId) {
             const delta = balanceDeltaForSpend(acc.accountType, autoTx.amount);
             await ctx.db.patch(autoTx.accountId, { balance: acc.balance - delta });
           }
         }
         const debtAfter = await ctx.db.get(args.id);
-        if (debtAfter && debtAfter.userId === args.userId) {
+        if (debtAfter && debtAfter.userId === userId) {
           await ctx.db.patch(args.id, {
             balance: debtAfter.balance + autoTx.amount,
           });
@@ -238,22 +272,17 @@ export const setPaidForMonth = mutation({
         await ctx.db.delete(autoTx._id);
       }
 
-      if (doc.markedPaidForMonth === args.monthKey) {
+      if (doc.markedPaidForMonth === monthKey) {
         await ctx.db.patch(args.id, { markedPaidForMonth: undefined });
       }
       return;
     }
 
-    const debtTxs = await ctx.db
-      .query("transactions")
-      .withIndex("by_debt", (q) => q.eq("debtId", args.id))
-      .collect();
-
-    const inMonth = debtTxs.filter((t) => t.date.startsWith(args.monthKey));
-    const existingAuto = inMonth.find((t) => t.debtMarkedPaidMonthKey === args.monthKey);
+    const inMonth = await debtTransactionsForMonth(ctx, userId, args.id, monthKey);
+    const existingAuto = inMonth.find((t) => t.debtMarkedPaidMonthKey === monthKey);
 
     if (existingAuto) {
-      await ctx.db.patch(args.id, { markedPaidForMonth: args.monthKey });
+      await ctx.db.patch(args.id, { markedPaidForMonth: monthKey });
       return;
     }
 
@@ -262,33 +291,33 @@ export const setPaidForMonth = mutation({
     let amountToCreate = planned - paidSoFar;
 
     if (amountToCreate <= PAY_EPSILON) {
-      await ctx.db.patch(args.id, { markedPaidForMonth: args.monthKey });
+      await ctx.db.patch(args.id, { markedPaidForMonth: monthKey });
       return;
     }
 
     amountToCreate = Math.min(amountToCreate, doc.balance);
     if (amountToCreate <= PAY_EPSILON) {
-      await ctx.db.patch(args.id, { markedPaidForMonth: args.monthKey });
+      await ctx.db.patch(args.id, { markedPaidForMonth: monthKey });
       return;
     }
 
-    const payDate = isoDateInBudgetMonth(args.monthKey, dueDayForPaymentDate(doc));
+    const payDate = isoDateInBudgetMonth(monthKey, dueDayForPaymentDate(doc));
     const description = `Loan payment · ${doc.name}`;
 
     await ctx.db.insert("transactions", {
-      userId: args.userId,
+      userId,
       amount: amountToCreate,
       description,
       date: payDate,
       note: "Marked paid from Categories timeline",
       accountId: doc.paymentAccountId,
       debtId: args.id,
-      debtMarkedPaidMonthKey: args.monthKey,
+      debtMarkedPaidMonthKey: monthKey,
     });
 
     if (doc.paymentAccountId) {
       const acc = await ctx.db.get(doc.paymentAccountId);
-      if (acc && acc.userId === args.userId) {
+      if (acc && acc.userId === userId) {
         const delta = balanceDeltaForSpend(acc.accountType, amountToCreate);
         await ctx.db.patch(doc.paymentAccountId, { balance: acc.balance + delta });
       }
@@ -296,7 +325,7 @@ export const setPaidForMonth = mutation({
 
     await ctx.db.patch(args.id, {
       balance: Math.max(0, doc.balance - amountToCreate),
-      markedPaidForMonth: args.monthKey,
+      markedPaidForMonth: monthKey,
     });
   },
 });

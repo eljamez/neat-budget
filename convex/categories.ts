@@ -1,12 +1,14 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getEffectiveUserId } from "./authUser";
 
 export const list = query({
-  args: { userId: v.string() },
+  args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     return await ctx.db
       .query("categories")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.neq(q.field("isArchived"), true))
       .collect();
   },
@@ -14,14 +16,15 @@ export const list = query({
 
 export const create = mutation({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     name: v.string(),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     return await ctx.db.insert("categories", {
-      userId: args.userId,
+      userId,
       name: args.name,
       color: args.color,
       icon: args.icon,
@@ -33,12 +36,19 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("categories"),
+    userId: v.optional(v.string()),
     name: v.optional(v.string()),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const { id, ...updates } = args;
+    delete (updates as { userId?: string }).userId;
+    const doc = await ctx.db.get(id);
+    if (!doc || doc.userId !== userId) {
+      throw new Error("Category not found");
+    }
     const filtered = Object.fromEntries(
       Object.entries(updates).filter(([, val]) => val !== undefined)
     );
@@ -47,8 +57,13 @@ export const update = mutation({
 });
 
 export const archive = mutation({
-  args: { id: v.id("categories") },
+  args: { id: v.id("categories"), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
+    const doc = await ctx.db.get(args.id);
+    if (!doc || doc.userId !== userId) {
+      throw new Error("Category not found");
+    }
     await ctx.db.patch(args.id, { isArchived: true });
   },
 });

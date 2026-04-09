@@ -1,13 +1,15 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getEffectiveUserId } from "./authUser";
 
 export const listByUserMonth = query({
-  args: { userId: v.string(), monthKey: v.string() },
+  args: { userId: v.optional(v.string()), monthKey: v.string() },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     return await ctx.db
       .query("bucketMonthFundings")
       .withIndex("by_user_month", (q) =>
-        q.eq("userId", args.userId).eq("monthKey", args.monthKey)
+        q.eq("userId", userId).eq("monthKey", args.monthKey)
       )
       .collect();
   },
@@ -15,17 +17,18 @@ export const listByUserMonth = query({
 
 export const create = mutation({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     bucketId: v.id("buckets"),
     amount: v.number(),
     monthKey: v.string(),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     if (args.amount <= 0 || !/^\d{4}-\d{2}$/.test(args.monthKey)) {
       throw new Error("Invalid funding");
     }
     const bucket = await ctx.db.get(args.bucketId);
-    if (!bucket || bucket.userId !== args.userId) {
+    if (!bucket || bucket.userId !== userId) {
       throw new Error("Invalid bucket");
     }
     if (bucket.isArchived === true) {
@@ -49,7 +52,7 @@ export const create = mutation({
       throw new Error(`Cannot fund more than ${cap} for this bucket this month`);
     }
     return await ctx.db.insert("bucketMonthFundings", {
-      userId: args.userId,
+      userId,
       bucketId: args.bucketId,
       amount: args.amount,
       monthKey: args.monthKey,
@@ -58,10 +61,11 @@ export const create = mutation({
 });
 
 export const remove = mutation({
-  args: { id: v.id("bucketMonthFundings"), userId: v.string() },
+  args: { id: v.id("bucketMonthFundings"), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Not found");
     }
     await ctx.db.delete(args.id);
@@ -71,16 +75,17 @@ export const remove = mutation({
 /** Delete every month funding row for this bucket in the given calendar month. */
 export const removeAllForBucketMonth = mutation({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     bucketId: v.id("buckets"),
     monthKey: v.string(),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     if (!/^\d{4}-\d{2}$/.test(args.monthKey)) {
       throw new Error("Invalid month");
     }
     const bucket = await ctx.db.get(args.bucketId);
-    if (!bucket || bucket.userId !== args.userId) {
+    if (!bucket || bucket.userId !== userId) {
       throw new Error("Not found");
     }
     const rows = await ctx.db
@@ -90,7 +95,7 @@ export const removeAllForBucketMonth = mutation({
       )
       .collect();
     for (const r of rows) {
-      if (r.userId !== args.userId) continue;
+      if (r.userId !== userId) continue;
       await ctx.db.delete(r._id);
     }
   },

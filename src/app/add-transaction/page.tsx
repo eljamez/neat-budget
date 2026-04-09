@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { TransactionForm } from "@/components/TransactionForm";
@@ -11,55 +11,78 @@ const CONFETTI_COLORS = [
   "#ec4899", "#10b981", "#f97316", "#6366f1",
 ];
 
+function seededUnit(seed: number) {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setPrefersReducedMotion(mediaQuery.matches);
+    update();
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
+
+  return prefersReducedMotion;
+}
+
 function SuccessBanner() {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const pieces = useMemo(() =>
     Array.from({ length: 20 }, (_, i) => {
-      const angle = (i / 20) * 360 + (Math.random() - 0.5) * 22;
+      const angleJitter = (seededUnit(i + 11) - 0.5) * 22;
+      const angle = (i / 20) * 360 + angleJitter;
       const rad = (angle * Math.PI) / 180;
-      const dist = 48 + Math.random() * 52;
+      const dist = 48 + seededUnit(i + 23) * 52;
       return {
         id: i,
         color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
         tx: Math.cos(rad) * dist,
         ty: Math.sin(rad) * dist - 15,
-        rot: Math.random() * 600 - 300,
-        delay: Math.random() * 0.12,
-        duration: 0.55 + Math.random() * 0.25,
-        w: 6 + Math.random() * 5,
-        h: 3 + Math.random() * 3,
+        rot: seededUnit(i + 37) * 600 - 300,
+        delay: seededUnit(i + 41) * 0.12,
+        duration: 0.55 + seededUnit(i + 53) * 0.25,
+        w: 6 + seededUnit(i + 67) * 5,
+        h: 3 + seededUnit(i + 79) * 3,
       };
     }), []);
 
   return (
     <div
       className="relative bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex items-center gap-4 overflow-hidden"
-      style={{ animation: "pop-in 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards" }}
+      style={prefersReducedMotion ? undefined : { animation: "pop-in 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards" }}
     >
       {/* Confetti burst */}
-      <div className="absolute top-1/2 left-12 pointer-events-none" aria-hidden="true">
-        {pieces.map((p) => (
-          <div
-            key={p.id}
-            className="absolute rounded-sm"
-            style={{
-              backgroundColor: p.color,
-              width: p.w,
-              height: p.h,
-              top: 0,
-              left: 0,
-              "--tx": `${p.tx}px`,
-              "--ty": `${p.ty}px`,
-              "--rot": `${p.rot}deg`,
-              animation: `confetti-fly ${p.duration}s ease-out ${p.delay}s forwards`,
-            } as React.CSSProperties}
-          />
-        ))}
-      </div>
+      {!prefersReducedMotion && (
+        <div className="absolute top-1/2 left-12 pointer-events-none" aria-hidden="true">
+          {pieces.map((p) => (
+            <div
+              key={p.id}
+              className="absolute rounded-sm"
+              style={{
+                backgroundColor: p.color,
+                width: p.w,
+                height: p.h,
+                top: 0,
+                left: 0,
+                "--tx": `${p.tx}px`,
+                "--ty": `${p.ty}px`,
+                "--rot": `${p.rot}deg`,
+                animation: `confetti-fly ${p.duration}s ease-out ${p.delay}s forwards`,
+              } as React.CSSProperties}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Animated checkmark */}
       <div
         className="relative w-10 h-10 flex-shrink-0"
-        style={{ animation: "check-circle-in 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards" }}
+        style={prefersReducedMotion ? undefined : { animation: "check-circle-in 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards" }}
         aria-hidden="true"
       >
         <svg viewBox="0 0 40 40" fill="none" className="w-10 h-10">
@@ -71,7 +94,7 @@ function SuccessBanner() {
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeDasharray="30"
-            style={{ animation: "draw-check 0.35s ease-out 0.2s forwards", strokeDashoffset: 30 }}
+            style={prefersReducedMotion ? undefined : { animation: "draw-check 0.35s ease-out 0.2s forwards", strokeDashoffset: 30 }}
           />
         </svg>
       </div>

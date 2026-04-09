@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { formatCurrency, formatMonth, formatShortDate } from "@/lib/utils";
@@ -17,11 +18,18 @@ export function ExpenseLinkedTransactions({
   monthKey?: string;
   className?: string;
 }) {
+  const { user } = useUser();
   const { openEditTransaction } = useTransactionModal();
-  const txs = useQuery(api.transactions.listByBudgetItem, {
-    budgetItemId,
-    month: monthKey,
-  });
+  const txs = useQuery(
+    api.transactions.listByBudgetItem,
+    user
+      ? {
+          userId: user.id,
+          budgetItemId,
+          month: monthKey,
+        }
+      : "skip"
+  );
 
   if (txs === undefined) {
     return (

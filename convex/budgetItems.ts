@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getEffectiveUserId } from "./authUser";
 
 const expenseStatusValidator = v.union(
   v.literal("unfunded"),
@@ -15,22 +16,29 @@ const ASSET_TYPES = new Set([
 ]);
 
 export const listByCategory = query({
-  args: { categoryId: v.id("categories") },
+  args: { categoryId: v.id("categories"), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
+    const category = await ctx.db.get(args.categoryId);
+    if (!category || category.userId !== userId) {
+      throw new Error("Invalid category");
+    }
     return await ctx.db
       .query("budgetItems")
       .withIndex("by_category", (q) => q.eq("categoryId", args.categoryId))
+      .filter((q) => q.eq(q.field("userId"), userId))
       .filter((q) => q.neq(q.field("isArchived"), true))
       .collect();
   },
 });
 
 export const listByUser = query({
-  args: { userId: v.string() },
+  args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     return await ctx.db
       .query("budgetItems")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.neq(q.field("isArchived"), true))
       .collect();
   },
@@ -51,7 +59,7 @@ export const stripLegacyMoneyNeededByDay = mutation({
 
 export const create = mutation({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     categoryId: v.id("categories"),
     name: v.string(),
     amount: v.number(),
@@ -62,18 +70,20 @@ export const create = mutation({
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const cat = await ctx.db.get(args.categoryId);
-    if (!cat || cat.userId !== args.userId) {
+    if (!cat || cat.userId !== userId) {
       throw new Error("Invalid category");
     }
     if (args.accountId) {
       const acct = await ctx.db.get(args.accountId);
-      if (!acct || acct.userId !== args.userId) {
+      if (!acct || acct.userId !== userId) {
         throw new Error("Invalid account");
       }
     }
     return await ctx.db.insert("budgetItems", {
       ...args,
+      userId,
       isArchived: false,
     });
   },
@@ -82,6 +92,7 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("budgetItems"),
+    userId: v.optional(v.string()),
     categoryId: v.optional(v.id("categories")),
     name: v.optional(v.string()),
     amount: v.optional(v.number()),
@@ -92,17 +103,26 @@ export const update = mutation({
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const { id, ...updates } = args;
+    delete (updates as { userId?: string }).userId;
     const doc = await ctx.db.get(id);
-    if (!doc) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Not found");
+    }
+
+    if (updates.categoryId !== undefined) {
+      const cat = await ctx.db.get(updates.categoryId);
+      if (!cat || cat.userId !== userId) {
+        throw new Error("Invalid category");
+      }
     }
 
     const accountArg = updates.accountId;
     if (accountArg !== undefined) {
       if (accountArg !== null) {
         const acct = await ctx.db.get(accountArg);
-        if (!acct || acct.userId !== doc.userId) {
+        if (!acct || acct.userId !== userId) {
           throw new Error("Invalid account");
         }
       }
@@ -125,8 +145,13 @@ export const update = mutation({
 });
 
 export const archive = mutation({
-  args: { id: v.id("budgetItems") },
+  args: { id: v.id("budgetItems"), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
+    const doc = await ctx.db.get(args.id);
+    if (!doc || doc.userId !== userId) {
+      throw new Error("Not found");
+    }
     await ctx.db.patch(args.id, { isArchived: true });
   },
 });
@@ -135,15 +160,16 @@ export const archive = mutation({
 export const markExpensePaid = mutation({
   args: {
     id: v.id("budgetItems"),
-    userId: v.string(),
+    userId: v.optional(v.string()),
     monthKey: v.string(),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     if (!/^\d{4}-\d{2}$/.test(args.monthKey)) {
       throw new Error("Invalid month");
     }
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Not found");
     }
     await ctx.db.patch(args.id, {
@@ -160,8 +186,9 @@ export const markExpensePaid = mutation({
  * `date` is `YYYY-MM-DD`. Uses stored `accounts.balance`.
  */
 export const getAvailableBalance = query({
-  args: { userId: v.string(), date: v.string() },
-  handler: async (ctx, { userId, date }) => {
+  args: { userId: v.optional(v.string()), date: v.string() },
+  handler: async (ctx, { userId: providedUserId, date }) => {
+    const userId = await getEffectiveUserId(ctx, providedUserId);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       throw new Error("Invalid date");
     }
@@ -227,11 +254,12 @@ export const getAvailableBalance = query({
 });
 
 export const getExpensesByStatus = query({
-  args: { userId: v.string(), status: expenseStatusValidator },
+  args: { userId: v.optional(v.string()), status: expenseStatusValidator },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const items = await ctx.db
       .query("budgetItems")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.neq(q.field("isArchived"), true))
       .collect();
 
@@ -249,15 +277,17 @@ export const getExpensesByStatus = query({
 export const setPaidForMonth = mutation({
   args: {
     id: v.id("budgetItems"),
+    userId: v.optional(v.string()),
     monthKey: v.string(),
     paid: v.boolean(),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     if (!/^\d{4}-\d{2}$/.test(args.monthKey)) {
       throw new Error("Invalid month");
     }
     const doc = await ctx.db.get(args.id);
-    if (!doc) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Not found");
     }
     if (args.paid) {

@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { AccountManager } from "@/components/AccountManager";
-import { formatCurrency, formatAccountType } from "@/lib/utils";
+import { formatCurrency, formatAccountType, ACCENT_COLOR_FALLBACK } from "@/lib/utils";
 import { Landmark, Wallet } from "lucide-react";
 
 export default function AccountsPage() {
@@ -99,7 +99,7 @@ export default function AccountsPage() {
             <li key={acc._id}>
               <div
                 className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-4 flex items-center justify-between gap-3"
-                style={{ borderLeft: "3px solid #0d9488" }}
+                style={{ borderLeft: `3px solid ${ACCENT_COLOR_FALLBACK.category}` }}
               >
                 <div className="flex items-start gap-3 min-w-0">
                   <div
@@ -134,19 +134,19 @@ export default function AccountsPage() {
                     }
                     className="text-sm text-slate-500 hover:text-rose-600 px-3 py-2 rounded-lg hover:bg-rose-50"
                   >
-                    Remove
+                    Archive
                   </button>
                 </div>
               </div>
               {archivePendingId === acc._id && (
                 <div
                   role="region"
-                  aria-label={`Confirm remove ${acc.name}`}
+                  aria-label={`Confirm archive ${acc.name}`}
                   className="mt-1 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3"
                 >
                   <p className="text-sm text-rose-700">
-                    Remove <strong>{acc.name}</strong>? Past transactions keep their history; they won’t
-                    update this account anymore.
+                    Archive <strong>{acc.name}</strong>? It will be hidden from active planning. Past
+                    transactions keep their history.
                   </p>
                   <div className="flex gap-2 shrink-0">
                     <button
@@ -154,7 +154,7 @@ export default function AccountsPage() {
                       onClick={handleArchiveConfirm}
                       className="text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 px-3 py-1.5 rounded-lg"
                     >
-                      Remove
+                      Archive
                     </button>
                     <button
                       type="button"

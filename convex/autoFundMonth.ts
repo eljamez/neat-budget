@@ -1,5 +1,6 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { getEffectiveUserId } from "./authUser";
 
 const ASSET_TYPES = new Set(["checking", "savings", "cash", "other"]);
 
@@ -8,8 +9,10 @@ const ASSET_TYPES = new Set(["checking", "savings", "cash", "other"]);
  * up to each line's cap. Does not mark anything paid — funding is separate from payment.
  */
 export const run = mutation({
-  args: { userId: v.string(), monthKey: v.string() },
-  handler: async (ctx, { userId, monthKey }) => {
+  args: { userId: v.optional(v.string()), monthKey: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
+    const { monthKey } = args;
     if (!/^\d{4}-\d{2}$/.test(monthKey)) {
       throw new Error("Invalid month");
     }

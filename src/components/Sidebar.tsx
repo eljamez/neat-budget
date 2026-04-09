@@ -37,11 +37,6 @@ export function Sidebar() {
   const { openAddTransaction } = useTransactionModal();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Close drawer on route change
-  useEffect(() => {
-    setDrawerOpen(false);
-  }, [pathname]);
-
   // Close drawer on Escape key
   useEffect(() => {
     if (!drawerOpen) return;
@@ -201,6 +196,7 @@ export function Sidebar() {
                   <Link
                     key={href}
                     href={href}
+                    onClick={() => setDrawerOpen(false)}
                     aria-current={active ? "page" : undefined}
                     className={itemClass}
                   >

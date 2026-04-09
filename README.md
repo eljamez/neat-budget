@@ -4,12 +4,12 @@ A YNAB/Mint-style personal budgeting app built with Next.js 14, Convex, and Cler
 
 ## Features
 
-- **Budget Categories** — Create categories with monthly limits (Groceries, Rent, etc.)
-- **Transaction Logging** — Record spending with descriptions, amounts, and dates
-- **Real-time Dashboard** — See budget utilization instantly, per category
-- **Overspend Alerts** — Visual warnings when you exceed category limits
-- **Month Navigation** — Browse spending history by month
-- **Secure Auth** — Each user's data is fully isolated via Clerk + Convex
+- **Categories + recurring expenses** — Organize budget groups and define recurring bills with expected monthly amount + due day
+- **Buckets (envelopes)** — Track discretionary targets by period, optional rollover, and monthly fill caps
+- **Debts and credit cards** — Plan monthly paydown/payment separately for loans vs revolving balances
+- **Month-based funding workflow** — Use the dashboard timeline to fund bills/buckets and mark items paid for a selected month
+- **Transaction logging** — Record spending and payments to update balances/history
+- **Secure Auth** — Each user's data is isolated via Clerk + Convex
 
 ## Tech Stack
 
@@ -19,6 +19,10 @@ A YNAB/Mint-style personal budgeting app built with Next.js 14, Convex, and Cler
 | Database | Convex (real-time, reactive) |
 | Auth | Clerk |
 | State | React hooks + Convex queries |
+
+## Architecture
+
+Convex handlers use Clerk-backed identity resolution; see [docs/AUTH_PATTERN.md](docs/AUTH_PATTERN.md) for the `getEffectiveUserId` pattern and migration checklist.
 
 ## Setup
 
@@ -96,9 +100,13 @@ app/
 │   └── auth.config.ts       # Clerk JWT config
 ├── src/
 │   ├── app/
-│   │   ├── dashboard/       # Main budget overview
-│   │   ├── categories/      # Manage budget categories
-│   │   ├── add-transaction/ # Log spending
+│   │   ├── dashboard/       # Month picker, funding workflow, timeline
+│   │   ├── categories/      # Categories + recurring expenses
+│   │   ├── buckets/         # Envelope buckets and targets
+│   │   ├── debts/           # Loan/installment planning
+│   │   ├── credit-cards/    # Revolving card planning
+│   │   ├── accounts/        # Cash and account balances
+│   │   ├── add-transaction/ # Log spending and payments
 │   │   ├── sign-in/         # Clerk sign-in
 │   │   └── sign-up/         # Clerk sign-up
 │   ├── components/
@@ -118,8 +126,12 @@ app/
 | Route | Description |
 |---|---|
 | `/` | Landing page (redirects to dashboard if signed in) |
-| `/dashboard` | Budget overview, spending summary, recent transactions |
-| `/categories` | Create, edit, and archive budget categories |
-| `/add-transaction` | Log a new spending transaction |
+| `/dashboard` | Month view, funding, timeline, spending summary, recent transactions |
+| `/categories` | Categories and recurring expense templates |
+| `/buckets` | Bucket targets, periods, rollover, and links to categories |
+| `/debts` | Loans/installment debts with planned monthly paydown |
+| `/credit-cards` | Revolving cards with planned monthly payments |
+| `/accounts` | Cash/account balances used for budget funding context |
+| `/add-transaction` | Log a spending/payment transaction |
 | `/sign-in` | Clerk sign-in |
 | `/sign-up` | Clerk sign-up |

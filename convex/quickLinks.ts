@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getEffectiveUserId } from "./authUser";
 
 const SUGGESTED_LINKS: Array<{ label: string; url: string }> = [
   { label: "Chase", url: "https://www.chase.com" },
@@ -11,11 +12,12 @@ const SUGGESTED_LINKS: Array<{ label: string; url: string }> = [
 ];
 
 export const list = query({
-  args: { userId: v.string() },
+  args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const rows = await ctx.db
       .query("quickLinks")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
     return rows.sort((a, b) => a.sortOrder - b.sortOrder);
   },
@@ -23,21 +25,22 @@ export const list = query({
 
 export const create = mutation({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     label: v.string(),
     url: v.string(),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const existing = await ctx.db
       .query("quickLinks")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
     const nextOrder =
       existing.length === 0
         ? 0
         : Math.max(...existing.map((r) => r.sortOrder)) + 1;
     return await ctx.db.insert("quickLinks", {
-      userId: args.userId,
+      userId,
       label: args.label.trim(),
       url: args.url.trim(),
       sortOrder: nextOrder,
@@ -48,13 +51,14 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("quickLinks"),
-    userId: v.string(),
+    userId: v.optional(v.string()),
     label: v.optional(v.string()),
     url: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Link not found");
     }
     const patch: {
@@ -80,12 +84,13 @@ export const update = mutation({
 export const setOgPreviewResult = mutation({
   args: {
     id: v.id("quickLinks"),
-    userId: v.string(),
+    userId: v.optional(v.string()),
     ogImageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Link not found");
     }
     await ctx.db.patch(args.id, {
@@ -96,10 +101,11 @@ export const setOgPreviewResult = mutation({
 });
 
 export const remove = mutation({
-  args: { id: v.id("quickLinks"), userId: v.string() },
+  args: { id: v.id("quickLinks"), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Link not found");
     }
     await ctx.db.delete(args.id);
@@ -108,11 +114,12 @@ export const remove = mutation({
 
 /** Adds suggested bank and financial URLs that this user does not already have. */
 export const addSuggested = mutation({
-  args: { userId: v.string() },
+  args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const existing = await ctx.db
       .query("quickLinks")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
     const urls = new Set(existing.map((e) => e.url.toLowerCase()));
     const orderBase =
@@ -123,7 +130,7 @@ export const addSuggested = mutation({
     for (const item of SUGGESTED_LINKS) {
       if (urls.has(item.url.toLowerCase())) continue;
       await ctx.db.insert("quickLinks", {
-        userId: args.userId,
+        userId,
         label: item.label,
         url: item.url,
         sortOrder: orderBase + added,

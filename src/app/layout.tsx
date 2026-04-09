@@ -14,7 +14,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "Neat Budget - Personal Budgeting",
-  description: "Take control of your finances with real-time budget tracking",
+  description: "Plan monthly funding for recurring bills, buckets, debts, and cards.",
   icons: {
     // SVG icon for modern desktop browsers (Chrome 80+, Firefox 41+, Safari 12+)
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],

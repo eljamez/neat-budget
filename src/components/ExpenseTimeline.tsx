@@ -17,6 +17,7 @@ import {
   debtPlannerMonthlyAmount,
   expenseFundingLevel,
   budgetBillFundRemainingForMonth,
+  ACCENT_COLOR_FALLBACK,
 } from "@/lib/utils";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
 import { BudgetItemManager } from "@/components/BudgetItemManager";
@@ -506,7 +507,7 @@ export function ExpenseTimeline({
   }, [rowMenuKey]);
 
   const handleArchive = async (id: Id<"budgetItems">) => {
-    await archiveItem({ id });
+    await archiveItem({ id, userId });
     setArchivePendingId(null);
   };
 
@@ -526,8 +527,8 @@ export function ExpenseTimeline({
     );
   }
 
-  const DEBTS_SECTION_COLOR = "#475569";
-  const CREDIT_CARDS_SECTION_COLOR = "#4f46e5";
+  const DEBTS_SECTION_COLOR = ACCENT_COLOR_FALLBACK.debt;
+  const CREDIT_CARDS_SECTION_COLOR = ACCENT_COLOR_FALLBACK.creditCard;
 
   const timelineCheckboxClass =
     "h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-teal-600 focus:ring-teal-500 focus:ring-offset-0";
@@ -989,7 +990,7 @@ export function ExpenseTimeline({
                                 setRowMenuKey(null);
                               }}
                             >
-                              Remove
+                              Archive
                             </button>
                           </TimelineRowActionsMenu>
                         </div>
@@ -997,7 +998,8 @@ export function ExpenseTimeline({
                         {archiveDebtPendingId === item.debtId && (
                           <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
                             <p className="text-xs text-rose-700">
-                              Remove <strong>{item.name}</strong>? Balances are unchanged.
+                              Archive <strong>{item.name}</strong>? It will be hidden from active planning.
+                              Balances are unchanged.
                             </p>
                             <div className="flex shrink-0 gap-2">
                               <button
@@ -1005,7 +1007,7 @@ export function ExpenseTimeline({
                                 onClick={() => handleArchiveDebt(item.debtId)}
                                 className="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700"
                               >
-                                Remove
+                                Archive
                               </button>
                               <button
                                 type="button"
@@ -1025,7 +1027,7 @@ export function ExpenseTimeline({
                     return null;
                   }
                   const cat = categoryMap[item.categoryId];
-                  const color = cat?.color ?? "#0d9488";
+                  const color = cat?.color ?? ACCENT_COLOR_FALLBACK.category;
                   const iconName = cat?.icon;
                   const IconComp = iconName ? CATEGORY_ICON_MAP[iconName] : null;
                   const isPaidForMonth = item.markedPaidForMonth === budgetMonth;
@@ -1093,6 +1095,7 @@ export function ExpenseTimeline({
                             try {
                               await setBudgetPaidForMonth({
                                 id: item._id,
+                                userId,
                                 monthKey: budgetMonth,
                                 paid: !isPaidForMonth,
                               });
@@ -1318,7 +1321,7 @@ export function ExpenseTimeline({
                               setRowMenuKey(null);
                             }}
                           >
-                            Remove
+                            Archive
                           </button>
                         </TimelineRowActionsMenu>
                       </div>
@@ -1326,7 +1329,7 @@ export function ExpenseTimeline({
                       {archivePendingId === item._id && (
                         <div className="mt-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
                           <p className="text-xs text-rose-700">
-                            Remove <strong>{item.name}</strong>?
+                            Archive <strong>{item.name}</strong>? It will be hidden from active planning.
                           </p>
                           <div className="flex gap-2 shrink-0">
                             <button
@@ -1334,7 +1337,7 @@ export function ExpenseTimeline({
                               onClick={() => handleArchive(item._id)}
                               className="text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 px-2.5 py-1 rounded-lg"
                             >
-                              Remove
+                              Archive
                             </button>
                             <button
                               type="button"

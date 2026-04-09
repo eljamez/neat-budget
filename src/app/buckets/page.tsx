@@ -7,7 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { BucketManager } from "@/components/BucketManager";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, ACCENT_COLOR_FALLBACK } from "@/lib/utils";
 import type { Bucket } from "@/types/bucket";
 import { Boxes } from "lucide-react";
 
@@ -131,7 +131,7 @@ export default function BucketsPage() {
             <li key={b._id}>
               <div
                 className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-4 flex items-center justify-between gap-3"
-                style={{ borderLeft: "3px solid #0d9488" }}
+                style={{ borderLeft: `3px solid ${ACCENT_COLOR_FALLBACK.category}` }}
               >
                 <div className="flex items-start gap-3 min-w-0">
                   <div

@@ -64,7 +64,7 @@ export function TransactionForm({
       note: editTransaction.note ?? "",
     });
     setError("");
-  }, [editTransaction?._id]);
+  }, [editTransaction]);
 
   useEffect(() => {
     if (editTransaction) return;
@@ -82,8 +82,8 @@ export function TransactionForm({
       const c = creditCards?.find((x) => x._id === id);
       acc = c?.paymentAccountId ? String(c.paymentAccountId) : "";
     }
-    setForm((f) => ({ ...f, accountId: acc }));
-  }, [payeeKey, editTransaction?._id, budgetItems, debts, creditCards]);
+    setForm((f) => (f.accountId === acc ? f : { ...f, accountId: acc }));
+  }, [payeeKey, editTransaction, budgetItems, debts, creditCards]);
 
   const categoryNameById = useMemo(() => {
     if (!categories) return {} as Record<string, string>;

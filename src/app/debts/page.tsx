@@ -15,6 +15,7 @@ import {
   dateInBudgetMonth,
   getCurrentMonth,
   debtPlannerMonthlyAmount,
+  ACCENT_COLOR_FALLBACK,
 } from "@/lib/utils";
 import { Landmark } from "lucide-react";
 
@@ -96,7 +97,7 @@ export default function DebtsPage() {
       ) : (
         <ul className="space-y-2">
           {sortedDebts.map((d) => {
-            const color = d.color ?? "#64748b";
+            const color = d.color ?? ACCENT_COLOR_FALLBACK.debtCard;
             const apr = formatAprPercent(d.aprPercent);
             const monthlyPlan = debtPlannerMonthlyAmount(d);
             const showMonthlyPlan = monthlyPlan > 0;
@@ -200,7 +201,7 @@ export default function DebtsPage() {
                         }
                         className="text-xs sm:text-sm text-slate-500 hover:text-rose-600 px-2.5 py-1.5 rounded-lg hover:bg-rose-50 border border-slate-100 sm:border-transparent"
                       >
-                        Remove
+                        Archive
                       </button>
                     </div>
                   </div>
@@ -209,7 +210,8 @@ export default function DebtsPage() {
                 {archiveDebtId === d._id && (
                   <div className="mt-1.5 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2.5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                     <p className="text-sm text-rose-700">
-                      Remove <strong>{d.name}</strong> from your list? Balances are unchanged.
+                      Archive <strong>{d.name}</strong>? It will be hidden from active planning. Balances
+                      are unchanged.
                     </p>
                     <div className="flex gap-2 shrink-0">
                       <button
@@ -220,7 +222,7 @@ export default function DebtsPage() {
                           setArchiveDebtId(null);
                         }}
                       >
-                        Remove
+                        Archive
                       </button>
                       <button
                         type="button"

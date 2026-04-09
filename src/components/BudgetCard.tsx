@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, ACCENT_COLOR_FALLBACK } from "@/lib/utils";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
 
 interface BudgetCardProps {
@@ -22,7 +22,7 @@ export function BudgetCard({
   name,
   monthlyLimit,
   spent,
-  color = "#0d9488",
+  color = ACCENT_COLOR_FALLBACK.category,
   icon = "Receipt",
   budgetBreakdown,
   spentPeriodLabel = "spent this month",
@@ -36,10 +36,10 @@ export function BudgetCard({
   const isWarning = rawPercent >= 80 && !isOverBudget;
 
   const progressColor = isOverBudget
-    ? "#f43f5e"
+    ? ACCENT_COLOR_FALLBACK.danger
     : isWarning
-    ? "#f59e0b"
-    : "#10b981";
+    ? ACCENT_COLOR_FALLBACK.warning
+    : ACCENT_COLOR_FALLBACK.success;
 
   return (
     <div

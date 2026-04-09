@@ -1,14 +1,19 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
 import { useTransactionModal } from "@/components/TransactionModalProvider";
 
 export function DebtPaymentLog({ debtId }: { debtId: Id<"debts"> }) {
+  const { user } = useUser();
   const { openEditTransaction } = useTransactionModal();
-  const payments = useQuery(api.transactions.listByDebt, { debtId });
+  const payments = useQuery(
+    api.transactions.listByDebt,
+    user ? { userId: user.id, debtId } : "skip"
+  );
 
   if (payments === undefined) {
     return (

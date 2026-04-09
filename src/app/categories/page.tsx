@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useMemo } from "react";
 import type { DragEvent } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
@@ -15,6 +15,7 @@ import {
   budgetItemPaidFromLabel,
   formatAccountType,
   expenseHasPayFromAccount,
+  ACCENT_COLOR_FALLBACK,
 } from "@/lib/utils";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
 import {
@@ -104,7 +105,8 @@ function CategoryExpensesSection({
     useState<Id<"budgetItems"> | null>(null);
 
   const handleArchive = async (id: Id<"budgetItems">) => {
-    await archiveItem({ id });
+    if (!user) return;
+    await archiveItem({ id, userId: user.id });
     setArchivePendingId(null);
   };
 
@@ -198,11 +200,13 @@ function CategoryExpensesSection({
                       onMouseDown={(e) => e.stopPropagation()}
                       onChange={async (e) => {
                         e.stopPropagation();
+                        if (!user) return;
                         const v = e.target.value;
                         setAccountSelectPendingId(item._id);
                         try {
                           await updateExpenseRow({
                             id: item._id,
+                            userId: user.id,
                             accountId: v === "" ? null : (v as Id<"accounts">),
                           });
                         } finally {
@@ -230,10 +234,12 @@ function CategoryExpensesSection({
                         disabled={autopayTogglePendingId === item._id}
                         onChange={async (e) => {
                           e.stopPropagation();
+                          if (!user) return;
                           setAutopayTogglePendingId(item._id);
                           try {
                             await updateExpenseRow({
                               id: item._id,
+                              userId: user.id,
                               isAutopay: e.target.checked,
                             });
                           } finally {
@@ -269,7 +275,7 @@ function CategoryExpensesSection({
                         }}
                         className="text-xs text-slate-400 hover:text-rose-600 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors"
                       >
-                        Remove
+                        Archive
                       </button>
                     </div>
                   </div>
@@ -277,7 +283,7 @@ function CategoryExpensesSection({
                   {archivePendingId === item._id && (
                     <div className="mt-1 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
                       <p className="text-xs text-rose-700">
-                        Remove <strong>{item.name}</strong>?
+                        Archive <strong>{item.name}</strong>? It will be hidden from active planning.
                       </p>
                       <div className="flex gap-2">
                         <button
@@ -285,7 +291,7 @@ function CategoryExpensesSection({
                           onClick={() => handleArchive(item._id)}
                           className="text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 px-2.5 py-1 rounded-lg transition-colors"
                         >
-                          Remove
+                          Archive
                         </button>
                         <button
                           type="button"
@@ -353,8 +359,9 @@ export default function CategoriesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editCategory, setEditCategory] = useState<Category | null>(null);
   const [archivePendingId, setArchivePendingId] = useState<Id<"categories"> | null>(null);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const categoryListSigRef = useRef<string | null>(null);
+  const [categoryExpansionOverrides, setCategoryExpansionOverrides] = useState<
+    Record<string, boolean>
+  >({});
   const [expenseDrag, setExpenseDrag] = useState<ExpenseDragState | null>(null);
   const [dropHighlightCategoryId, setDropHighlightCategoryId] = useState<Id<"categories"> | null>(
     null
@@ -384,12 +391,13 @@ export default function CategoriesPage() {
 
   const handleCategoryDrop = async (e: DragEvent<HTMLDivElement>, targetCatId: Id<"categories">) => {
     e.preventDefault();
+    if (!user) return;
     const pending = expenseDrag;
     setExpenseDrag(null);
     setDropHighlightCategoryId(null);
     if (!pending || pending.fromCategoryId === targetCatId) return;
     try {
-      await updateExpense({ id: pending.itemId, categoryId: targetCatId });
+      await updateExpense({ id: pending.itemId, userId: user.id, categoryId: targetCatId });
     } catch {
       // Convex surfaces errors in dev; no extra UI for now
     }
@@ -404,47 +412,50 @@ export default function CategoriesPage() {
     setDropHighlightCategoryId(null);
   };
 
-  useEffect(() => {
-    if (!categories) return;
-    if (categories.length === 0) {
-      categoryListSigRef.current = null;
-      setExpandedCategories(new Set());
-      return;
-    }
-    const sig = categories
-      .map((c) => c._id)
-      .sort()
-      .join("|");
-    const prevSig = categoryListSigRef.current;
-    const prevIds = prevSig ? new Set(prevSig.split("|")) : null;
-    categoryListSigRef.current = sig;
-
-    setExpandedCategories((prev) => {
-      if (!prevIds) {
-        return new Set(categories.map((c) => c._id));
-      }
-      const next = new Set(prev);
-      for (const c of categories) {
-        if (!prevIds.has(c._id)) {
-          next.add(c._id);
-        }
-      }
-      for (const id of next) {
-        if (!categories.some((c) => c._id === id)) {
-          next.delete(id);
-        }
-      }
-      return next;
-    });
-  }, [categories]);
-
-  const toggleExpand = (id: string) => {
-    setExpandedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
+  const expandedCategories = useMemo(() => {
+    if (!categories) return new Set<Id<"categories">>();
+    const next = new Set(categories.map((c) => c._id));
+    for (const [id, isExpanded] of Object.entries(categoryExpansionOverrides)) {
+      if (!categories.some((c) => c._id === (id as Id<"categories">))) continue;
+      const categoryId = id as Id<"categories">;
+      if (isExpanded) {
+        next.add(categoryId);
       } else {
-        next.add(id);
+        next.delete(categoryId);
+      }
+    }
+    return next;
+  }, [categories, categoryExpansionOverrides]);
+
+  const toggleExpand = (id: Id<"categories">) => {
+    const currentlyExpanded = expandedCategories.has(id);
+    setCategoryExpansionOverrides((prev) => ({
+      ...prev,
+      [id]: !currentlyExpanded,
+    }));
+  };
+
+  const handleFormSuccess = () => {
+    setShowForm(false);
+    setEditCategory(null);
+    if (categories && categories.length > 0) {
+      const newest = categories[categories.length - 1];
+      setCategoryExpansionOverrides((prev) => ({
+        ...prev,
+        [newest._id]: true,
+      }));
+    }
+  };
+
+  const handleNewCategory = () => {
+    setShowForm(true);
+    setEditCategory(null);
+    setCategoryExpansionOverrides((prev) => {
+      const next = { ...prev };
+      if (categories) {
+        for (const c of categories) {
+          next[c._id] = expandedCategories.has(c._id);
+        }
       }
       return next;
     });
@@ -456,14 +467,9 @@ export default function CategoriesPage() {
   };
 
   const handleArchiveConfirm = async () => {
-    if (!archivePendingId) return;
-    await archiveCategory({ id: archivePendingId });
+    if (!archivePendingId || !user) return;
+    await archiveCategory({ id: archivePendingId, userId: user.id });
     setArchivePendingId(null);
-  };
-
-  const handleFormSuccess = () => {
-    setShowForm(false);
-    setEditCategory(null);
   };
 
   const plannedByCategory = useMemo(() => {
@@ -505,10 +511,7 @@ export default function CategoriesPage() {
               )}
               <button
                 type="button"
-                onClick={() => {
-                  setShowForm(true);
-                  setEditCategory(null);
-                }}
+                onClick={handleNewCategory}
                 className="bg-teal-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-teal-700 active:scale-[0.97] transition-all shadow-sm w-full sm:w-auto"
               >
                 + New Category
@@ -545,7 +548,7 @@ export default function CategoriesPage() {
           <p className="text-slate-500 mb-1 font-medium">No categories yet</p>
           <p className="text-slate-500 text-sm mb-5">Create budget categories to start tracking your spending</p>
           <button
-            onClick={() => setShowForm(true)}
+            onClick={handleNewCategory}
             className="bg-teal-600 text-white text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-teal-700 active:scale-[0.97] transition-all"
           >
             Create your first category
@@ -555,7 +558,7 @@ export default function CategoriesPage() {
         <div className="space-y-2.5">
           {categories.map((cat) => {
             const isExpanded = expandedCategories.has(cat._id);
-            const color = cat.color ?? "#0d9488";
+            const color = cat.color ?? ACCENT_COLOR_FALLBACK.category;
             const plannedSum = plannedByCategory[cat._id] ?? 0;
 
             const showDropRing =
