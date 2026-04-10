@@ -26,6 +26,32 @@ Convex handlers use Clerk-backed identity resolution; see [docs/AUTH_PATTERN.md]
 
 **AI-assisted contributors:** See [AGENTS.md](AGENTS.md) for where shared Cursor rules (`.cursor/rules/`), `CLAUDE.md`, and project conventions live.
 
+## Production deployment (GitHub Actions)
+
+The workflow [`.github/workflows/production.yml`](.github/workflows/production.yml) runs on **every push to `main`** (including when a pull request is merged) and on **manual** runs via **Actions → Production → Run workflow**. It:
+
+1. Runs **`npm run lint`**
+2. Deploys the **Convex** backend to production using [`npx convex deploy`](https://docs.convex.dev/production/hosting)
+
+### Required secret (Convex)
+
+| Secret | Where to get it |
+|--------|------------------|
+| `CONVEX_DEPLOY_KEY` | Convex Dashboard → your project → **Settings** → **Deploy keys** → create a **Production** deploy key |
+
+Add it under GitHub → **Settings** → **Secrets and variables** → **Actions** → **Repository secrets**.
+
+### Optional: deploy the Next.js app from Actions (Vercel)
+
+If you already use **Vercel’s GitHub integration** to build and deploy the frontend on every push to `main`, **do not** enable the step below—your app would deploy twice. Use this workflow for **Convex only** (default).
+
+To have GitHub Actions build and upload a **production** deployment to Vercel (per [Vercel’s guide](https://vercel.com/kb/guide/how-can-i-use-github-actions-with-vercel)):
+
+1. Add repository **Actions secrets**: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` (from `vercel link` / `.vercel/project.json` and a [Vercel access token](https://vercel.com/guides/how-do-i-use-a-vercel-api-access-token)).
+2. Add a repository **Actions variable** named `DEPLOY_VERCEL` with value **`true`**.
+
+Ensure your Vercel project’s **production** environment variables (Clerk, `NEXT_PUBLIC_CONVEX_URL`, etc.) match your live Convex deployment.
+
 ## Setup
 
 ### 1. Clone and install
