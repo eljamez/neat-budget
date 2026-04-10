@@ -31,6 +31,14 @@ const budgetExpenseStatusValidator = v.union(
 );
 
 export default defineSchema({
+  budgets: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    isDefault: v.boolean(),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_user", ["userId"]),
+
   users: defineTable({
     clerkId: v.string(),
     email: v.string(),
@@ -40,6 +48,7 @@ export default defineSchema({
 
   accounts: defineTable({
     userId: v.string(),
+    budgetId: v.optional(v.id("budgets")),
     name: v.string(),
     /** For checking/savings/cash: cash on hand. For credit_card: amount owed. */
     balance: v.number(),
@@ -56,6 +65,7 @@ export default defineSchema({
   /** Loans and non–credit-card debts; balance drops when you log a transaction with `debtId`. */
   debts: defineTable({
     userId: v.string(),
+    budgetId: v.optional(v.id("budgets")),
     name: v.string(),
     /** Current amount owed. */
     balance: v.number(),
@@ -94,6 +104,7 @@ export default defineSchema({
    */
   creditCards: defineTable({
     userId: v.string(),
+    budgetId: v.optional(v.id("budgets")),
     name: v.string(),
     /** Current balance owed. */
     balance: v.number(),
@@ -117,6 +128,7 @@ export default defineSchema({
   /** Planned payment lines for a debt, each with a calendar due date. */
   debtExpenses: defineTable({
     userId: v.string(),
+    budgetId: v.optional(v.id("budgets")),
     debtId: v.id("debts"),
     name: v.string(),
     amount: v.number(),
@@ -131,6 +143,7 @@ export default defineSchema({
 
   categories: defineTable({
     userId: v.string(),
+    budgetId: v.optional(v.id("budgets")),
     name: v.string(),
     monthlyLimit: v.optional(v.number()),
     color: v.optional(v.string()),
@@ -142,6 +155,7 @@ export default defineSchema({
 
   transactions: defineTable({
     userId: v.string(),
+    budgetId: v.optional(v.id("budgets")),
     /** Copied from the budget item when `budgetItemId` is set; omitted for debt/card-only amounts. */
     categoryId: v.optional(v.id("categories")),
     /** When set, this payment counts toward that recurring budget expense for the transaction month. */
@@ -176,6 +190,7 @@ export default defineSchema({
    */
   bucketMonthFundings: defineTable({
     userId: v.string(),
+    budgetId: v.optional(v.id("budgets")),
     bucketId: v.id("buckets"),
     /** @deprecated Legacy rows only — month funding is budget-wide, not tied to an account. */
     accountId: v.optional(v.id("accounts")),
@@ -191,6 +206,7 @@ export default defineSchema({
    */
   expenseAllocations: defineTable({
     userId: v.string(),
+    budgetId: v.optional(v.id("budgets")),
     budgetItemId: v.id("budgetItems"),
     /** @deprecated Legacy rows only — funding is budget-wide, not taken from a specific account. */
     accountId: v.optional(v.id("accounts")),
@@ -206,6 +222,7 @@ export default defineSchema({
    */
   budgetItemMonthOverrides: defineTable({
     userId: v.string(),
+    budgetId: v.optional(v.id("budgets")),
     budgetItemId: v.id("budgetItems"),
     monthKey: v.string(),
     actualPaidAmount: v.optional(v.number()),
@@ -219,6 +236,7 @@ export default defineSchema({
    */
   buckets: defineTable({
     userId: v.string(),
+    budgetId: v.optional(v.id("budgets")),
     name: v.string(),
     targetAmount: v.number(),
     period: bucketPeriodValidator,
@@ -241,6 +259,7 @@ export default defineSchema({
 
   budgetItems: defineTable({
     userId: v.string(),
+    budgetId: v.optional(v.id("budgets")),
     categoryId: v.id("categories"),
     name: v.string(),
     amount: v.number(), // expected monthly amount

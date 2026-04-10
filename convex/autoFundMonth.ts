@@ -1,6 +1,7 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getEffectiveUserId } from "./authUser";
+import { getEffectiveBudgetIdForMutation } from "./budgetScope";
 
 const ASSET_TYPES = new Set(["checking", "savings", "cash", "other"]);
 
@@ -12,6 +13,7 @@ export const run = mutation({
   args: { userId: v.optional(v.string()), monthKey: v.string() },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForMutation(ctx, userId);
     const { monthKey } = args;
     if (!/^\d{4}-\d{2}$/.test(monthKey)) {
       throw new Error("Invalid month");
@@ -21,6 +23,7 @@ export const run = mutation({
       .query("accounts")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.neq(q.field("isArchived"), true))
+      .filter((q) => q.eq(q.field("budgetId"), budgetId))
       .collect();
 
     let totalCash = 0;
@@ -32,6 +35,7 @@ export const run = mutation({
       .query("budgetItems")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.neq(q.field("isArchived"), true))
+      .filter((q) => q.eq(q.field("budgetId"), budgetId))
       .collect();
 
     const itemIds = new Set(budgetItems.map((i) => i._id as string));
@@ -41,6 +45,7 @@ export const run = mutation({
       .withIndex("by_user_month", (q) =>
         q.eq("userId", userId).eq("monthKey", monthKey)
       )
+      .filter((q) => q.eq(q.field("budgetId"), budgetId))
       .collect();
 
     const bucketFundings = await ctx.db
@@ -48,6 +53,7 @@ export const run = mutation({
       .withIndex("by_user_month", (q) =>
         q.eq("userId", userId).eq("monthKey", monthKey)
       )
+      .filter((q) => q.eq(q.field("budgetId"), budgetId))
       .collect();
 
     let totalFunded = 0;
@@ -100,6 +106,7 @@ export const run = mutation({
       const add = Math.min(need, pool);
       await ctx.db.insert("expenseAllocations", {
         userId,
+        budgetId,
         budgetItemId: item._id,
         amount: add,
         monthKey,
@@ -114,6 +121,7 @@ export const run = mutation({
       .query("buckets")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.neq(q.field("isArchived"), true))
+      .filter((q) => q.eq(q.field("budgetId"), budgetId))
       .collect();
 
     const monthlyBuckets = buckets.filter((b) => b.period === "monthly");
@@ -141,6 +149,7 @@ export const run = mutation({
       const add = Math.min(need, pool);
       await ctx.db.insert("bucketMonthFundings", {
         userId,
+        budgetId,
         bucketId: bucket._id,
         amount: add,
         monthKey,

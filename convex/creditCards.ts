@@ -3,14 +3,16 @@ import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getEffectiveUserId } from "./authUser";
+import { getEffectiveBudgetIdForMutation, getEffectiveBudgetIdForQuery } from "./budgetScope";
 
 async function assertPaymentAccount(
   ctx: MutationCtx,
   userId: string,
+  budgetId: Id<"budgets">,
   accountId: Id<"accounts">
 ) {
   const a = await ctx.db.get(accountId);
-  if (!a || a.userId !== userId) {
+  if (!a || a.userId !== userId || a.budgetId !== budgetId) {
     throw new Error("Invalid payment account");
   }
 }
@@ -21,10 +23,13 @@ export const list = query({
   args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
+    if (!budgetId) return [];
     return await ctx.db
       .query("creditCards")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.neq(q.field("isArchived"), true))
+      .filter((q) => q.eq(q.field("budgetId"), budgetId))
       .collect();
   },
 });
@@ -49,11 +54,13 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForMutation(ctx, userId);
     if (args.paymentAccountId) {
-      await assertPaymentAccount(ctx, userId, args.paymentAccountId);
+      await assertPaymentAccount(ctx, userId, budgetId, args.paymentAccountId);
     }
     return await ctx.db.insert("creditCards", {
       userId,
+      budgetId,
       name: args.name,
       balance: args.balance,
       usageMode: args.usageMode,
@@ -94,8 +101,9 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== userId) {
+    if (!doc || doc.userId !== userId || doc.budgetId !== budgetId) {
       throw new Error("Credit card not found");
     }
     const { id, paymentAccountId, ...rest } = args;
@@ -106,7 +114,8 @@ export const update = mutation({
       if (paymentAccountId === null) {
         patch.paymentAccountId = undefined;
       } else {
-        await assertPaymentAccount(ctx, userId, paymentAccountId);
+        if (!budgetId) throw new Error("No active budget");
+        await assertPaymentAccount(ctx, userId, budgetId, paymentAccountId);
         patch.paymentAccountId = paymentAccountId;
       }
     }
@@ -118,8 +127,9 @@ export const archive = mutation({
   args: { id: v.id("creditCards"), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== userId) {
+    if (!doc || doc.userId !== userId || doc.budgetId !== budgetId) {
       throw new Error("Credit card not found");
     }
     await ctx.db.patch(args.id, { isArchived: true });
@@ -135,8 +145,9 @@ export const setPaidForMonth = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== userId) {
+    if (!doc || doc.userId !== userId || doc.budgetId !== budgetId) {
       throw new Error("Credit card not found");
     }
     if (args.paid) {
