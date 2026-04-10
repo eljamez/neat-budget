@@ -24,6 +24,8 @@ A YNAB/Mint-style personal budgeting app built with Next.js 14, Convex, and Cler
 
 Convex handlers use Clerk-backed identity resolution; see [docs/AUTH_PATTERN.md](docs/AUTH_PATTERN.md) for the `getEffectiveUserId` pattern and migration checklist.
 
+**AI-assisted contributors:** See [AGENTS.md](AGENTS.md) for where shared Cursor rules (`.cursor/rules/`), `CLAUDE.md`, and project conventions live.
+
 ## Setup
 
 ### 1. Clone and install

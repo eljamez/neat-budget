@@ -1,0 +1,13 @@
+---
+description: Next.js app — Convex usage, components, and UI alignment with brand
+globs: src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Next.js frontend (`src/`)
+
+- **Data**: Use `useQuery`, `useMutation`, `useAction` from **`convex/react`** with generated API from **`convex/_generated/api`**. Pass **`userId`** from Clerk (`useAuth` / session) into Convex calls as required by each function.
+- **Layout**: Root layout uses **`ConvexClerkProvider`** and app chrome (e.g. **`Sidebar`**). Match existing patterns in **`src/app/layout.tsx`** and **`src/components/`**.
+- **UI / UX**: **Teal accent `#0d9488`**, warm neutrals, calm spacing—**not** a cold corporate bank dashboard. Full **`CLAUDE.md` → Design Context** is authoritative for voice, light/dark feel, and anti-patterns (no gradient hero metric cards, etc.).
+- **Utilities**: Prefer **`src/lib/utils.ts`** and **`src/lib/icons.ts`** for formatting and icons before adding one-off helpers.
+- **Accessibility & responsive**: Mobile-equal experience; touch-friendly controls on small screens.

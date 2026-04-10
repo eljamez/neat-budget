@@ -2,12 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Shared agent rules (Cursor + Claude + others)
+
+- **`.cursor/rules/*.mdc`** — Stack, auth, Convex, and frontend conventions. Cursor loads these automatically; **follow them for implementation** in this repo even when using Claude Code. They use YAML frontmatter (`description`, `alwaysApply`, `globs`) plus Markdown.
+- **`AGENTS.md`** — Short index of where rules live so nothing is “Cursor-only” or “Claude-only” by accident.
+- **Product / UX voice and visual design** — This file (`CLAUDE.md`) remains the longer reference for brand personality and design principles.
+- If instructions conflict, prefer **`.cursor/rules`** for code/stack patterns and **this file** for product and UX tone unless a rule explicitly says otherwise.
+
 ## Commands
 
 ```bash
 # Development (run both simultaneously)
 npx convex dev        # Terminal 1: Convex backend dev server (required)
-npm run dev           # Terminal 2: Next.js frontend
+npm run dev           # Terminal 2: Next.js frontend (port 3005)
+# or: npm run dev:all  # both Convex + Next in one terminal
 
 # Build & lint
 npm run build
@@ -18,21 +26,20 @@ There are no tests configured.
 
 ## Architecture
 
-**Neat Budget** is a YNAB-style budgeting app. The stack is Next.js 14 (App Router) + Convex (backend/database) + Clerk (auth).
+**Neat Budget** is a YNAB-style budgeting app. The stack is Next.js (App Router) + Convex (backend/database) + Clerk (auth).
 
 ### Auth flow
 
-Clerk handles auth. `src/middleware.ts` protects all routes except `/`, `/sign-in`, and `/sign-up`. The `ConvexClerkProvider` (`src/components/providers/ConvexClerkProvider.tsx`) wraps the app and bridges Clerk JWTs into Convex via a JWT template configured in the Clerk dashboard. Convex validates those JWTs via `convex/auth.config.ts` using `CLERK_JWT_ISSUER_DOMAIN`.
+Clerk handles auth. **`src/proxy.ts`** uses `clerkMiddleware` and protects all routes except `/`, `/sign-in`, and `/sign-up`. The `ConvexClerkProvider` (`src/components/providers/ConvexClerkProvider.tsx`) wraps the app and bridges Clerk JWTs into Convex via a JWT template configured in the Clerk dashboard. Convex validates those JWTs via `convex/auth.config.ts` using `CLERK_JWT_ISSUER_DOMAIN`.
 
-**Important**: Convex functions receive `userId` as a plain string argument (the Clerk user ID) — there is no server-side auth identity extraction in the current mutations/queries. All data isolation relies on passing and filtering by `userId`.
+**Important**: Convex functions receive `userId` as a plain string argument (the Clerk user ID) — there is no server-side auth identity extraction in the current mutations/queries. All data isolation relies on passing and filtering by `userId` (and budget scoping where applicable).
 
 ### Convex backend (`convex/`)
 
-- `schema.ts` — defines three tables: `users`, `categories`, `transactions`
-  - `transactions.date` is stored as ISO string `YYYY-MM-DD`; month filtering is done client-side via `String.startsWith("YYYY-MM")`
-  - `categories` supports soft-delete via `isArchived`
-- `transactions.ts` — CRUD + `getMonthlySpendingByCategory` which returns a `Record<categoryId, totalAmount>` map
-- `categories.ts` / `users.ts` — standard CRUD
+- `schema.ts` — defines all tables (budgets, users, accounts, transactions, categories, buckets, debts, credit cards, etc.). **This file is the source of truth** for fields and indexes.
+- `transactions.date` / similar fields use ISO `YYYY-MM-DD` where applicable; month filtering is often done client-side via `String.startsWith("YYYY-MM")`.
+- `categories` supports soft-delete via `isArchived` where used.
+- Feature modules follow the existing `*.ts` files in `convex/` (CRUD + queries per domain).
 
 ### Frontend (`src/`)
 

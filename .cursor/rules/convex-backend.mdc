@@ -1,0 +1,12 @@
+---
+description: Convex functions — validation, indexes, and user scoping
+globs: convex/**/*.ts
+alwaysApply: false
+---
+
+# Convex backend
+
+- **New or changed functions**: Use `v` validators from `convex/values` for args and returns where appropriate. Prefer existing table types and indexes from **`convex/schema.ts`**.
+- **User data**: Arguments should include **`userId`** (and **`budgetId`** when the row is budget-scoped). **Query with indexes** (`withIndex`) when filtering by `userId` / `budgetId`—avoid full table scans for hot paths.
+- **Patterns**: Follow naming and structure in neighboring files (e.g. `accounts.ts`, `transactions.ts`). Reuse helpers rather than duplicating money/date logic.
+- **Generated API**: After schema or function signature changes, ensure Convex codegen is satisfied (`npx convex dev` or deploy pipeline). Do not hand-edit **`convex/_generated/`**.

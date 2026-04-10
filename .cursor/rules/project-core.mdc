@@ -1,0 +1,14 @@
+---
+description: Neat Budget stack, auth model, commands, and where shared docs live (all agents)
+alwaysApply: true
+---
+
+# Neat Budget — core context
+
+- **App**: YNAB-style household budgeting. **Stack**: Next.js (App Router) + Convex + Clerk.
+- **Dual tooling**: Rules in `.cursor/rules/*.mdc` apply to **Cursor and Claude** (and any assistant). **`CLAUDE.md`** holds deeper architecture + **design / brand** context. **`AGENTS.md`** indexes both.
+- **Auth**: Clerk issues JWTs; Convex validates via `convex/auth.config.ts`. Route protection uses **`src/proxy.ts`** (Clerk `clerkMiddleware` + public route matcher)—not a `middleware.ts` file.
+- **Data isolation**: Convex functions take **`userId`** (Clerk id) as an argument. There is no automatic server identity injection—**every query/mutation must filter or scope by `userId`** (and `budgetId` when applicable) for user-owned data.
+- **Dates**: Transaction-style dates use ISO **`YYYY-MM-DD`** strings; month filters often use `String.startsWith("YYYY-MM")` in the client.
+- **Commands**: `npm run dev` (Next, port 3005), `npx convex dev`, or `npm run dev:all` for both. **No test suite** yet—use `npm run build` and `npm run lint` before shipping changes.
+- **Convex schema**: Single source of truth is **`convex/schema.ts`** (many tables; do not assume only users/categories/transactions).
