@@ -3,14 +3,16 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { getEffectiveUserId } from "./authUser";
+import { getEffectiveBudgetIdForMutation, getEffectiveBudgetIdForQuery } from "./budgetScope";
 
 async function assertPaymentAccount(
   ctx: MutationCtx,
   userId: string,
+  budgetId: Id<"budgets">,
   accountId: Id<"accounts">
 ) {
   const a = await ctx.db.get(accountId);
-  if (!a || a.userId !== userId) {
+  if (!a || a.userId !== userId || a.budgetId !== budgetId) {
     throw new Error("Invalid payment account");
   }
 }
@@ -34,10 +36,11 @@ function assertNonEmptyName(name: string): string {
 async function assertCategoryOwnedByUser(
   ctx: QueryCtx | MutationCtx,
   categoryId: Id<"categories">,
-  userId: string
+  userId: string,
+  budgetId: Id<"budgets">
 ) {
   const cat = await ctx.db.get(categoryId);
-  if (!cat || cat.userId !== userId) {
+  if (!cat || cat.userId !== userId || cat.budgetId !== budgetId) {
     throw new Error("Invalid category");
   }
 }
@@ -46,10 +49,13 @@ export const getBuckets = query({
   args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
+    if (!budgetId) return [];
     return await ctx.db
       .query("buckets")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.neq(q.field("isArchived"), true))
+      .filter((q) => q.eq(q.field("budgetId"), budgetId))
       .collect();
   },
 });
@@ -61,8 +67,9 @@ export const getBucketById = query({
   },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== userId) {
+    if (!doc || doc.userId !== userId || doc.budgetId !== budgetId) {
       return null;
     }
     return doc;
@@ -84,6 +91,7 @@ export const createBucket = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForMutation(ctx, userId);
     const name = assertNonEmptyName(args.name);
     if (!Number.isFinite(args.targetAmount) || args.targetAmount < 0) {
       throw new Error("targetAmount must be a non-negative number");
@@ -95,13 +103,14 @@ export const createBucket = mutation({
       throw new Error("monthlyFillGoal must be a non-negative number");
     }
     if (args.categoryId) {
-      await assertCategoryOwnedByUser(ctx, args.categoryId, userId);
+      await assertCategoryOwnedByUser(ctx, args.categoryId, userId, budgetId);
     }
     if (args.paymentAccountId) {
-      await assertPaymentAccount(ctx, userId, args.paymentAccountId);
+      await assertPaymentAccount(ctx, userId, budgetId, args.paymentAccountId);
     }
     return await ctx.db.insert("buckets", {
       userId,
+      budgetId,
       name,
       targetAmount: args.targetAmount,
       period: args.period,
@@ -132,8 +141,9 @@ export const updateBucket = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== userId) {
+    if (!doc || doc.userId !== userId || doc.budgetId !== budgetId) {
       throw new Error("Not found");
     }
 
@@ -177,7 +187,8 @@ export const updateBucket = mutation({
       if (catArg === null) {
         patch.categoryId = undefined;
       } else {
-        await assertCategoryOwnedByUser(ctx, catArg, doc.userId);
+        if (!budgetId) throw new Error("No active budget");
+        await assertCategoryOwnedByUser(ctx, catArg, doc.userId, budgetId);
         patch.categoryId = catArg;
       }
     }
@@ -187,7 +198,8 @@ export const updateBucket = mutation({
       if (payArg === null) {
         patch.paymentAccountId = undefined;
       } else {
-        await assertPaymentAccount(ctx, doc.userId, payArg);
+        if (!budgetId) throw new Error("No active budget");
+        await assertPaymentAccount(ctx, doc.userId, budgetId, payArg);
         patch.paymentAccountId = payArg;
       }
     }
@@ -203,8 +215,9 @@ export const deleteBucket = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== userId) {
+    if (!doc || doc.userId !== userId || doc.budgetId !== budgetId) {
       throw new Error("Not found");
     }
     await ctx.db.delete(args.id);

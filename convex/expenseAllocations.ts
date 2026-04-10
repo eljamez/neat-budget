@@ -1,16 +1,20 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getEffectiveUserId } from "./authUser";
+import { getEffectiveBudgetIdForMutation, getEffectiveBudgetIdForQuery } from "./budgetScope";
 
 export const listByUserMonth = query({
   args: { userId: v.optional(v.string()), monthKey: v.string() },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
+    if (!budgetId) return [];
     return await ctx.db
       .query("expenseAllocations")
       .withIndex("by_user_month", (q) =>
         q.eq("userId", userId).eq("monthKey", args.monthKey)
       )
+      .filter((q) => q.eq(q.field("budgetId"), budgetId))
       .collect();
   },
 });
@@ -24,11 +28,12 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForMutation(ctx, userId);
     if (args.amount <= 0 || !/^\d{4}-\d{2}$/.test(args.monthKey)) {
       throw new Error("Invalid allocation");
     }
     const item = await ctx.db.get(args.budgetItemId);
-    if (!item || item.userId !== userId) {
+    if (!item || item.userId !== userId || item.budgetId !== budgetId) {
       throw new Error("Invalid expense");
     }
     const existing = await ctx.db
@@ -45,6 +50,7 @@ export const create = mutation({
     }
     return await ctx.db.insert("expenseAllocations", {
       userId,
+      budgetId,
       budgetItemId: args.budgetItemId,
       amount: args.amount,
       monthKey: args.monthKey,
@@ -56,8 +62,9 @@ export const remove = mutation({
   args: { id: v.id("expenseAllocations"), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== userId) {
+    if (!doc || doc.userId !== userId || doc.budgetId !== budgetId) {
       throw new Error("Not found");
     }
     await ctx.db.delete(args.id);
@@ -73,11 +80,12 @@ export const removeAllForBudgetMonth = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
     if (!/^\d{4}-\d{2}$/.test(args.monthKey)) {
       throw new Error("Invalid month");
     }
     const item = await ctx.db.get(args.budgetItemId);
-    if (!item || item.userId !== userId) {
+    if (!item || item.userId !== userId || item.budgetId !== budgetId) {
       throw new Error("Not found");
     }
     const rows = await ctx.db
@@ -87,7 +95,7 @@ export const removeAllForBudgetMonth = mutation({
       )
       .collect();
     for (const r of rows) {
-      if (r.userId !== userId) continue;
+      if (r.userId !== userId || r.budgetId !== budgetId) continue;
       await ctx.db.delete(r._id);
     }
   },
@@ -106,6 +114,7 @@ export const setTotalForBudgetMonth = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForMutation(ctx, userId);
     if (!/^\d{4}-\d{2}$/.test(args.monthKey)) {
       throw new Error("Invalid month");
     }
@@ -113,7 +122,7 @@ export const setTotalForBudgetMonth = mutation({
       throw new Error("Invalid amount");
     }
     const item = await ctx.db.get(args.budgetItemId);
-    if (!item || item.userId !== userId) {
+    if (!item || item.userId !== userId || item.budgetId !== budgetId) {
       throw new Error("Not found");
     }
     const rows = await ctx.db
@@ -123,7 +132,7 @@ export const setTotalForBudgetMonth = mutation({
       )
       .collect();
     for (const r of rows) {
-      if (r.userId !== userId) continue;
+      if (r.userId !== userId || r.budgetId !== budgetId) continue;
       await ctx.db.delete(r._id);
     }
     const cap = item.amount;
@@ -133,6 +142,7 @@ export const setTotalForBudgetMonth = mutation({
     }
     await ctx.db.insert("expenseAllocations", {
       userId,
+      budgetId,
       budgetItemId: args.budgetItemId,
       amount: toFund,
       monthKey: args.monthKey,

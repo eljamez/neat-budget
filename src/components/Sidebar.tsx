@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, useAuth } from "@clerk/nextjs";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import {
@@ -106,9 +109,18 @@ const PRIMARY_NAV = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
   const { openAddTransaction } = useTransactionModal();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const budgets = useQuery(api.budgets.list, userId ? { userId } : "skip");
+  const ensureDefaultBudget = useMutation(api.budgets.ensureDefault);
+  const setActiveBudget = useMutation(api.budgets.setActive);
+  const createBudget = useMutation(api.budgets.create);
+
+  useEffect(() => {
+    if (!userId) return;
+    void ensureDefaultBudget({ userId });
+  }, [ensureDefaultBudget, userId]);
 
   // Close drawer on Escape key
   useEffect(() => {
@@ -123,6 +135,8 @@ export function Sidebar() {
   if (!isSignedIn) return null;
   if (pathname === "/") return null;
 
+  const activeBudgetId = budgets?.find((b) => b.isActive)?._id ?? "";
+
   return (
     <>
       {/* ── Desktop sidebar ── */}
@@ -135,6 +149,41 @@ export function Sidebar() {
             <LogoMark size={32} />
             <span className="font-bold text-white text-base tracking-tight">Neat Budget</span>
           </Link>
+          <div className="mt-4">
+            <label htmlFor="budget-select-desktop" className="block text-xs text-slate-400 mb-1">
+              Budget
+            </label>
+            <select
+              id="budget-select-desktop"
+              value={activeBudgetId}
+              onChange={(e) => {
+                if (!userId || !e.target.value) return;
+                void setActiveBudget({ userId, budgetId: e.target.value as Id<"budgets"> });
+              }}
+              className="w-full rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-400"
+            >
+              {(budgets ?? []).map((budget) => (
+                <option key={budget._id} value={budget._id} className="text-slate-900">
+                  {budget.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                if (!userId) return;
+                const name = window.prompt("Name your new budget");
+                if (!name?.trim()) return;
+                void (async () => {
+                  const budgetId = await createBudget({ userId, name: name.trim() });
+                  await setActiveBudget({ userId, budgetId });
+                })();
+              }}
+              className="mt-2 text-xs text-teal-300 hover:text-teal-200"
+            >
+              + New budget
+            </button>
+          </div>
         </div>
 
         <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-0.5">
@@ -235,6 +284,26 @@ export function Sidebar() {
               >
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
+            </div>
+            <div className="px-5 py-4 border-b border-white/5">
+              <label htmlFor="budget-select-mobile" className="block text-xs text-slate-400 mb-1">
+                Budget
+              </label>
+              <select
+                id="budget-select-mobile"
+                value={activeBudgetId}
+                onChange={(e) => {
+                  if (!userId || !e.target.value) return;
+                  void setActiveBudget({ userId, budgetId: e.target.value as Id<"budgets"> });
+                }}
+                className="w-full rounded-md border border-white/15 bg-white/5 px-2.5 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-400"
+              >
+                {(budgets ?? []).map((budget) => (
+                  <option key={budget._id} value={budget._id} className="text-slate-900">
+                    {budget.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Drawer nav */}

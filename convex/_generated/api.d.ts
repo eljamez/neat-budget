@@ -16,6 +16,8 @@ import type * as bucketMonthFundings from "../bucketMonthFundings.js";
 import type * as buckets from "../buckets.js";
 import type * as budgetItemMonthOverrides from "../budgetItemMonthOverrides.js";
 import type * as budgetItems from "../budgetItems.js";
+import type * as budgetScope from "../budgetScope.js";
+import type * as budgets from "../budgets.js";
 import type * as categories from "../categories.js";
 import type * as creditCards from "../creditCards.js";
 import type * as debtExpenses from "../debtExpenses.js";
@@ -40,6 +42,8 @@ declare const fullApi: ApiFromModules<{
   buckets: typeof buckets;
   budgetItemMonthOverrides: typeof budgetItemMonthOverrides;
   budgetItems: typeof budgetItems;
+  budgetScope: typeof budgetScope;
+  budgets: typeof budgets;
   categories: typeof categories;
   creditCards: typeof creditCards;
   debtExpenses: typeof debtExpenses;
