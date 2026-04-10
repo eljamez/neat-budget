@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, ACCENT_COLOR_FALLBACK, cn } from "@/lib/utils";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
 
 interface BudgetCardProps {
@@ -22,7 +22,7 @@ export function BudgetCard({
   name,
   monthlyLimit,
   spent,
-  color = "#0d9488",
+  color = ACCENT_COLOR_FALLBACK.category,
   icon = "Receipt",
   budgetBreakdown,
   spentPeriodLabel = "spent this month",
@@ -36,14 +36,14 @@ export function BudgetCard({
   const isWarning = rawPercent >= 80 && !isOverBudget;
 
   const progressColor = isOverBudget
-    ? "#f43f5e"
+    ? ACCENT_COLOR_FALLBACK.danger
     : isWarning
-    ? "#f59e0b"
-    : "#10b981";
+    ? ACCENT_COLOR_FALLBACK.warning
+    : ACCENT_COLOR_FALLBACK.success;
 
   return (
     <div
-      className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-200 group"
+      className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-white/10 overflow-hidden hover:shadow-md dark:hover:border-white/15 transition-all duration-200 group"
       style={{ borderLeft: `4px solid ${color}`, cursor: onViewTransactions ? "pointer" : "default" }}
       role={onViewTransactions ? "button" : undefined}
       tabIndex={onViewTransactions ? 0 : undefined}
@@ -70,23 +70,23 @@ export function BudgetCard({
               })()}
             </div>
             <div>
-              <h3 className="font-semibold text-slate-800 leading-tight">{name}</h3>
+              <h3 className="font-semibold text-slate-800 dark:text-slate-100 leading-tight">{name}</h3>
               {budgetBreakdown ? (
-                <p className="text-xs text-slate-400 mt-0.5">
-                  <span className="font-medium text-slate-500">{formatCurrency(monthlyLimit)} total</span>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                  <span className="font-medium text-slate-500 dark:text-slate-400">{formatCurrency(monthlyLimit)} total</span>
                   {" · "}
                   {formatCurrency(budgetBreakdown.fromPlannedExpenses)} expenses +{" "}
                   {formatCurrency(budgetBreakdown.manualExtra)} extra
                 </p>
               ) : (
-                <p className="text-xs text-slate-400 mt-0.5">{formatCurrency(monthlyLimit)} budget</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{formatCurrency(monthlyLimit)} budget</p>
               )}
             </div>
           </div>
           {onEdit && (
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="opacity-0 group-hover:opacity-100 text-xs text-slate-400 hover:text-teal-600 px-2 py-1 rounded-lg hover:bg-teal-50 transition-all"
+              className="opacity-0 group-hover:opacity-100 text-xs text-slate-400 dark:text-slate-500 hover:text-teal-600 dark:hover:text-teal-400 px-2 py-1 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-all"
             >
               Edit
             </button>
@@ -95,23 +95,27 @@ export function BudgetCard({
 
         <div className="flex items-end justify-between mb-3">
           <div>
-            <p className="text-2xl font-bold text-slate-900 leading-none">{formatCurrency(spent)}</p>
-            <p className="text-xs text-slate-400 mt-1">{spentPeriodLabel}</p>
+            <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 leading-none">{formatCurrency(spent)}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{spentPeriodLabel}</p>
           </div>
           <div className="text-right">
             <p
-              className="text-sm font-semibold leading-none"
-              style={{ color: progressColor }}
+              className={cn(
+                "text-sm font-semibold leading-none",
+                isOverBudget && "text-rose-600 dark:text-rose-400",
+                isWarning && "text-amber-700 dark:text-amber-400",
+                !isOverBudget && !isWarning && "text-emerald-700 dark:text-emerald-400"
+              )}
             >
               {isOverBudget
                 ? `+${formatCurrency(Math.abs(remaining))} over`
                 : `${formatCurrency(remaining)} left`}
             </p>
-            <p className="text-xs text-slate-400 mt-1">{Math.round(rawPercent)}% used</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{Math.round(rawPercent)}% used</p>
           </div>
         </div>
 
-        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
           <div
             className="h-1.5 rounded-full transition-all duration-500"
             style={{ width: `${displayPercent}%`, backgroundColor: progressColor }}
@@ -119,14 +123,14 @@ export function BudgetCard({
         </div>
 
         {isOverBudget && (
-          <div role="status" aria-label="Over budget" className="mt-3 inline-flex items-center gap-1.5 bg-rose-50 text-rose-600 text-xs font-medium px-2.5 py-1 rounded-full">
-            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+          <div role="status" aria-label="Over budget" className="mt-3 inline-flex items-center gap-1.5 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-medium px-2.5 py-1 rounded-full border border-rose-100/80 dark:border-rose-800/50">
+            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-rose-500 dark:bg-rose-400 animate-pulse" />
             Over budget
           </div>
         )}
         {isWarning && (
-          <div role="status" aria-label="Approaching budget limit" className="mt-3 inline-flex items-center gap-1.5 bg-amber-50 text-amber-600 text-xs font-medium px-2.5 py-1 rounded-full">
-            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          <div role="status" aria-label="Approaching budget limit" className="mt-3 inline-flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-xs font-medium px-2.5 py-1 rounded-full border border-amber-100/80 dark:border-amber-800/50">
+            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
             Almost there
           </div>
         )}

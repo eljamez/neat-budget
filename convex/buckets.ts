@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
+import { getEffectiveUserId } from "./authUser";
 
 async function assertPaymentAccount(
   ctx: MutationCtx,
@@ -42,11 +43,12 @@ async function assertCategoryOwnedByUser(
 }
 
 export const getBuckets = query({
-  args: { userId: v.string() },
+  args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     return await ctx.db
       .query("buckets")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.neq(q.field("isArchived"), true))
       .collect();
   },
@@ -55,11 +57,12 @@ export const getBuckets = query({
 export const getBucketById = query({
   args: {
     id: v.id("buckets"),
-    userId: v.string(),
+    userId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       return null;
     }
     return doc;
@@ -68,7 +71,7 @@ export const getBucketById = query({
 
 export const createBucket = mutation({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     name: v.string(),
     targetAmount: v.number(),
     period: bucketPeriodValidator,
@@ -80,6 +83,7 @@ export const createBucket = mutation({
     paymentAccountId: v.optional(v.id("accounts")),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const name = assertNonEmptyName(args.name);
     if (!Number.isFinite(args.targetAmount) || args.targetAmount < 0) {
       throw new Error("targetAmount must be a non-negative number");
@@ -91,13 +95,13 @@ export const createBucket = mutation({
       throw new Error("monthlyFillGoal must be a non-negative number");
     }
     if (args.categoryId) {
-      await assertCategoryOwnedByUser(ctx, args.categoryId, args.userId);
+      await assertCategoryOwnedByUser(ctx, args.categoryId, userId);
     }
     if (args.paymentAccountId) {
-      await assertPaymentAccount(ctx, args.userId, args.paymentAccountId);
+      await assertPaymentAccount(ctx, userId, args.paymentAccountId);
     }
     return await ctx.db.insert("buckets", {
-      userId: args.userId,
+      userId,
       name,
       targetAmount: args.targetAmount,
       period: args.period,
@@ -115,7 +119,7 @@ export const createBucket = mutation({
 export const updateBucket = mutation({
   args: {
     id: v.id("buckets"),
-    userId: v.string(),
+    userId: v.optional(v.string()),
     name: v.optional(v.string()),
     targetAmount: v.optional(v.number()),
     period: v.optional(bucketPeriodValidator),
@@ -127,8 +131,9 @@ export const updateBucket = mutation({
     paymentAccountId: v.optional(v.union(v.id("accounts"), v.null())),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Not found");
     }
 
@@ -194,11 +199,12 @@ export const updateBucket = mutation({
 export const deleteBucket = mutation({
   args: {
     id: v.id("buckets"),
-    userId: v.string(),
+    userId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Not found");
     }
     await ctx.db.delete(args.id);

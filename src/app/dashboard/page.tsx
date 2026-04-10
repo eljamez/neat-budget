@@ -21,6 +21,7 @@ import {
   bucketMonthlyFundingCap,
   asOfDateForBudgetView,
   debtPlannerMonthlyAmount,
+  ACCENT_COLOR_FALLBACK,
 } from "@/lib/utils";
 import { BucketFundingModal } from "@/components/BucketFundingModal";
 import { MonthFundingModal } from "@/components/MonthFundingModal";
@@ -43,6 +44,8 @@ import {
   Boxes,
   Info,
   Sparkles,
+  Pencil,
+  CircleAlert,
 } from "lucide-react";
 import type { Bucket } from "@/types/bucket";
 
@@ -116,6 +119,9 @@ export default function DashboardPage() {
   const [monthFundingOpen, setMonthFundingOpen] = useState(false);
   const [autoFundPending, setAutoFundPending] = useState(false);
   const [fundingNotice, setFundingNotice] = useState<string | null>(null);
+  const [openHelpTooltip, setOpenHelpTooltip] = useState<"timeline" | "buckets" | "accounts" | null>(
+    null
+  );
 
   const autoFundMonth = useMutation(api.autoFundMonth.run);
 
@@ -292,22 +298,22 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between w-full">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-slate-900">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
                   Good {getTimeOfDay()}, {user.firstName ?? "there"}
                 </h1>
                 {headerMood ? (
-                  <span className="text-base sm:text-lg text-slate-500 font-medium leading-snug max-w-prose">
+                  <span className="text-base sm:text-lg text-slate-500 dark:text-slate-400 font-medium leading-snug max-w-prose">
                     {headerMood}
                   </span>
                 ) : null}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
-              <div className="flex items-center rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div className="flex items-center rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 shadow-sm overflow-hidden dark:[color-scheme:dark]">
                 <button
                   type="button"
                   onClick={() => setSelectedMonth((m) => shiftMonth(m, -1))}
-                  className="p-2.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors border-r border-slate-100"
+                  className="p-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-slate-100 transition-colors border-r border-slate-100 dark:border-white/10"
                   aria-label="Previous month"
                 >
                   <ChevronLeft className="w-5 h-5" aria-hidden="true" />
@@ -317,12 +323,12 @@ export default function DashboardPage() {
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   aria-label="Select month"
-                  className="min-w-0 flex-1 sm:w-38 border-0 bg-transparent px-2 py-2.5 text-base text-slate-700 text-center focus:ring-0 focus:outline-none"
+                  className="min-w-0 flex-1 sm:w-38 border-0 bg-transparent px-2 py-2.5 text-base text-slate-700 dark:text-slate-200 text-center focus:ring-0 focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setSelectedMonth((m) => shiftMonth(m, 1))}
-                  className="p-2.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors border-l border-slate-100"
+                  className="p-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-slate-100 transition-colors border-l border-slate-100 dark:border-white/10"
                   aria-label="Next month"
                 >
                   <ChevronRight className="w-5 h-5" aria-hidden="true" />
@@ -332,7 +338,7 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedMonth(getCurrentMonth())}
-                  className="text-base font-medium text-teal-600 hover:text-teal-700 px-2 py-1 rounded-lg hover:bg-teal-50 transition-colors"
+                  className="text-base font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 px-2 py-1 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-colors"
                 >
                   This month
                 </button>
@@ -348,163 +354,194 @@ export default function DashboardPage() {
         <h2 id="dashboard-budget-summary-heading" className="sr-only">
           Budget, funded, and left to fund
         </h2>
-        <div className="-mx-5 px-5 pb-3 mb-1 border-b border-slate-200/90 bg-slate-50/95 lg:-mx-8 lg:px-8">
-          <div
-            className={cn(
-              "w-full rounded-xl border bg-white/80 shadow-sm px-4 py-4 sm:px-5 sm:py-5",
-              headerOverFunded
-                ? "border-rose-300/90 ring-1 ring-rose-200/60"
-                : "border-emerald-200/80 ring-1 ring-emerald-100/50"
-            )}
-          >
-            {cashBudgetAmount === null ? (
-              <p className="text-slate-400 italic text-base">Loading account balances…</p>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-0 sm:divide-x sm:divide-slate-100">
-                  <div className="min-w-0 sm:pr-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Budget</p>
-                    <p className="text-3xl sm:text-4xl font-bold tabular-nums text-emerald-600">
-                      {formatCurrency(cashBudgetAmount)}
-                    </p>
-                    <p className="text-sm text-slate-500 mt-1.5">
-                      {cashAccounts.length} {cashAccounts.length === 1 ? "account" : "accounts"}
-                    </p>
-                  </div>
-                  <div className="min-w-0 sm:px-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Funded</p>
-                    <p
-                      className={cn(
-                        "text-3xl sm:text-4xl font-bold tabular-nums",
-                        headerTotalFunded === null
-                          ? "text-slate-400"
-                          : headerOverFunded
-                            ? "text-rose-600"
-                            : "text-emerald-600"
-                      )}
-                    >
-                      {headerTotalFunded === null ? "…" : formatCurrency(headerTotalFunded)}
-                    </p>
-                    <p className="text-sm text-slate-500 mt-1.5">bills &amp; buckets (not paid yet)</p>
-                  </div>
-                  <div className="min-w-0 sm:pl-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                      Left to fund
-                    </p>
-                    <p
-                      className={cn(
-                        "text-3xl sm:text-4xl font-bold tabular-nums",
-                        headerAvailableToFund === null
-                          ? "text-slate-400"
-                          : headerOverFunded
-                            ? "text-rose-600"
-                            : "text-emerald-600"
-                      )}
-                    >
-                      {headerAvailableToFund === null ? "…" : formatCurrency(headerAvailableToFund)}
-                    </p>
-                    <p className="text-sm text-slate-500 mt-1.5">
-                      {headerAvailableToFund === null
-                        ? "Loading funding…"
-                        : headerOverFunded
-                          ? "Over-funded vs cash"
-                          : "Still unassigned"}
-                    </p>
-                  </div>
-                </div>
-                {fundingNotice ? (
-                  <p className="mt-3 text-sm text-teal-900 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
-                    {fundingNotice}
-                  </p>
-                ) : null}
-                <div className="mt-4 pt-4 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={autoFundPending || !user}
-                      onClick={() => {
-                        if (!user) return;
-                        setFundingNotice(null);
-                        setAutoFundPending(true);
-                        void (async () => {
-                          try {
-                            const r = await autoFundMonth({
-                              userId: user.id,
-                              monthKey: selectedMonth,
-                            });
-                            if (r.message) {
-                              setFundingNotice(r.message);
-                            } else if (r.totalAdded > 0.005) {
-                              const parts: string[] = [];
-                              if (r.billsTouched > 0) {
-                                parts.push(
-                                  `${r.billsTouched} bill${r.billsTouched === 1 ? "" : "s"}`
-                                );
-                              }
-                              if (r.bucketsTouched > 0) {
-                                parts.push(
-                                  `${r.bucketsTouched} bucket${r.bucketsTouched === 1 ? "" : "s"}`
-                                );
-                              }
-                              setFundingNotice(
-                                `Auto-funded ${formatCurrency(r.totalAdded)} (${parts.join(", ")}). Remaining to assign: ${formatCurrency(Math.max(0, r.remainingAvailable))}.`
-                              );
-                            } else {
-                              setFundingNotice(
-                                "Nothing was added — you may already be fully funded for this month, or there is no cash left to assign."
-                              );
-                            }
-                          } catch (e) {
-                            setFundingNotice(
-                              e instanceof Error ? e.message : "Could not auto-fund this month."
+        {cashBudgetAmount === null ? (
+          <p className="text-slate-400 dark:text-slate-500 italic text-base">
+            Loading account balances…
+          </p>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
+              <div
+                className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 sm:p-6 shadow-sm"
+                style={{ borderLeft: `3px solid ${ACCENT_COLOR_FALLBACK.successStrong}` }}
+              >
+                <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">
+                  Budget
+                </p>
+                <p className="text-4xl sm:text-5xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  {formatCurrency(cashBudgetAmount)}
+                </p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                  {cashAccounts.length} {cashAccounts.length === 1 ? "account" : "accounts"}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 sm:p-6 shadow-sm">
+                <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">
+                  Funded
+                </p>
+                <p
+                  className={cn(
+                    "text-4xl sm:text-5xl font-bold tracking-tight tabular-nums",
+                    headerTotalFunded === null
+                      ? "text-slate-400 dark:text-slate-500"
+                      : headerOverFunded
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-emerald-600 dark:text-emerald-400"
+                  )}
+                >
+                  {headerTotalFunded === null ? "—" : formatCurrency(headerTotalFunded)}
+                </p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                  Bills &amp; buckets (not paid yet)
+                </p>
+              </div>
+              <div
+                className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 sm:p-6 shadow-sm"
+                style={{
+                  borderLeft: `3px solid ${
+                    headerAvailableToFund === null
+                      ? ACCENT_COLOR_FALLBACK.success
+                      : headerOverFunded
+                        ? ACCENT_COLOR_FALLBACK.danger
+                        : ACCENT_COLOR_FALLBACK.success
+                  }`,
+                }}
+              >
+                <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">
+                  Left to fund
+                </p>
+                <p
+                  className={cn(
+                    "text-4xl sm:text-5xl font-bold tracking-tight tabular-nums",
+                    headerAvailableToFund === null
+                      ? "text-slate-400 dark:text-slate-500"
+                      : headerOverFunded
+                        ? "text-rose-600 dark:text-rose-400"
+                        : "text-emerald-600 dark:text-emerald-400"
+                  )}
+                >
+                  {headerAvailableToFund === null ? "—" : formatCurrency(headerAvailableToFund)}
+                </p>
+                <p
+                  className={cn(
+                    "text-base mt-3",
+                    headerAvailableToFund === null
+                      ? "text-slate-400 dark:text-slate-500"
+                      : headerOverFunded
+                        ? "text-rose-400 dark:text-rose-300"
+                        : "text-emerald-400 dark:text-emerald-500"
+                  )}
+                >
+                  {headerAvailableToFund === null
+                    ? "Loading funding…"
+                    : headerOverFunded
+                      ? "Over-funded vs cash"
+                      : "Still unassigned"}
+                </p>
+              </div>
+            </div>
+            {fundingNotice ? (
+              <p className="text-sm text-teal-900 dark:text-teal-100 bg-teal-50 dark:bg-teal-950/60 border border-teal-100 dark:border-teal-800/60 rounded-xl px-3 py-2.5">
+                {fundingNotice}
+              </p>
+            ) : null}
+            <div className="rounded-2xl border border-slate-100 dark:border-white/10 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  disabled={autoFundPending || !user}
+                  onClick={() => {
+                    if (!user) return;
+                    setFundingNotice(null);
+                    setAutoFundPending(true);
+                    void (async () => {
+                      try {
+                        const r = await autoFundMonth({
+                          userId: user.id,
+                          monthKey: selectedMonth,
+                        });
+                        if (r.message) {
+                          setFundingNotice(r.message);
+                        } else if (r.totalAdded > 0.005) {
+                          const parts: string[] = [];
+                          if (r.billsTouched > 0) {
+                            parts.push(
+                              `${r.billsTouched} bill${r.billsTouched === 1 ? "" : "s"}`
                             );
-                          } finally {
-                            setAutoFundPending(false);
                           }
-                        })();
-                      }}
-                      className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50/90 px-3 py-2 text-sm font-semibold text-teal-900 shadow-sm hover:bg-teal-100/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <Sparkles className="w-4 h-4 shrink-0" aria-hidden="true" />
-                      {autoFundPending ? "Funding…" : "Auto-fund month"}
-                    </button>
-                    <span className="text-xs text-slate-500 max-w-xs leading-snug">
-                      Fills bills (by due date) then monthly buckets, up to cash on hand. Does not mark anything paid.
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setMonthFundingOpen(true)}
-                    className="text-base font-semibold text-teal-700 hover:text-teal-800 rounded-lg px-1 sm:ml-auto py-1 hover:bg-teal-50/80 transition-colors text-left sm:text-right"
-                  >
-                    View &amp; remove funding for {formatMonth(selectedMonth)} →
-                  </button>
-                </div>
-              </>
-            )}
+                          if (r.bucketsTouched > 0) {
+                            parts.push(
+                              `${r.bucketsTouched} bucket${r.bucketsTouched === 1 ? "" : "s"}`
+                            );
+                          }
+                          setFundingNotice(
+                            `Auto-funded ${formatCurrency(r.totalAdded)} (${parts.join(", ")}). Remaining to assign: ${formatCurrency(Math.max(0, r.remainingAvailable))}.`
+                          );
+                        } else {
+                          setFundingNotice(
+                            "Nothing was added — you may already be fully funded for this month, or there is no cash left to assign."
+                          );
+                        }
+                      } catch (e) {
+                        setFundingNotice(
+                          e instanceof Error ? e.message : "Could not auto-fund this month."
+                        );
+                      } finally {
+                        setAutoFundPending(false);
+                      }
+                    })();
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl border border-teal-200 dark:border-teal-800/70 bg-teal-50/90 dark:bg-teal-950/50 px-3 py-2 text-sm font-semibold text-teal-900 dark:text-teal-100 shadow-sm hover:bg-teal-100/90 dark:hover:bg-teal-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                >
+                  <Sparkles className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  {autoFundPending ? "Funding…" : "Auto-fund month"}
+                </button>
+                <span className="text-xs text-slate-500 dark:text-slate-400 max-w-md leading-snug">
+                  Fills bills (by due date) then monthly buckets, up to cash on hand. Does not mark
+                  anything paid.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMonthFundingOpen(true)}
+                className="text-sm sm:text-base font-semibold text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 rounded-lg px-1 py-1 hover:bg-teal-50/80 dark:hover:bg-teal-950/50 transition-colors text-left sm:text-right shrink-0"
+              >
+                View &amp; remove funding for {formatMonth(selectedMonth)} →
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       {categories !== undefined && categories.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6 items-start">
           <div className="lg:col-span-2 w-full min-w-0 space-y-4">
-            <div className="rounded-xl border border-teal-100 bg-linear-to-r from-teal-50/90 to-slate-50/80 px-4 py-3.5 sm:px-5 sm:py-4 shadow-sm">
+            <div className="rounded-xl border border-teal-100 dark:border-teal-900/40 bg-linear-to-r from-teal-50/90 to-slate-50/80 dark:from-teal-950/50 dark:to-slate-900/80 px-4 py-3.5 sm:px-5 sm:py-4 shadow-sm">
               <div className="flex items-center gap-2 min-w-0">
-                <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-teal-950">
+                <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-teal-950 dark:text-teal-100">
                   {formatMonth(selectedMonth)}
                 </h2>
                 <span className="relative shrink-0 group z-10">
                   <button
                     type="button"
-                    className="rounded-full p-1 text-teal-700/70 hover:text-teal-900 hover:bg-teal-100/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                    onClick={() =>
+                      setOpenHelpTooltip((prev) => (prev === "timeline" ? null : "timeline"))
+                    }
+                    className="rounded-full p-1 text-teal-700/70 dark:text-teal-400 hover:text-teal-900 dark:hover:text-teal-100 hover:bg-teal-100/80 dark:hover:bg-teal-900/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
                     aria-label="How the bill timeline works"
+                    aria-describedby="timeline-help-tooltip"
+                    aria-expanded={openHelpTooltip === "timeline"}
+                    aria-controls="timeline-help-tooltip"
                   >
                     <Info className="w-5 h-5 sm:w-[1.35rem] sm:h-[1.35rem]" aria-hidden="true" />
                   </button>
                   <span
+                    id="timeline-help-tooltip"
                     role="tooltip"
-                    className="pointer-events-none absolute left-0 top-full mt-1.5 w-[min(22rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20"
+                    className={cn(
+                      "pointer-events-none absolute left-0 top-full mt-1.5 w-[min(22rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
+                      openHelpTooltip === "timeline" && "opacity-100 visible translate-y-0"
+                    )}
                   >
                     Bills are ordered by{" "}
                     <span className="font-semibold text-white">when funds must be ready</span>. Row colors:{" "}
@@ -524,7 +561,7 @@ export default function DashboardPage() {
             {allBudgetItems === undefined || debts === undefined || creditCards === undefined ? (
               <div className="space-y-3">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-16 bg-white rounded-xl border border-slate-100 animate-pulse" />
+                  <div key={i} className="h-16 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-white/10 animate-pulse" />
                 ))}
               </div>
             ) : (
@@ -539,21 +576,31 @@ export default function DashboardPage() {
           </div>
 
           <aside className="lg:col-span-1 w-full min-w-0">
-            <div className="rounded-2xl border border-slate-100 bg-white shadow-sm p-4 sm:p-5">
-              <div className="flex items-start justify-between gap-2 mb-4">
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900">Buckets</h2>
+                  <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Buckets</h2>
                   <span className="relative shrink-0 group z-10">
                     <button
                       type="button"
-                      className="rounded-full p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                      onClick={() =>
+                        setOpenHelpTooltip((prev) => (prev === "buckets" ? null : "buckets"))
+                      }
+                      className="rounded-full p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
                       aria-label="How buckets work this month"
+                      aria-describedby="buckets-help-tooltip"
+                      aria-expanded={openHelpTooltip === "buckets"}
+                      aria-controls="buckets-help-tooltip"
                     >
                       <Info className="w-5 h-5 sm:w-[1.35rem] sm:h-[1.35rem]" aria-hidden="true" />
                     </button>
                     <span
+                      id="buckets-help-tooltip"
                       role="tooltip"
-                      className="pointer-events-none absolute right-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white text-left shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20"
+                      className={cn(
+                        "pointer-events-none absolute right-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white text-left shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
+                        openHelpTooltip === "buckets" && "opacity-100 visible translate-y-0"
+                      )}
                     >
                       Spending vs targets for{" "}
                       <span className="font-semibold text-white">{formatMonth(selectedMonth)}</span>. Set a monthly fill
@@ -565,7 +612,7 @@ export default function DashboardPage() {
                 </div>
                 <Link
                   href="/buckets"
-                  className="inline-flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 font-semibold shrink-0 rounded-lg px-1.5 py-1 hover:bg-teal-50/80 transition-colors"
+                  className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-semibold shrink-0 rounded-lg px-1.5 py-1 hover:bg-teal-50/80 dark:hover:bg-teal-950/50 transition-colors"
                 >
                   Manage <ArrowRight size={14} aria-hidden="true" />
                 </Link>
@@ -573,25 +620,25 @@ export default function DashboardPage() {
               {buckets === undefined ? (
                 <div className="space-y-2">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-20 rounded-xl bg-slate-50 animate-pulse" />
+                    <div key={i} className="h-[4.5rem] rounded-lg bg-slate-50 dark:bg-slate-800/60 animate-pulse" />
                   ))}
                 </div>
               ) : sortedBuckets.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-6 text-center">
-                  <Boxes className="w-8 h-8 text-slate-300 mx-auto mb-2" aria-hidden="true" />
-                  <p className="text-xs text-slate-600 font-medium">No buckets yet</p>
-                  <p className="text-[11px] text-slate-500 mt-1 mb-3">Create envelopes for discretionary spending.</p>
+                <div className="rounded-lg border border-dashed border-slate-200 dark:border-white/15 px-3 py-6 text-center">
+                  <Boxes className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" aria-hidden="true" />
+                  <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">No buckets yet</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 mb-3">Create envelopes for discretionary spending.</p>
                   <Link
                     href="/buckets"
-                    className="inline-flex text-xs font-medium text-teal-600 hover:text-teal-700"
+                    className="inline-flex text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300"
                   >
                     Add buckets →
                   </Link>
                 </div>
               ) : (
-                <ul className="space-y-2.5 max-h-[min(70vh,36rem)] overflow-y-auto pr-0.5 -mr-0.5">
+                <ul className="space-y-2">
                   {sortedBuckets.map((b) => {
-                    const accent = b.color ?? "#0d9488";
+                    const accent = b.color ?? ACCENT_COLOR_FALLBACK.category;
                     const spent =
                       b.categoryId != null ? (spendingByCategory?.[b.categoryId] ?? 0) : 0;
                     const isMonthly = b.period === "monthly";
@@ -601,7 +648,7 @@ export default function DashboardPage() {
                     const canMonthFund = isMonthly && fillCap > 0.005;
                     const fundedForMonth =
                       canMonthFund && fundedEnvelope + 0.005 >= fillCap;
-                    const notFundedYet = canMonthFund && !fundedForMonth;
+                    const needsCategory = !b.categoryId;
                     const openBucketFund = () => {
                       setBucketFundOpen({
                         id: b._id,
@@ -610,83 +657,90 @@ export default function DashboardPage() {
                         spendTarget: b.targetAmount,
                       });
                     };
-                    const cardTint = isMonthly
-                      ? fundedForMonth
-                        ? "border-emerald-200/90 bg-emerald-50/90"
-                        : notFundedYet
-                          ? "border-amber-200/90 bg-amber-50/85"
-                          : "border-slate-100 bg-slate-50/90"
-                      : "border-slate-100 bg-slate-50/90";
                     return (
                       <li
                         key={b._id}
-                        className={cn(
-                          "rounded-xl border px-3 py-2.5 transition-colors",
-                          cardTint
-                        )}
-                        style={{ borderLeft: `3px solid ${accent}` }}
+                        className="rounded-lg border border-slate-200/90 bg-slate-100 px-2.5 py-2.5 transition-colors dark:border-white/10 dark:bg-slate-800/80"
+                        style={{ borderLeftWidth: 3, borderLeftColor: accent }}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-medium text-slate-800 text-sm leading-tight truncate">{b.name}</p>
-                          <span className="text-[10px] uppercase tracking-wide text-slate-400 shrink-0">
-                            /{BUCKET_PERIOD_LABEL[b.period]}
-                          </span>
-                        </div>
-                        {!b.categoryId ? (
-                          <p className="text-[11px] text-amber-800/90 mt-1.5">
-                            Link a category to subtract spending from funded cash.
-                          </p>
-                        ) : null}
-                        {isMonthly ? (
-                          <>
-                            <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                              In bucket
-                            </p>
-                            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">
-                              {formatCurrency(inBucketNow)}
-                            </p>
-                            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                              <span className="text-slate-500">Monthly target</span>
-                              <span className="text-slate-800 font-medium tabular-nums text-right">
-                                {formatCurrency(b.targetAmount)}
-                              </span>
-                              <span className="text-slate-500">Funded</span>
-                              <span className="text-slate-800 font-semibold tabular-nums text-right">
-                                {formatCurrency(fundedEnvelope)}
-                              </span>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                              Target
-                            </p>
-                            <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900">
-                              {formatCurrency(b.targetAmount)}
-                            </p>
-                            {b.categoryId ? (
-                              <p className="mt-2 text-xs text-slate-600">
-                                Spent this month{" "}
-                                <span className="font-semibold tabular-nums text-slate-900">
-                                  {formatCurrency(spent)}
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              {fundedForMonth && canMonthFund ? (
+                                <span className="inline-flex shrink-0 text-emerald-600 dark:text-emerald-400">
+                                  <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                                  <span className="sr-only">
+                                    Funded for {formatMonth(selectedMonth)}
+                                  </span>
                                 </span>
+                              ) : null}
+                              <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+                                {b.name}
                               </p>
-                            ) : (
-                              <p className="mt-2 text-[11px] text-slate-500 leading-snug">
-                                Month funding applies to monthly buckets only.
-                              </p>
-                            )}
-                          </>
-                        )}
-                        {canMonthFund ? (
-                          <button
-                            type="button"
-                            onClick={openBucketFund}
-                            className="mt-2 w-full rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50 transition-colors"
-                          >
-                            Fund bucket
-                          </button>
-                        ) : null}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              {needsCategory ? (
+                                <span className="relative z-10 group/alert">
+                                  <button
+                                    type="button"
+                                    className="flex h-7 w-7 items-center justify-center rounded-md text-amber-600 transition-colors hover:bg-amber-500/15 dark:text-amber-400 dark:hover:bg-amber-500/10"
+                                    aria-label="Link a category on the Buckets page to track spending in this envelope"
+                                  >
+                                    <CircleAlert className="h-4 w-4" aria-hidden="true" />
+                                  </button>
+                                  <span
+                                    role="tooltip"
+                                    className="pointer-events-none absolute right-0 top-full z-20 mt-1.5 w-[min(16rem,calc(100vw-2rem))] rounded-lg bg-slate-900 px-3 py-2 text-left text-[11px] font-normal leading-snug text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover/alert:opacity-100 group-hover/alert:visible group-hover/alert:translate-y-0"
+                                  >
+                                    Link a category on the Buckets page so spending subtracts from this
+                                    envelope.
+                                  </span>
+                                </span>
+                              ) : null}
+                              <Link
+                                href={`/buckets?edit=${b._id}`}
+                                className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100"
+                                aria-label={`Edit ${b.name}`}
+                              >
+                                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                              </Link>
+                              {canMonthFund && !fundedForMonth ? (
+                                <button
+                                  type="button"
+                                  onClick={openBucketFund}
+                                  className="rounded-md border border-indigo-200 bg-white px-2.5 py-1 text-xs font-semibold text-indigo-700 shadow-sm transition-colors hover:bg-indigo-50 dark:border-indigo-700/50 dark:bg-slate-900 dark:text-indigo-300 dark:hover:bg-indigo-950/50"
+                                >
+                                  Fund
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                          <p className="text-3xl sm:text-[2rem] font-bold tabular-nums tracking-tight text-slate-900 dark:text-slate-50 leading-none">
+                            {formatCurrency(inBucketNow)}
+                          </p>
+                          <div className="flex items-end justify-between gap-2 pt-0.5">
+                            <div className="min-w-0 flex-1">
+                              {!isMonthly && b.categoryId ? (
+                                <p className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400">
+                                  Spent {formatCurrency(spent)} this month
+                                </p>
+                              ) : null}
+                            </div>
+                            <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-600 dark:text-slate-300 text-right leading-snug">
+                              {formatCurrency(fillCap)}
+                              {isMonthly ? (
+                                <span className="font-medium text-slate-500 dark:text-slate-400">
+                                  /month
+                                </span>
+                              ) : (
+                                <span className="font-medium text-slate-500 dark:text-slate-400">
+                                  {" "}
+                                  per {BUCKET_PERIOD_LABEL[b.period]}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
                       </li>
                     );
                   })}
@@ -699,21 +753,31 @@ export default function DashboardPage() {
 
       {/* Accounts: below timeline; balances + link to Accounts page */}
       {accounts !== undefined && accounts.length > 0 && (
-        <div className="rounded-2xl border border-slate-200/80 bg-linear-to-br from-slate-50/95 via-white to-teal-50/35 shadow-sm p-5 sm:p-6 w-full">
+        <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-linear-to-br from-slate-50/95 via-white to-teal-50/35 dark:from-slate-950/90 dark:via-slate-900 dark:to-teal-950/25 shadow-sm p-5 sm:p-6 w-full">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-6">
             <div className="flex items-start gap-2 min-w-0">
-              <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-slate-900">Your accounts</h2>
+              <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Your accounts</h2>
               <span className="relative shrink-0 group z-10">
                 <button
                   type="button"
-                  className="rounded-full p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                  onClick={() =>
+                    setOpenHelpTooltip((prev) => (prev === "accounts" ? null : "accounts"))
+                  }
+                  className="rounded-full p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
                   aria-label="How account balances work with your budget"
+                  aria-describedby="accounts-help-tooltip"
+                  aria-expanded={openHelpTooltip === "accounts"}
+                  aria-controls="accounts-help-tooltip"
                 >
                   <Info className="w-4 h-4" aria-hidden="true" />
                 </button>
                 <span
+                  id="accounts-help-tooltip"
                   role="tooltip"
-                  className="pointer-events-none absolute left-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20"
+                  className={cn(
+                    "pointer-events-none absolute left-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
+                    openHelpTooltip === "accounts" && "opacity-100 visible translate-y-0"
+                  )}
                 >
                   Balances update when you log transactions. The dashboard <span className="font-semibold text-teal-200">budget</span>{" "}
                   is the sum of these asset balances. <span className="font-semibold text-teal-200">Funding</span> for{" "}
@@ -723,7 +787,7 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/accounts"
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal-700 hover:text-teal-800 shrink-0 rounded-lg px-2 py-1 -mr-2 hover:bg-teal-50/80 transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 shrink-0 rounded-lg px-2 py-1 -mr-2 hover:bg-teal-50/80 dark:hover:bg-teal-950/50 transition-colors"
             >
               All accounts <ArrowRight size={15} aria-hidden="true" />
             </Link>
@@ -734,31 +798,31 @@ export default function DashboardPage() {
               return (
                 <div
                   key={acc._id}
-                  className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_1px_0_rgba(15,23,42,0.04)] transition-shadow hover:shadow-md hover:border-slate-300/90"
+                  className="relative overflow-hidden rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-slate-900 px-4 py-4 shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)] transition-shadow hover:shadow-md hover:border-slate-300/90 dark:hover:border-white/15"
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-slate-800 truncate text-sm sm:text-base">{acc.name}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5 font-medium uppercase tracking-wide">
+                      <p className="font-semibold text-slate-800 dark:text-slate-100 truncate text-sm sm:text-base">{acc.name}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium uppercase tracking-wide">
                         {formatAccountType(acc.accountType)}
                       </p>
                     </div>
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-700 ring-1 ring-teal-600/10">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-700 dark:text-teal-400 ring-1 ring-teal-600/10 dark:ring-teal-500/20">
                       <Landmark className="h-4 w-4" aria-hidden="true" />
                     </div>
                   </div>
 
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Balance</p>
-                  <p className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 tabular-nums leading-none">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">Balance</p>
+                  <p className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums leading-none">
                     {formatCurrency(acc.balance)}
                   </p>
 
                   {!isAsset ? (
-                    <p className="mt-2 text-[11px] text-slate-500">
-                      <Link href="/accounts" className="font-medium text-teal-700 hover:text-teal-800 underline-offset-2 hover:underline">
+                    <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                      <Link href="/accounts" className="font-medium text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 underline-offset-2 hover:underline">
                         Accounts
                       </Link>
-                      <span className="text-slate-400"> · liability</span>
+                      <span className="text-slate-400 dark:text-slate-500"> · liability</span>
                     </p>
                   ) : null}
                 </div>
@@ -770,16 +834,16 @@ export default function DashboardPage() {
 
       {/* Hero Stats — cash budget vs spending; category targets live in Budget Categories below */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
-        <div className="rounded-2xl bg-white border border-slate-100 p-5 sm:p-6 shadow-sm" style={{ borderLeft: "3px solid #059669" }}>
-          <p className="text-slate-400 text-sm font-semibold uppercase tracking-widest mb-3">Cash budget</p>
-          <p className="text-4xl sm:text-5xl font-bold tracking-tight text-emerald-600 tabular-nums">
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 sm:p-6 shadow-sm" style={{ borderLeft: `3px solid ${ACCENT_COLOR_FALLBACK.successStrong}` }}>
+          <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">Cash budget</p>
+          <p className="text-4xl sm:text-5xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums">
             {cashBudgetAmount !== null ? formatCurrency(cashBudgetAmount) : "—"}
           </p>
-          <p className="text-sm text-slate-500 mt-2">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
             Same as header: combined asset account balances.
           </p>
           <div className="mt-4">
-            <div className="flex justify-between text-sm text-slate-400 mb-1.5">
+            <div className="flex justify-between text-sm text-slate-400 dark:text-slate-500 mb-1.5">
               <span>
                 {cashBudgetAmount !== null && cashBudgetAmount > 0.005
                   ? `${Math.round(cashPercentUsed)}% of cash spent`
@@ -791,7 +855,7 @@ export default function DashboardPage() {
                   : "—"}
               </span>
             </div>
-            <div className="w-full bg-slate-100 rounded-full h-1.5">
+            <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
               <div
                 className="h-1.5 rounded-full bg-emerald-500 transition-all duration-500"
                 style={{ width: `${cashOverallPercent}%` }}
@@ -800,35 +864,37 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white border border-slate-100 p-5 sm:p-6 shadow-sm">
-          <p className="text-slate-400 text-sm font-semibold uppercase tracking-widest mb-3">Total Spent</p>
-          <p className="text-4xl sm:text-5xl font-bold tracking-tight text-emerald-600 tabular-nums">
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 sm:p-6 shadow-sm">
+          <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">Total Spent</p>
+          <p className="text-4xl sm:text-5xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums">
             {formatCurrency(totalSpent)}
           </p>
-          <p className="text-base text-slate-400 mt-3">
+          <p className="text-base text-slate-400 dark:text-slate-500 mt-3">
             across {categories?.length ?? 0} categories
           </p>
         </div>
 
         <div
-          className="rounded-2xl bg-white border border-slate-100 p-5 sm:p-6 shadow-sm"
+          className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 sm:p-6 shadow-sm"
           style={{
             borderLeft: `3px solid ${
-              cashAfterSpent !== null && cashAfterSpent < -0.005 ? "#f43f5e" : "#10b981"
+              cashAfterSpent !== null && cashAfterSpent < -0.005
+                ? ACCENT_COLOR_FALLBACK.danger
+                : ACCENT_COLOR_FALLBACK.success
             }`,
           }}
         >
-          <p className="text-slate-400 text-sm font-semibold uppercase tracking-widest mb-3">Cash after spending</p>
+          <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">Cash after spending</p>
           <p
             className={`text-4xl sm:text-5xl font-bold tracking-tight tabular-nums ${
-              cashAfterSpent !== null && cashAfterSpent < -0.005 ? "text-rose-600" : "text-emerald-600"
+              cashAfterSpent !== null && cashAfterSpent < -0.005 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
             }`}
           >
             {cashAfterSpent !== null ? formatCurrency(Math.abs(cashAfterSpent)) : "—"}
           </p>
           <p
             className={`text-base mt-3 ${
-              cashAfterSpent !== null && cashAfterSpent < -0.005 ? "text-rose-400" : "text-emerald-400"
+              cashAfterSpent !== null && cashAfterSpent < -0.005 ? "text-rose-400 dark:text-rose-300" : "text-emerald-400 dark:text-emerald-500"
             }`}
           >
             {cashAfterSpent === null
@@ -841,15 +907,15 @@ export default function DashboardPage() {
       </div>
 
       {creditCards !== undefined && creditCards.length > 0 && (
-        <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-indigo-600" aria-hidden="true" />
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
               Credit cards
             </h2>
             <Link
               href="/credit-cards"
-              className="inline-flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 font-medium"
+              className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium"
             >
               Manage <ArrowRight size={13} aria-hidden="true" />
             </Link>
@@ -860,19 +926,19 @@ export default function DashboardPage() {
               return (
                 <div
                   key={c._id}
-                  className="rounded-xl border border-slate-100 bg-slate-50/90 px-4 py-3"
-                  style={{ borderLeft: `3px solid ${c.color ?? "#4f46e5"}` }}
+                  className="rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50/90 dark:bg-slate-800/50 px-4 py-3"
+                  style={{ borderLeft: `3px solid ${c.color ?? ACCENT_COLOR_FALLBACK.creditCard}` }}
                 >
-                  <p className="text-xs text-slate-500 font-medium truncate">{c.name}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{c.name}</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
                     {formatCreditCardUsageMode(c.usageMode)}
                   </p>
-                  <p className="text-lg font-bold text-slate-900 tabular-nums mt-1">
+                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100 tabular-nums mt-1">
                     {formatCurrency(c.balance)}
                   </p>
-                  {apr && <p className="text-xs text-slate-500 mt-1">{apr}</p>}
+                  {apr && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{apr}</p>}
                   {c.plannedMonthlyPayment != null && c.plannedMonthlyPayment > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       Plan {formatCurrency(c.plannedMonthlyPayment)}/mo
                     </p>
                   )}
@@ -884,12 +950,12 @@ export default function DashboardPage() {
       )}
 
       {debts !== undefined && debts.length > 0 && (
-        <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800">Debts & loans</h2>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Debts & loans</h2>
             <Link
               href="/debts"
-              className="inline-flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 font-medium"
+              className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium"
             >
               Manage <ArrowRight size={13} aria-hidden="true" />
             </Link>
@@ -901,17 +967,17 @@ export default function DashboardPage() {
               return (
                 <div
                   key={d._id}
-                  className="rounded-xl border border-slate-100 bg-slate-50/90 px-4 py-3"
-                  style={{ borderLeft: `3px solid ${d.color ?? "#64748b"}` }}
+                  className="rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50/90 dark:bg-slate-800/50 px-4 py-3"
+                  style={{ borderLeft: `3px solid ${d.color ?? ACCENT_COLOR_FALLBACK.debtCard}` }}
                 >
-                  <p className="text-xs text-slate-500 font-medium truncate">{d.name}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{formatDebtType(d.debtType)}</p>
-                  <p className="text-lg font-bold text-slate-900 tabular-nums mt-1">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{d.name}</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{formatDebtType(d.debtType)}</p>
+                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100 tabular-nums mt-1">
                     {formatCurrency(d.balance)}
                   </p>
-                  {apr && <p className="text-xs text-slate-500 mt-1">{apr}</p>}
+                  {apr && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{apr}</p>}
                   {planMo > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       Plan {formatCurrency(planMo)}/mo
                     </p>
                   )}
@@ -924,24 +990,24 @@ export default function DashboardPage() {
 
       {/* Budget status strip */}
       {overBudgetCount > 0 ? (
-        <div role="alert" className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center gap-4" style={{ animation: "slide-up-fade-in 0.3s ease-out" }}>
-          <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" aria-hidden="true" />
+        <div role="alert" className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 rounded-2xl p-4 flex items-center gap-4" style={{ animation: "slide-up-fade-in 0.3s ease-out" }}>
+          <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 flex-shrink-0" aria-hidden="true" />
           <div className="flex-1">
-            <p className="font-semibold text-rose-800">
+            <p className="font-semibold text-rose-800 dark:text-rose-200">
               {overBudgetCount} {overBudgetCount === 1 ? "category" : "categories"} over budget
             </p>
-            <p className="text-sm text-rose-500 mt-0.5">Review your spending to stay on track.</p>
+            <p className="text-sm text-rose-500 dark:text-rose-400 mt-0.5">Review your spending to stay on track.</p>
           </div>
-          <Link href="/categories" className="inline-flex items-center gap-1 text-sm font-medium text-rose-600 hover:text-rose-700 flex-shrink-0">
+          <Link href="/categories" className="inline-flex items-center gap-1 text-sm font-medium text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 flex-shrink-0">
             View <ArrowRight size={13} aria-hidden="true" />
           </Link>
         </div>
       ) : allOnTrack ? (
-        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex items-center gap-3" style={{ animation: "slide-up-fade-in 0.35s ease-out" }}>
-          <CheckCircle2 className="w-5 h-5 text-teal-600 flex-shrink-0" aria-hidden="true" />
+        <div className="bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 rounded-2xl p-4 flex items-center gap-3" style={{ animation: "slide-up-fade-in 0.35s ease-out" }}>
+          <CheckCircle2 className="w-5 h-5 text-teal-600 dark:text-teal-400 flex-shrink-0" aria-hidden="true" />
           <div className="flex-1">
-            <p className="font-semibold text-teal-800 text-sm">Every category is on track</p>
-            <p className="text-xs text-teal-600 mt-0.5">
+            <p className="font-semibold text-teal-800 dark:text-teal-200 text-sm">Every category is on track</p>
+            <p className="text-xs text-teal-600 dark:text-teal-400 mt-0.5">
               {viewingCalendarMonth
                 ? `${formatCurrency(totalBudget - totalSpent)} remaining — nice work this month.`
                 : `${formatCurrency(totalBudget - totalSpent)} remaining for ${formatMonth(selectedMonth)}.`}
@@ -955,8 +1021,8 @@ export default function DashboardPage() {
         {/* Budget Categories */}
         <div className="lg:col-span-3">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800">Budget Categories</h2>
-            <Link href="/categories" className="inline-flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 font-medium">
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Budget Categories</h2>
+            <Link href="/categories" className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium">
               Manage <ArrowRight size={13} aria-hidden="true" />
             </Link>
           </div>
@@ -964,14 +1030,14 @@ export default function DashboardPage() {
           {categories === undefined ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-white rounded-2xl h-32 animate-pulse border border-slate-100" />
+                <div key={i} className="bg-white dark:bg-slate-800/80 rounded-2xl h-32 animate-pulse border border-slate-100 dark:border-white/10" />
               ))}
             </div>
           ) : categories.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-100 p-8 text-center">
-              <p className="text-slate-700 font-medium mb-1">Set up your first category</p>
-              <p className="text-slate-400 text-sm mb-4">Define where your money goes — rent, food, fun — then start tracking.</p>
-              <Link href="/categories" className="bg-teal-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-teal-700 active:scale-[0.97] transition-all">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 p-8 text-center">
+              <p className="text-slate-700 dark:text-slate-200 font-medium mb-1">Set up your first category</p>
+              <p className="text-slate-400 dark:text-slate-500 text-sm mb-4">Define where your money goes — rent, food, fun — then start tracking.</p>
+              <Link href="/categories" className="bg-teal-600 dark:bg-teal-500 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-teal-700 dark:hover:bg-teal-400 active:scale-[0.97] transition-all">
                 Create your first category
               </Link>
             </div>
@@ -998,13 +1064,13 @@ export default function DashboardPage() {
         {/* Recent Transactions */}
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800">
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">
               Transactions · {formatMonth(selectedMonth)}
             </h2>
             <button
               type="button"
               onClick={openAddTransaction}
-              className="inline-flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 font-medium"
+              className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium"
             >
               <Plus size={13} aria-hidden="true" /> Add
             </button>
@@ -1013,35 +1079,40 @@ export default function DashboardPage() {
           {transactions === undefined ? (
             <div className="space-y-2">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="bg-white rounded-xl h-14 animate-pulse border border-slate-100" />
+                <div key={i} className="bg-white dark:bg-slate-800/80 rounded-xl h-14 animate-pulse border border-slate-100 dark:border-white/10" />
               ))}
             </div>
           ) : transactions.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 text-center">
-              <p className="text-slate-600 text-sm font-medium">Fresh start</p>
-              <p className="text-slate-400 text-xs mt-1">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 p-6 text-center">
+              <p className="text-slate-600 dark:text-slate-300 text-sm font-medium">Fresh start</p>
+              <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">
                 {viewingCalendarMonth
                   ? "No spending logged this month yet."
                   : `No transactions in ${formatMonth(selectedMonth)} yet.`}
               </p>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm overflow-hidden">
               {transactions.slice(0, 12).map((tx, i) => {
                 const cat = tx.categoryId ? categoryMap[tx.categoryId] : undefined;
                 const bi = tx.budgetItemId ? budgetItemMap[tx.budgetItemId] : undefined;
                 const cardOnly = !cat && tx.creditCardId;
                 const debtOnly = !cat && tx.debtId;
                 const accentColor =
-                  cat?.color ?? (cardOnly ? "#4f46e5" : debtOnly ? "#475569" : "#0d9488");
+                  cat?.color ??
+                  (cardOnly
+                    ? ACCENT_COLOR_FALLBACK.creditCard
+                    : debtOnly
+                      ? ACCENT_COLOR_FALLBACK.debt
+                      : ACCENT_COLOR_FALLBACK.category);
                 const accentBg = `${accentColor}18`;
                 return (
                   <button
                     type="button"
                     key={tx._id}
                     onClick={() => openEditTransaction(tx)}
-                    className={`flex w-full text-left items-center justify-between px-4 py-3 transition-colors hover:bg-slate-50/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-inset ${
-                      i < Math.min(transactions.length, 12) - 1 ? "border-b border-slate-50" : ""
+                    className={`flex w-full text-left items-center justify-between px-4 py-3 transition-colors hover:bg-slate-50/90 dark:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-inset ${
+                      i < Math.min(transactions.length, 12) - 1 ? "border-b border-slate-50 dark:border-white/10" : ""
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -1054,7 +1125,7 @@ export default function DashboardPage() {
                           (() => {
                             const iconName = cat.icon;
                             const IconComp = iconName ? CATEGORY_ICON_MAP[iconName] : null;
-                            const color = cat.color ?? "#0d9488";
+                            const color = cat.color ?? ACCENT_COLOR_FALLBACK.category;
                             return IconComp
                               ? <IconComp className="w-4 h-4" style={{ color }} />
                               : <span className="text-sm">{iconName ?? "💰"}</span>;
@@ -1068,8 +1139,8 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-800 truncate">{tx.description}</p>
-                        <p className="text-xs text-slate-500">{formatShortDate(tx.date)}</p>
+                        <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{tx.description}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{formatShortDate(tx.date)}</p>
                         {(() => {
                           const parts: string[] = [];
                           if (tx.accountId && accountMap[tx.accountId]) {
@@ -1088,12 +1159,12 @@ export default function DashboardPage() {
                           const note = tx.note?.trim();
                           if (note) parts.push(note);
                           return parts.length > 0 ? (
-                            <p className="text-xs text-slate-400 mt-0.5 truncate">{parts.join(" · ")}</p>
+                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{parts.join(" · ")}</p>
                           ) : null;
                         })()}
                       </div>
                     </div>
-                    <span className="text-sm font-semibold text-slate-700 ml-2 flex-shrink-0">
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 ml-2 flex-shrink-0">
                       {formatCurrency(tx.amount)}
                     </span>
                   </button>
@@ -1138,17 +1209,19 @@ export default function DashboardPage() {
 function DashboardSkeleton() {
   return (
     <div className="w-full space-y-8 animate-pulse">
-      <div className="h-8 bg-slate-200 rounded-xl w-56" />
+      <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-xl w-56" />
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-teal-200 rounded-2xl h-28" />
-        <div className="bg-slate-200 rounded-2xl h-28" />
-        <div className="bg-slate-200 rounded-2xl h-28" />
+        <div className="bg-teal-200 dark:bg-teal-900/50 rounded-2xl h-28" />
+        <div className="bg-slate-200 dark:bg-slate-700 rounded-2xl h-28" />
+        <div className="bg-slate-200 dark:bg-slate-700 rounded-2xl h-28" />
       </div>
       <div className="grid grid-cols-5 gap-6">
         <div className="col-span-3 space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="bg-slate-200 rounded-2xl h-32" />)}
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-slate-200 dark:bg-slate-700 rounded-2xl h-32" />
+          ))}
         </div>
-        <div className="col-span-2 bg-slate-200 rounded-2xl h-64" />
+        <div className="col-span-2 bg-slate-200 dark:bg-slate-700 rounded-2xl h-64" />
       </div>
     </div>
   );

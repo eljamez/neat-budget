@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useQuery } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { formatCurrency, getProgressColor, getProgressTextColor } from "@/lib/utils";
@@ -23,7 +24,11 @@ export function DebtPaydownBar({
   currentBalance: number;
   originalLoanAmount?: number | null;
 }) {
-  const txs = useQuery(api.transactions.listByDebt, { debtId });
+  const { user } = useUser();
+  const txs = useQuery(
+    api.transactions.listByDebt,
+    user ? { userId: user.id, debtId } : "skip"
+  );
 
   const hasOriginal =
     originalLoanAmount != null && originalLoanAmount > 0.005;

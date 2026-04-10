@@ -104,11 +104,10 @@ export function BudgetItemManager({
   }, [
     monthEditorOpen,
     monthDataReady,
-    editItem?._id,
+    editItem,
     transactionsMonthKey,
     fundedThisMonth,
-    monthOverride?.actualPaidAmount,
-    editItem?.amount,
+    monthOverride,
   ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -144,6 +143,7 @@ export function BudgetItemManager({
       if (editItem) {
         await updateItem({
           id: editItem._id,
+          userId: user.id,
           name: form.name,
           amount,
           paymentDayOfMonth: dueDay,

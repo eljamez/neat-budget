@@ -64,7 +64,7 @@ export function TransactionForm({
       note: editTransaction.note ?? "",
     });
     setError("");
-  }, [editTransaction?._id]);
+  }, [editTransaction]);
 
   useEffect(() => {
     if (editTransaction) return;
@@ -82,8 +82,8 @@ export function TransactionForm({
       const c = creditCards?.find((x) => x._id === id);
       acc = c?.paymentAccountId ? String(c.paymentAccountId) : "";
     }
-    setForm((f) => ({ ...f, accountId: acc }));
-  }, [payeeKey, editTransaction?._id, budgetItems, debts, creditCards]);
+    setForm((f) => (f.accountId === acc ? f : { ...f, accountId: acc }));
+  }, [payeeKey, editTransaction, budgetItems, debts, creditCards]);
 
   const categoryNameById = useMemo(() => {
     if (!categories) return {} as Record<string, string>;
@@ -234,7 +234,7 @@ export function TransactionForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="tx-date" className="block text-sm font-medium text-slate-600 mb-1.5">
+        <label htmlFor="tx-date" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
           Date
         </label>
         <input
@@ -242,21 +242,21 @@ export function TransactionForm({
           type="date"
           value={form.date}
           onChange={(e) => setForm({ ...form, date: e.target.value })}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+          className="w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors"
           required
         />
       </div>
 
       {accounts !== undefined && accounts.length > 0 && (
         <div>
-          <label htmlFor="tx-account" className="block text-sm font-medium text-slate-600 mb-1.5">
+          <label htmlFor="tx-account" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
             Paid from <span className="text-slate-400 font-normal">(optional)</span>
           </label>
           <select
             id="tx-account"
             value={form.accountId}
             onChange={(e) => setForm({ ...form, accountId: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className="w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors"
           >
             <option value="">Don&apos;t link — balance won&apos;t change</option>
             {accounts.map((acc) => (
@@ -265,7 +265,7 @@ export function TransactionForm({
               </option>
             ))}
           </select>
-          <p className="text-xs text-slate-400 mt-1.5">
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
             Linking updates that account&apos;s balance (checking goes down; credit card balance owed
             goes up when it&apos;s a card account).
           </p>
@@ -273,11 +273,11 @@ export function TransactionForm({
       )}
 
       <div>
-        <label htmlFor="tx-payee" className="block text-sm font-medium text-slate-600 mb-1.5">
+        <label htmlFor="tx-payee" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
           Pay toward
         </label>
         {noPayees ? (
-          <p className="text-sm text-slate-500 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <p className="text-sm text-slate-500 dark:text-slate-400 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 px-3 py-2.5">
             Add a recurring expense under a category, or add a debt / credit card first — then you can
             log payments here.
           </p>
@@ -286,7 +286,7 @@ export function TransactionForm({
             id="tx-payee"
             value={payeeKey}
             onChange={(e) => setPayeeKey(e.target.value)}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className="w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors"
             required
           >
             <option value="">Select expense, card, or loan…</option>
@@ -301,13 +301,13 @@ export function TransactionForm({
             ))}
           </select>
         )}
-        <p className="text-xs text-slate-400 mt-1.5">
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
           Spending is recorded against a specific bill or debt — no separate category pick.
         </p>
       </div>
 
       <div>
-        <label htmlFor="tx-amount" className="block text-sm font-medium text-slate-600 mb-1.5">
+        <label htmlFor="tx-amount" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
           Amount ($)
         </label>
         <input
@@ -319,13 +319,13 @@ export function TransactionForm({
           value={form.amount}
           onChange={(e) => setForm({ ...form, amount: e.target.value })}
           placeholder="0.00"
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+          className="w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors"
           required
         />
       </div>
 
       <div>
-        <label htmlFor="tx-note" className="block text-sm font-medium text-slate-600 mb-1.5">
+        <label htmlFor="tx-note" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
           Note <span className="text-slate-400 font-normal">(optional)</span>
         </label>
         <textarea
@@ -335,12 +335,14 @@ export function TransactionForm({
           placeholder="Anything you want to remember about this payment…"
           rows={2}
           maxLength={500}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors resize-none"
+          className="w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors resize-none"
         />
       </div>
 
       {error && (
-        <p role="alert" className="text-sm text-rose-600 bg-rose-50 px-3 py-2 rounded-xl">{error}</p>
+        <p role="alert" className="text-sm text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 rounded-xl">
+          {error}
+        </p>
       )}
 
       <button

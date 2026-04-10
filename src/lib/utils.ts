@@ -5,6 +5,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export const ACCENT_COLOR_FALLBACK = {
+  category: "#0d9488",
+  creditCard: "#4f46e5",
+  debt: "#475569",
+  debtCard: "#64748b",
+  success: "#10b981",
+  successStrong: "#059669",
+  danger: "#f43f5e",
+  warning: "#f59e0b",
+} as const;
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

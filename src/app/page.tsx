@@ -173,7 +173,8 @@ function LandingPage({ isSignedIn }: { isSignedIn: boolean }) {
 
           {/* Subheadline */}
           <p className="text-white/70 text-lg sm:text-xl max-w-lg mb-10 leading-relaxed">
-            Set monthly limits, log your spending, and see exactly where your money goes — all in real time.
+            Plan recurring bills, buckets, debt and card payments by month, then log real transactions to
+            keep balances honest.
           </p>
 
           {/* CTA buttons */}
@@ -232,18 +233,18 @@ function LandingPage({ isSignedIn }: { isSignedIn: boolean }) {
             {[
               {
                 icon: BarChart2,
-                title: "Real-time tracking",
-                desc: "Watch your spending update instantly as you log transactions. Always know exactly where you stand across every category.",
+                title: "Month-based funding timeline",
+                desc: "Fund recurring bills and buckets for a chosen month, then mark items paid as they settle.",
               },
               {
                 icon: Tag,
-                title: "Custom categories",
-                desc: "Define your own budget categories — rent, groceries, subscriptions — and set precise monthly limits for each one.",
+                title: "Recurring expenses in categories",
+                desc: "Group your budget and attach recurring expenses with expected monthly amount and due day.",
               },
               {
                 icon: AlertTriangle,
-                title: "Overspend alerts",
-                desc: "Visual warnings flag categories before and after you exceed your limit, so you can course-correct before it becomes a problem.",
+                title: "Buckets, debts, and cards",
+                desc: "Track discretionary envelopes and plan monthly paydown for loans and revolving credit cards.",
               },
             ].map(({ icon: Icon, title, desc }) => (
               <div

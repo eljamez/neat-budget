@@ -47,6 +47,7 @@ export function CategoryManager({ editCategory, onSuccess, onCancel }: CategoryM
       if (editCategory) {
         await updateCategory({
           id: editCategory._id,
+          userId: user.id,
           name: form.name,
           color: form.color,
           icon: form.icon,

@@ -6,7 +6,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { AccountManager } from "@/components/AccountManager";
-import { formatCurrency, formatAccountType } from "@/lib/utils";
+import { formatCurrency, formatAccountType, ACCENT_COLOR_FALLBACK } from "@/lib/utils";
 import { Landmark, Wallet } from "lucide-react";
 
 export default function AccountsPage() {
@@ -35,8 +35,8 @@ export default function AccountsPage() {
     <div className="w-full space-y-5 lg:space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Accounts</h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Accounts</h1>
+          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
             Track cash in each bank account or card. When you add a transaction and choose an account,
             the balance updates automatically. Edit the balance here if it drifts from your bank.
           </p>
@@ -56,8 +56,8 @@ export default function AccountsPage() {
       </div>
 
       {showForm && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="font-semibold text-slate-800 mb-5">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm p-6">
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-5">
             {editId ? "Edit account" : "New account"}
           </h2>
           <AccountManager
@@ -75,14 +75,17 @@ export default function AccountsPage() {
       {accounts === undefined ? (
         <div className="space-y-3">
           {[1, 2].map((i) => (
-            <div key={i} className="bg-white rounded-2xl border border-slate-100 h-24 animate-pulse" />
+            <div
+              key={i}
+              className="bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-100 dark:border-white/10 h-24 animate-pulse"
+            />
           ))}
         </div>
       ) : accounts.length === 0 && !showForm ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
-          <Wallet className="w-12 h-12 text-slate-300 mx-auto mb-3" aria-hidden="true" />
-          <p className="text-slate-500 mb-1 font-medium">No accounts yet</p>
-          <p className="text-slate-500 text-sm mb-5">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 p-12 text-center">
+          <Wallet className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" aria-hidden="true" />
+          <p className="text-slate-500 dark:text-slate-400 mb-1 font-medium">No accounts yet</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mb-5">
             Add checking, savings, or a card so balances stay in sync when you log spending.
           </p>
           <button
@@ -98,8 +101,8 @@ export default function AccountsPage() {
           {accounts.map((acc) => (
             <li key={acc._id}>
               <div
-                className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-4 flex items-center justify-between gap-3"
-                style={{ borderLeft: "3px solid #0d9488" }}
+                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm px-4 py-4 flex items-center justify-between gap-3"
+                style={{ borderLeft: `3px solid ${ACCENT_COLOR_FALLBACK.category}` }}
               >
                 <div className="flex items-start gap-3 min-w-0">
                   <div
@@ -109,9 +112,11 @@ export default function AccountsPage() {
                     <Landmark className="w-5 h-5 text-teal-600" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-800">{acc.name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{formatAccountType(acc.accountType)}</p>
-                    <p className="text-lg font-bold text-slate-900 mt-1 tabular-nums">
+                    <p className="font-semibold text-slate-800 dark:text-slate-100">{acc.name}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {formatAccountType(acc.accountType)}
+                    </p>
+                    <p className="text-lg font-bold text-slate-900 dark:text-slate-50 mt-1 tabular-nums">
                       {formatCurrency(acc.balance)}
                     </p>
                   </div>
@@ -123,7 +128,7 @@ export default function AccountsPage() {
                       setEditId(acc._id);
                       setShowForm(true);
                     }}
-                    className="text-sm text-teal-600 hover:text-teal-700 px-3 py-2 rounded-lg hover:bg-teal-50 font-medium"
+                    className="text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 px-3 py-2 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 font-medium"
                   >
                     Edit
                   </button>
@@ -132,21 +137,21 @@ export default function AccountsPage() {
                     onClick={() =>
                       setArchivePendingId(archivePendingId === acc._id ? null : acc._id)
                     }
-                    className="text-sm text-slate-500 hover:text-rose-600 px-3 py-2 rounded-lg hover:bg-rose-50"
+                    className="text-sm text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 px-3 py-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
                   >
-                    Remove
+                    Archive
                   </button>
                 </div>
               </div>
               {archivePendingId === acc._id && (
                 <div
                   role="region"
-                  aria-label={`Confirm remove ${acc.name}`}
-                  className="mt-1 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3"
+                  aria-label={`Confirm archive ${acc.name}`}
+                  className="mt-1 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 rounded-xl px-4 py-3 flex items-center justify-between gap-3"
                 >
-                  <p className="text-sm text-rose-700">
-                    Remove <strong>{acc.name}</strong>? Past transactions keep their history; they won’t
-                    update this account anymore.
+                  <p className="text-sm text-rose-700 dark:text-rose-300">
+                    Archive <strong>{acc.name}</strong>? It will be hidden from active planning. Past
+                    transactions keep their history.
                   </p>
                   <div className="flex gap-2 shrink-0">
                     <button
@@ -154,12 +159,12 @@ export default function AccountsPage() {
                       onClick={handleArchiveConfirm}
                       className="text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 px-3 py-1.5 rounded-lg"
                     >
-                      Remove
+                      Archive
                     </button>
                     <button
                       type="button"
                       onClick={() => setArchivePendingId(null)}
-                      className="text-sm font-medium text-slate-600 bg-white hover:bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200"
+                      className="text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10"
                     >
                       Cancel
                     </button>

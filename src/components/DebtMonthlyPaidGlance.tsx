@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useQuery } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { formatShortDate } from "@/lib/utils";
@@ -9,7 +10,11 @@ import { formatShortDate } from "@/lib/utils";
 const GLANCE_MONTHS = 8;
 
 export function DebtMonthlyPaidGlance({ debtId }: { debtId: Id<"debts"> }) {
-  const txs = useQuery(api.transactions.listByDebt, { debtId });
+  const { user } = useUser();
+  const txs = useQuery(
+    api.transactions.listByDebt,
+    user ? { userId: user.id, debtId } : "skip"
+  );
 
   const phrase = useMemo(() => {
     if (!txs) return null;

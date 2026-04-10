@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { getEffectiveUserId } from "./authUser";
 
 async function assertPaymentAccount(
   ctx: MutationCtx,
@@ -17,11 +18,12 @@ async function assertPaymentAccount(
 const usageModeValidator = v.union(v.literal("paying_off"), v.literal("active_use"));
 
 export const list = query({
-  args: { userId: v.string() },
+  args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     return await ctx.db
       .query("creditCards")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.neq(q.field("isArchived"), true))
       .collect();
   },
@@ -29,7 +31,7 @@ export const list = query({
 
 export const create = mutation({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     name: v.string(),
     balance: v.number(),
     usageMode: usageModeValidator,
@@ -46,11 +48,12 @@ export const create = mutation({
     paymentAccountId: v.optional(v.id("accounts")),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     if (args.paymentAccountId) {
-      await assertPaymentAccount(ctx, args.userId, args.paymentAccountId);
+      await assertPaymentAccount(ctx, userId, args.paymentAccountId);
     }
     return await ctx.db.insert("creditCards", {
-      userId: args.userId,
+      userId,
       name: args.name,
       balance: args.balance,
       usageMode: args.usageMode,
@@ -73,7 +76,7 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("creditCards"),
-    userId: v.string(),
+    userId: v.optional(v.string()),
     name: v.optional(v.string()),
     balance: v.optional(v.number()),
     usageMode: v.optional(usageModeValidator),
@@ -90,13 +93,14 @@ export const update = mutation({
     paymentAccountId: v.optional(v.union(v.id("accounts"), v.null())),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Credit card not found");
     }
-    const { id, userId, paymentAccountId, ...rest } = args;
+    const { id, paymentAccountId, ...rest } = args;
     const patch: Record<string, unknown> = Object.fromEntries(
-      Object.entries(rest).filter(([, val]) => val !== undefined)
+      Object.entries(rest).filter(([key, val]) => key !== "userId" && val !== undefined)
     );
     if (paymentAccountId !== undefined) {
       if (paymentAccountId === null) {
@@ -111,10 +115,11 @@ export const update = mutation({
 });
 
 export const archive = mutation({
-  args: { id: v.id("creditCards"), userId: v.string() },
+  args: { id: v.id("creditCards"), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Credit card not found");
     }
     await ctx.db.patch(args.id, { isArchived: true });
@@ -124,13 +129,14 @@ export const archive = mutation({
 export const setPaidForMonth = mutation({
   args: {
     id: v.id("creditCards"),
-    userId: v.string(),
+    userId: v.optional(v.string()),
     monthKey: v.string(),
     paid: v.boolean(),
   },
   handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== args.userId) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Credit card not found");
     }
     if (args.paid) {
