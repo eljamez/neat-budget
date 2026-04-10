@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -109,14 +116,44 @@ function plannedPaymentRowFundState(
 function timelineRowSurfaceClasses(state: TimelineFundState): string {
   switch (state) {
     case "paid":
-      return "bg-emerald-50/55 border-emerald-200/85 ring-1 ring-emerald-200/45";
+      return "bg-emerald-50/55 border-emerald-200/85 ring-1 ring-emerald-200/45 dark:bg-emerald-950/35 dark:border-emerald-500/25 dark:ring-emerald-500/20";
     case "funded":
-      return "bg-amber-50/80 border-amber-200/90 ring-1 ring-amber-200/40";
+      return "bg-amber-50/80 border-amber-200/90 ring-1 ring-amber-200/40 dark:bg-amber-950/35 dark:border-amber-500/25 dark:ring-amber-500/15";
     case "waiting":
-      return "bg-rose-50/60 border-rose-200/90 ring-1 ring-rose-200/35";
+      return "bg-rose-50/60 border-rose-200/90 ring-1 ring-rose-200/35 dark:bg-rose-950/30 dark:border-rose-500/25 dark:ring-rose-500/15";
     default:
-      return "bg-white border-slate-100";
+      return "bg-white border-slate-100 dark:bg-slate-800/80 dark:border-white/10";
   }
+}
+
+/** Mockup-style track + fill; `fillStyle` when using category hex */
+function TimelineFundingBar({
+  pct,
+  fillClassName,
+  fillStyle,
+  label,
+}: {
+  pct: number;
+  fillClassName?: string;
+  fillStyle?: CSSProperties;
+  label: string;
+}) {
+  const w = Math.max(0, Math.min(100, pct));
+  return (
+    <div
+      className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/90 dark:bg-white/8"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(w)}
+      aria-label={label}
+    >
+      <div
+        className={`h-full rounded-full transition-[width] duration-200 ${fillClassName ?? ""}`}
+        style={{ width: `${w}%`, ...fillStyle }}
+      />
+    </div>
+  );
 }
 
 function rowKey(row: PlannerRow): string {
@@ -153,7 +190,7 @@ function TimelineRowActionsMenu({
     <div className="relative shrink-0" data-timeline-row-menu>
       <button
         type="button"
-        className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+        className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-slate-200"
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={(e) => {
@@ -167,7 +204,7 @@ function TimelineRowActionsMenu({
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-0.5 min-w-36 rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          className="absolute right-0 z-20 mt-0.5 min-w-36 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-slate-900"
           onMouseDown={(e) => e.preventDefault()}
         >
           {children}
@@ -518,9 +555,11 @@ export function ExpenseTimeline({
 
   if (items.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-10 text-center">
-        <p className="text-slate-600 text-sm font-medium">Nothing on the timeline this month</p>
-        <p className="text-slate-400 text-xs mt-1 max-w-sm mx-auto">
+      <div className="rounded-2xl border border-slate-100 bg-white px-5 py-10 text-center shadow-sm dark:border-white/10 dark:bg-slate-900/80">
+        <p className="text-sm font-medium text-slate-600 dark:text-slate-200">
+          Nothing on the timeline this month
+        </p>
+        <p className="mx-auto mt-1 max-w-sm text-xs text-slate-400 dark:text-slate-500">
           Add recurring expenses under a category, or set planned payments on credit cards and debts.
         </p>
       </div>
@@ -531,7 +570,7 @@ export function ExpenseTimeline({
   const CREDIT_CARDS_SECTION_COLOR = ACCENT_COLOR_FALLBACK.creditCard;
 
   const timelineCheckboxClass =
-    "h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-teal-600 focus:ring-teal-500 focus:ring-offset-0";
+    "h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-teal-600 focus:ring-teal-500 focus:ring-offset-0 dark:border-white/20 dark:bg-slate-900/40 dark:focus:ring-teal-400";
 
   return (
     <div className="relative w-full min-w-0">
@@ -539,17 +578,17 @@ export function ExpenseTimeline({
         <div
           className={`mb-3 flex items-start justify-between gap-2 rounded-xl border px-3 py-2 text-sm ${
             actionBanner.kind === "error"
-              ? "border-rose-200 bg-rose-50 text-rose-900"
+              ? "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-500/30 dark:bg-rose-950/50 dark:text-rose-100"
               : actionBanner.kind === "success"
-                ? "border-teal-200 bg-teal-50/90 text-teal-950"
-                : "border-slate-200 bg-slate-50 text-slate-800"
+                ? "border-teal-200 bg-teal-50/90 text-teal-950 dark:border-teal-500/30 dark:bg-teal-950/45 dark:text-teal-100"
+                : "border-slate-200 bg-slate-50 text-slate-800 dark:border-white/10 dark:bg-slate-800/80 dark:text-slate-200"
           }`}
         >
           <p className="min-w-0 leading-snug">{actionBanner.message}</p>
           <button
             type="button"
             onClick={() => setActionBanner(null)}
-            className="shrink-0 rounded-md px-1.5 py-0.5 text-xs font-semibold text-slate-500 hover:bg-black/5 hover:text-slate-800"
+            className="shrink-0 rounded-md px-1.5 py-0.5 text-xs font-semibold text-slate-500 hover:bg-black/5 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100"
           >
             Dismiss
           </button>
@@ -557,11 +596,11 @@ export function ExpenseTimeline({
       ) : null}
 
       {selectedRowKeys.size > 0 ? (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur-sm">
-          <p className="text-sm text-slate-700">
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-md backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/90">
+          <p className="text-sm text-slate-700 dark:text-slate-200">
             <span className="font-semibold tabular-nums">{selectedRowKeys.size}</span> selected
             {selectedBudgetCount > 0 ? (
-              <span className="text-slate-500">
+              <span className="text-slate-500 dark:text-slate-400">
                 {" "}
                 ({selectedBudgetCount} bill{selectedBudgetCount === 1 ? "" : "s"})
               </span>
@@ -588,7 +627,7 @@ export function ExpenseTimeline({
             type="button"
             disabled={bulkClearFundingRunning || bulkClearFundingEligibleCount === 0}
             onClick={() => void handleBulkClearFunding()}
-            className="rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-500/35 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-950/60"
             title={
               bulkClearFundingEligibleCount === 0
                 ? "No selected bills have funding to clear"
@@ -605,7 +644,7 @@ export function ExpenseTimeline({
             <button
               type="button"
               onClick={selectAllBudgetRows}
-              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/80"
             >
               Select all bills
             </button>
@@ -613,14 +652,17 @@ export function ExpenseTimeline({
           <button
             type="button"
             onClick={clearRowSelection}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700/80"
           >
             Clear
           </button>
         </div>
       ) : null}
 
-      <div className="absolute left-[8px] sm:left-[11px] top-3 bottom-3 w-px bg-slate-200" aria-hidden="true" />
+      <div
+        className="absolute left-[8px] top-3 bottom-3 w-px bg-slate-200 sm:left-[11px] dark:bg-white/10"
+        aria-hidden="true"
+      />
 
       <ol className="space-y-6 w-full min-w-0">
         {groupedByDueDay.map(({ day, items: dayItems }) => {
@@ -638,42 +680,52 @@ export function ExpenseTimeline({
           return (
             <li key={day} className="relative pl-9 sm:pl-10 w-full min-w-0">
               <div
-                className={`absolute left-0 top-0.5 flex h-[18px] w-[18px] sm:h-[22px] sm:w-[22px] items-center justify-center rounded-full border-2 bg-white ${
-                  isToday
-                    ? "border-teal-500 shadow-[0_0_0_3px_rgba(20,184,166,0.2)]"
-                    : isPast
-                    ? "border-slate-200"
-                    : "border-teal-300"
-                }`}
+                className="absolute left-0 top-0.5 flex h-[22px] w-[22px] sm:h-[26px] sm:w-[26px] items-center justify-center rounded-md border border-slate-200/90 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:border-white/15 dark:bg-slate-950/90 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                 aria-hidden="true"
               >
-                <span
-                  className={`text-[9px] sm:text-[10px] font-bold tabular-nums ${
-                    isToday ? "text-teal-700" : isPast ? "text-slate-400" : "text-teal-600"
-                  }`}
-                >
-                  {day}
+                <span className="relative flex h-full w-full flex-col items-center justify-center gap-0.5 pt-0.5">
+                  <span
+                    className={`h-1 w-1 shrink-0 rounded-full ${
+                      isToday
+                        ? "bg-teal-400 shadow-[0_0_6px_rgba(45,212,191,0.55)]"
+                        : isPast
+                          ? "bg-slate-300 dark:bg-white/25"
+                          : "bg-teal-500/70 dark:bg-teal-500/45"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span
+                    className={`text-[9px] sm:text-[10px] font-semibold tabular-nums leading-none tracking-tight ${
+                      isToday
+                        ? "text-teal-800 dark:text-teal-100"
+                        : isPast
+                          ? "text-slate-500"
+                          : "text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    {day}
+                  </span>
                 </span>
               </div>
 
               <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm">
-                <h3 className="font-semibold text-slate-800">Due {ordinal(day)}</h3>
-                <span className="text-slate-300" aria-hidden="true">
+                <h3 className="font-semibold text-slate-800 dark:text-slate-100">Due {ordinal(day)}</h3>
+                <span className="text-slate-300 dark:text-white/20" aria-hidden="true">
                   ·
                 </span>
-                <span className="text-slate-400">{formatMonth(budgetMonth)}</span>
+                <span className="text-slate-400 dark:text-slate-400">{formatMonth(budgetMonth)}</span>
                 {rel && (
                   <>
-                    <span className="text-slate-300" aria-hidden="true">
+                    <span className="text-slate-300 dark:text-white/20" aria-hidden="true">
                       ·
                     </span>
                     <span
                       className={
                         isToday
-                          ? "text-teal-700 font-medium"
+                          ? "font-medium text-teal-700 dark:text-teal-400"
                           : isPast
-                          ? "text-slate-400"
-                          : "text-slate-500"
+                            ? "text-slate-400 dark:text-slate-500"
+                            : "text-slate-500 dark:text-slate-400"
                       }
                     >
                       {rel}
@@ -725,103 +777,143 @@ export function ExpenseTimeline({
                       .filter(Boolean)
                       .join(" · ");
 
+                    const readinessPct =
+                      fundState === "paid"
+                        ? 100
+                        : fundState === "funded"
+                          ? 100
+                          : 12;
+                    const readinessFill =
+                      fundState === "paid"
+                        ? "bg-emerald-500"
+                        : fundState === "funded"
+                          ? "bg-amber-500"
+                          : "bg-rose-500/50 dark:bg-rose-500/45";
+                    const readinessLabel =
+                      fundState === "paid"
+                        ? `Payment marked paid for ${item.name}`
+                        : fundState === "funded"
+                          ? `Pay-from account linked; planned payment ${formatCurrency(item.amount)} for ${item.name}`
+                          : `Waiting — link pay-from or set planned payment for ${item.name}`;
+
                     return (
                       <li key={rk} className="w-full min-w-0">
                         <div
-                          className={`group/row flex w-full min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border py-1 pl-1 pr-1.5 sm:pr-2 shadow-sm transition-colors ${timelineRowSurfaceClasses(
+                          className={`group/row w-full min-w-0 overflow-hidden rounded-lg border shadow-sm transition-colors ${timelineRowSurfaceClasses(
                             fundState
                           )}`}
                           style={{ borderLeftWidth: 3, borderLeftColor: color }}
                         >
-                          <input
-                            type="checkbox"
-                            checked={selectedRowKeys.has(rk)}
-                            onChange={() => toggleRowSelected(rk)}
-                            className={timelineCheckboxClass}
-                            aria-label={`Select ${item.name} for bulk actions`}
-                          />
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setPaidTogglePendingKey(rk);
-                              try {
-                                await setCreditCardPaidForMonth({
-                                  id: item.creditCardId,
-                                  userId,
-                                  monthKey: budgetMonth,
-                                  paid: !isPaidForMonth,
-                                });
-                              } finally {
-                                setPaidTogglePendingKey(null);
+                          <div className="flex w-full min-w-0 items-center gap-1.5 py-1 pl-1 pr-1.5 sm:gap-2 sm:pr-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedRowKeys.has(rk)}
+                              onChange={() => toggleRowSelected(rk)}
+                              className={timelineCheckboxClass}
+                              aria-label={`Select ${item.name} for bulk actions`}
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setPaidTogglePendingKey(rk);
+                                try {
+                                  await setCreditCardPaidForMonth({
+                                    id: item.creditCardId,
+                                    userId,
+                                    monthKey: budgetMonth,
+                                    paid: !isPaidForMonth,
+                                  });
+                                } finally {
+                                  setPaidTogglePendingKey(null);
+                                }
+                              }}
+                              disabled={paidTogglePendingKey === rk}
+                              aria-pressed={isPaidForMonth}
+                              title={
+                                isPaidForMonth
+                                  ? `Paid for ${formatMonth(budgetMonth)} — click to clear`
+                                  : `Mark as paid — payment settled this month`
                               }
-                            }}
-                            disabled={paidTogglePendingKey === rk}
-                            aria-pressed={isPaidForMonth}
-                            title={
-                              isPaidForMonth
-                                ? `Paid for ${formatMonth(budgetMonth)} — click to clear`
-                                : `Mark as paid — payment settled this month`
-                            }
-                            aria-label={
-                              isPaidForMonth
-                                ? `Mark ${item.name} payment not paid for ${formatMonth(budgetMonth)}`
-                                : `Mark ${item.name} payment paid for ${formatMonth(budgetMonth)}`
-                            }
-                            className={`shrink-0 rounded-md p-0.5 transition-colors disabled:opacity-50 ${
-                              isPaidForMonth
-                                ? "text-emerald-600 hover:bg-emerald-100/80"
-                                : "text-slate-300 hover:text-teal-600 hover:bg-teal-50"
-                            }`}
-                          >
-                            {isPaidForMonth ? (
-                              <CheckCircle2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" aria-hidden="true" />
-                            ) : (
-                              <Circle className="w-4 h-4 sm:w-[18px] sm:h-[18px]" aria-hidden="true" />
-                            )}
-                          </button>
+                              aria-label={
+                                isPaidForMonth
+                                  ? `Mark ${item.name} payment not paid for ${formatMonth(budgetMonth)}`
+                                  : `Mark ${item.name} payment paid for ${formatMonth(budgetMonth)}`
+                              }
+                              className={`shrink-0 rounded-md p-0.5 transition-colors disabled:opacity-50 ${
+                                isPaidForMonth
+                                  ? "text-emerald-600 hover:bg-emerald-100/80 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+                                  : "text-slate-300 hover:bg-teal-50 hover:text-teal-600 dark:text-slate-500 dark:hover:bg-teal-950/40 dark:hover:text-teal-400"
+                              }`}
+                            >
+                              {isPaidForMonth ? (
+                                <CheckCircle2
+                                  className="h-4 w-4 sm:h-[18px] sm:w-[18px]"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <Circle
+                                  className="h-4 w-4 sm:h-[18px] sm:w-[18px]"
+                                  aria-hidden="true"
+                                />
+                              )}
+                            </button>
 
-                          <div
-                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
-                            style={{ backgroundColor: `${CREDIT_CARDS_SECTION_COLOR}26` }}
-                            title="Credit cards"
-                          >
-                            <CreditCard
-                              className="w-3 h-3"
-                              style={{ color: CREDIT_CARDS_SECTION_COLOR }}
-                              aria-hidden="true"
+                            <div
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                              style={{ backgroundColor: `${CREDIT_CARDS_SECTION_COLOR}26` }}
+                              title="Credit cards"
+                            >
+                              <CreditCard
+                                className="h-3 w-3"
+                                style={{ color: CREDIT_CARDS_SECTION_COLOR }}
+                                aria-hidden="true"
+                              />
+                            </div>
+
+                            <div className="min-w-0 flex-1 overflow-hidden">
+                              <div className="truncate text-xs font-medium text-slate-800 dark:text-slate-100 sm:text-sm">
+                                {item.name}
+                                <span className="font-normal text-slate-400 dark:text-slate-400">
+                                  {" "}
+                                  · payment
+                                </span>
+                              </div>
+                              {ccSubline ? (
+                                <p
+                                  className="truncate text-[10px] leading-snug text-slate-500 dark:text-slate-400"
+                                  title={ccSubline}
+                                >
+                                  {ccSubline}
+                                </p>
+                              ) : null}
+                            </div>
+
+                            <span className="shrink-0 tabular-nums text-xs font-semibold text-slate-800 dark:text-slate-100 sm:text-sm">
+                              {formatCurrency(item.amount)}
+                            </span>
+
+                            <TimelineRowActionsMenu
+                              rowKey={rk}
+                              menuOpenKey={rowMenuKey}
+                              setMenuOpenKey={setRowMenuKey}
+                            >
+                              <Link
+                                href="/credit-cards"
+                                role="menuitem"
+                                className="block px-3 py-1.5 text-left text-sm font-medium text-teal-700 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-950/50"
+                                onClick={() => setRowMenuKey(null)}
+                              >
+                                Credit cards
+                              </Link>
+                            </TimelineRowActionsMenu>
+                          </div>
+                          <div className="px-2 pb-2 pt-0">
+                            <TimelineFundingBar
+                              pct={readinessPct}
+                              fillClassName={readinessFill}
+                              label={readinessLabel}
                             />
                           </div>
-
-                          <div className="min-w-0 flex-1 overflow-hidden">
-                            <div className="truncate text-xs font-medium text-slate-800 sm:text-sm">
-                              {item.name}
-                              <span className="font-normal text-slate-400"> · payment</span>
-                            </div>
-                            {ccSubline ? (
-                              <p className="truncate text-[10px] leading-snug text-slate-500" title={ccSubline}>
-                                {ccSubline}
-                              </p>
-                            ) : null}
-                          </div>
-
-                          <span className="shrink-0 tabular-nums text-xs sm:text-sm font-semibold text-slate-800">
-                            {formatCurrency(item.amount)}
-                          </span>
-
-                          <TimelineRowActionsMenu
-                            rowKey={rk}
-                            menuOpenKey={rowMenuKey}
-                            setMenuOpenKey={setRowMenuKey}
-                          >
-                            <Link
-                              href="/credit-cards"
-                              role="menuitem"
-                              className="block px-3 py-1.5 text-left text-sm font-medium text-teal-700 hover:bg-teal-50"
-                              onClick={() => setRowMenuKey(null)}
-                            >
-                              Credit cards
-                            </Link>
-                          </TimelineRowActionsMenu>
                         </div>
                       </li>
                     );
@@ -864,140 +956,177 @@ export function ExpenseTimeline({
                     const debtDoc = debts?.find((d) => d._id === item.debtId);
                     const balance = debtDoc?.balance ?? 0;
 
+                    const debtReadinessPct =
+                      fundState === "paid"
+                        ? 100
+                        : fundState === "funded"
+                          ? 100
+                          : 12;
+                    const debtReadinessFill =
+                      fundState === "paid"
+                        ? "bg-emerald-500"
+                        : fundState === "funded"
+                          ? "bg-amber-500"
+                          : "bg-rose-500/50 dark:bg-rose-500/45";
+                    const debtReadinessLabel =
+                      fundState === "paid"
+                        ? `Payment marked paid for ${item.name}`
+                        : fundState === "funded"
+                          ? `Pay-from linked; planned paydown ${formatCurrency(item.amount)} for ${item.name}`
+                          : `Waiting — link pay-from or set planned amount for ${item.name}`;
+
                     return (
                       <li key={rk} className="w-full min-w-0">
                         <div
-                          className={`group/row flex w-full min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border py-1 pl-1 pr-1.5 sm:pr-2 shadow-sm transition-colors ${timelineRowSurfaceClasses(
+                          className={`group/row w-full min-w-0 overflow-hidden rounded-lg border shadow-sm transition-colors ${timelineRowSurfaceClasses(
                             fundState
                           )}`}
                           style={{ borderLeftWidth: 3, borderLeftColor: color }}
                         >
-                          <input
-                            type="checkbox"
-                            checked={selectedRowKeys.has(rk)}
-                            onChange={() => toggleRowSelected(rk)}
-                            className={timelineCheckboxClass}
-                            aria-label={`Select ${item.name} for bulk actions`}
-                          />
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setPaidTogglePendingKey(rk);
-                              try {
-                                await setDebtPaidForMonth({
-                                  id: item.debtId,
-                                  userId,
-                                  monthKey: budgetMonth,
-                                  paid: !isPaidForMonth,
-                                });
-                              } finally {
-                                setPaidTogglePendingKey(null);
+                          <div className="flex w-full min-w-0 items-center gap-1.5 py-1 pl-1 pr-1.5 sm:gap-2 sm:pr-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedRowKeys.has(rk)}
+                              onChange={() => toggleRowSelected(rk)}
+                              className={timelineCheckboxClass}
+                              aria-label={`Select ${item.name} for bulk actions`}
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setPaidTogglePendingKey(rk);
+                                try {
+                                  await setDebtPaidForMonth({
+                                    id: item.debtId,
+                                    userId,
+                                    monthKey: budgetMonth,
+                                    paid: !isPaidForMonth,
+                                  });
+                                } finally {
+                                  setPaidTogglePendingKey(null);
+                                }
+                              }}
+                              disabled={paidTogglePendingKey === rk}
+                              aria-pressed={isPaidForMonth}
+                              title={
+                                isPaidForMonth
+                                  ? `Paid for ${formatMonth(budgetMonth)} — click to clear`
+                                  : `Mark as paid — payment settled this month`
                               }
-                            }}
-                            disabled={paidTogglePendingKey === rk}
-                            aria-pressed={isPaidForMonth}
-                            title={
-                              isPaidForMonth
-                                ? `Paid for ${formatMonth(budgetMonth)} — click to clear`
-                                : `Mark as paid — payment settled this month`
-                            }
-                            aria-label={
-                              isPaidForMonth
-                                ? `Mark ${item.name} payment not paid for ${formatMonth(budgetMonth)}`
-                                : `Mark ${item.name} payment paid for ${formatMonth(budgetMonth)}`
-                            }
-                            className={`shrink-0 rounded-md p-0.5 transition-colors disabled:opacity-50 ${
-                              isPaidForMonth
-                                ? "text-emerald-600 hover:bg-emerald-100/80"
-                                : "text-slate-300 hover:text-teal-600 hover:bg-teal-50"
-                            }`}
-                          >
-                            {isPaidForMonth ? (
-                              <CheckCircle2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" aria-hidden="true" />
-                            ) : (
-                              <Circle className="w-4 h-4 sm:w-[18px] sm:h-[18px]" aria-hidden="true" />
-                            )}
-                          </button>
+                              aria-label={
+                                isPaidForMonth
+                                  ? `Mark ${item.name} payment not paid for ${formatMonth(budgetMonth)}`
+                                  : `Mark ${item.name} payment paid for ${formatMonth(budgetMonth)}`
+                              }
+                              className={`shrink-0 rounded-md p-0.5 transition-colors disabled:opacity-50 ${
+                                isPaidForMonth
+                                  ? "text-emerald-600 hover:bg-emerald-100/80 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+                                  : "text-slate-300 hover:bg-teal-50 hover:text-teal-600 dark:text-slate-500 dark:hover:bg-teal-950/40 dark:hover:text-teal-400"
+                              }`}
+                            >
+                              {isPaidForMonth ? (
+                                <CheckCircle2
+                                  className="h-4 w-4 sm:h-[18px] sm:w-[18px]"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <Circle
+                                  className="h-4 w-4 sm:h-[18px] sm:w-[18px]"
+                                  aria-hidden="true"
+                                />
+                              )}
+                            </button>
 
-                          <div
-                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
-                            style={{ backgroundColor: `${DEBTS_SECTION_COLOR}26` }}
-                            title="Debts"
-                          >
-                            <Landmark
-                              className="w-3 h-3"
-                              style={{ color: DEBTS_SECTION_COLOR }}
-                              aria-hidden="true"
+                            <div
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                              style={{ backgroundColor: `${DEBTS_SECTION_COLOR}26` }}
+                              title="Debts"
+                            >
+                              <Landmark
+                                className="h-3 w-3"
+                                style={{ color: DEBTS_SECTION_COLOR }}
+                                aria-hidden="true"
+                              />
+                            </div>
+
+                            <div className="flex min-w-0 flex-1 flex-col gap-0 overflow-hidden">
+                              <div className="min-w-0 truncate text-xs font-medium text-slate-800 dark:text-slate-100 sm:text-sm">
+                                {item.name}
+                                <span className="font-normal text-slate-400 dark:text-slate-400">
+                                  {" "}
+                                  · payment
+                                </span>
+                              </div>
+                              {debtSubline ? (
+                                <p
+                                  className="truncate text-[10px] leading-snug text-slate-500 dark:text-slate-400"
+                                  title={debtSubline}
+                                >
+                                  {debtSubline}
+                                </p>
+                              ) : null}
+                            </div>
+
+                            <span
+                              className="shrink-0 tabular-nums text-xs font-semibold text-slate-800 dark:text-slate-100 sm:text-sm"
+                              title="Current balance owed"
+                            >
+                              {formatCurrency(balance)}
+                            </span>
+
+                            <TimelineRowActionsMenu
+                              rowKey={rk}
+                              menuOpenKey={rowMenuKey}
+                              setMenuOpenKey={setRowMenuKey}
+                            >
+                              <button
+                                type="button"
+                                role="menuitem"
+                                disabled={!debtEditable}
+                                className="block w-full px-3 py-1.5 text-left text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-teal-400 dark:hover:bg-teal-950/50"
+                                onClick={() => {
+                                  if (!debtEditable) return;
+                                  setEditDebtId(item.debtId);
+                                  setRowMenuKey(null);
+                                }}
+                              >
+                                Edit
+                              </button>
+                              <Link
+                                href="/debts"
+                                role="menuitem"
+                                className="block px-3 py-1.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                                onClick={() => setRowMenuKey(null)}
+                              >
+                                Debts page
+                              </Link>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="block w-full px-3 py-1.5 text-left text-sm font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                                onClick={() => {
+                                  setArchiveDebtPendingId(
+                                    archiveDebtPendingId === item.debtId ? null : item.debtId
+                                  );
+                                  setRowMenuKey(null);
+                                }}
+                              >
+                                Archive
+                              </button>
+                            </TimelineRowActionsMenu>
+                          </div>
+                          <div className="px-2 pb-2 pt-0">
+                            <TimelineFundingBar
+                              pct={debtReadinessPct}
+                              fillClassName={debtReadinessFill}
+                              label={debtReadinessLabel}
                             />
                           </div>
-
-                          <div className="flex min-w-0 flex-1 flex-col gap-0 overflow-hidden">
-                            <div className="min-w-0 truncate text-xs font-medium text-slate-800 sm:text-sm">
-                              {item.name}
-                              <span className="font-normal text-slate-400"> · payment</span>
-                            </div>
-                            {debtSubline ? (
-                              <p
-                                className="truncate text-[10px] leading-snug text-slate-500"
-                                title={debtSubline}
-                              >
-                                {debtSubline}
-                              </p>
-                            ) : null}
-                          </div>
-
-                          <span
-                            className="shrink-0 tabular-nums text-xs sm:text-sm font-semibold text-slate-800"
-                            title="Current balance owed"
-                          >
-                            {formatCurrency(balance)}
-                          </span>
-
-                          <TimelineRowActionsMenu
-                            rowKey={rk}
-                            menuOpenKey={rowMenuKey}
-                            setMenuOpenKey={setRowMenuKey}
-                          >
-                            <button
-                              type="button"
-                              role="menuitem"
-                              disabled={!debtEditable}
-                              className="block w-full px-3 py-1.5 text-left text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-40"
-                              onClick={() => {
-                                if (!debtEditable) return;
-                                setEditDebtId(item.debtId);
-                                setRowMenuKey(null);
-                              }}
-                            >
-                              Edit
-                            </button>
-                            <Link
-                              href="/debts"
-                              role="menuitem"
-                              className="block px-3 py-1.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-50"
-                              onClick={() => setRowMenuKey(null)}
-                            >
-                              Debts page
-                            </Link>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="block w-full px-3 py-1.5 text-left text-sm font-medium text-rose-600 hover:bg-rose-50"
-                              onClick={() => {
-                                setArchiveDebtPendingId(
-                                  archiveDebtPendingId === item.debtId ? null : item.debtId
-                                );
-                                setRowMenuKey(null);
-                              }}
-                            >
-                              Archive
-                            </button>
-                          </TimelineRowActionsMenu>
                         </div>
 
                         {archiveDebtPendingId === item.debtId && (
-                          <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
-                            <p className="text-xs text-rose-700">
+                          <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 dark:border-rose-500/35 dark:bg-rose-950/45">
+                            <p className="text-xs text-rose-700 dark:text-rose-100">
                               Archive <strong>{item.name}</strong>? It will be hidden from active planning.
                               Balances are unchanged.
                             </p>
@@ -1012,7 +1141,7 @@ export function ExpenseTimeline({
                               <button
                                 type="button"
                                 onClick={() => setArchiveDebtPendingId(null)}
-                                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600"
+                                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200"
                               >
                                 Cancel
                               </button>
@@ -1071,200 +1200,130 @@ export function ExpenseTimeline({
                       ? actualPaidByBudgetId[item._id as string]!
                       : item.amount;
 
+                  const billDenom = item.amount > 0.005 ? item.amount : 1;
+                  const fundedPctRaw = (setAsideTotal / billDenom) * 100;
+                  const barPct = isPaidForMonth
+                    ? 100
+                    : isOverAllocated
+                      ? 100
+                      : Math.min(fundedPctRaw, 100);
+                  const barFillStyle =
+                    isPaidForMonth || isOverAllocated
+                      ? undefined
+                      : ({ backgroundColor: color } satisfies CSSProperties);
+                  const barFillClass = isPaidForMonth
+                    ? "bg-emerald-500"
+                    : isOverAllocated
+                      ? "bg-rose-500"
+                      : "";
+                  const barLabel = isPaidForMonth
+                    ? `${item.name} paid for ${formatMonth(budgetMonth)}`
+                    : isOverAllocated
+                      ? `${item.name} over-funded: ${formatCurrency(setAsideTotal)} set aside for ${formatCurrency(item.amount)} bill`
+                      : `${item.name}: ${formatCurrency(setAsideTotal)} of ${formatCurrency(item.amount)} funded`;
+
                   return (
                     <li key={rk} className="w-full min-w-0">
                       <div
-                        className={`group/row flex w-full min-w-0 items-center gap-1.5 sm:gap-2 rounded-lg border py-1 pl-1 pr-1.5 sm:pr-2 shadow-sm transition-colors ${
+                        className={`group/row w-full min-w-0 overflow-hidden rounded-lg border shadow-sm transition-colors ${
                           isOverAllocated && !isPaidForMonth
-                            ? `${timelineRowSurfaceClasses(fundState)} ring-2 ring-amber-500/50 ring-offset-2 ring-offset-white`
+                            ? `${timelineRowSurfaceClasses(fundState)} ring-2 ring-amber-500/50 ring-offset-2 ring-offset-white dark:ring-offset-slate-900`
                             : timelineRowSurfaceClasses(fundState)
                         }`}
                         style={{ borderLeftWidth: 3, borderLeftColor: color }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={selectedRowKeys.has(rk)}
-                          onChange={() => toggleRowSelected(rk)}
-                          className={timelineCheckboxClass}
-                          aria-label={`Select ${item.name} for bulk actions`}
-                        />
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setPaidTogglePendingKey(rk);
-                            try {
-                              await setBudgetPaidForMonth({
-                                id: item._id,
-                                userId,
-                                monthKey: budgetMonth,
-                                paid: !isPaidForMonth,
-                              });
-                            } finally {
-                              setPaidTogglePendingKey(null);
-                            }
-                          }}
-                          disabled={paidTogglePendingKey === rk}
-                          aria-pressed={isPaidForMonth}
-                          title={
-                            isPaidForMonth
-                              ? `Paid for ${formatMonth(budgetMonth)} — click to clear`
-                              : `Mark as paid — bill settled this month`
-                          }
-                          aria-label={
-                            isPaidForMonth
-                              ? `Mark ${item.name} not paid for ${formatMonth(budgetMonth)}`
-                              : `Mark ${item.name} paid for ${formatMonth(budgetMonth)}`
-                          }
-                          className={`shrink-0 rounded-md p-0.5 transition-colors disabled:opacity-50 ${
-                            isPaidForMonth
-                              ? "text-emerald-600 hover:bg-emerald-100/80"
-                              : "text-slate-300 hover:text-teal-600 hover:bg-teal-50"
-                          }`}
-                        >
-                          {isPaidForMonth ? (
-                            <CheckCircle2 className="w-4 h-4 sm:w-[18px] sm:h-[18px]" aria-hidden="true" />
-                          ) : (
-                            <Circle className="w-4 h-4 sm:w-[18px] sm:h-[18px]" aria-hidden="true" />
-                          )}
-                        </button>
-
-                        <div
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
-                          style={{ backgroundColor: `${color}26` }}
-                          title={cat?.name ?? "Category"}
-                          aria-label={cat?.name ?? "Category"}
-                        >
-                          {IconComp ? (
-                            <IconComp className="w-3 h-3" style={{ color }} aria-hidden="true" />
-                          ) : (
-                            <span className="text-[10px] leading-none" aria-hidden="true">
-                              {iconName ?? "💰"}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex min-w-0 flex-1 flex-col gap-0 overflow-hidden">
-                          <div className="min-w-0 truncate text-xs font-medium text-slate-800 sm:text-sm">
-                            {item.name}
-                          </div>
-                          {budgetSubline ? (
-                            <p
-                              className="truncate text-[10px] leading-snug text-slate-500"
-                              title={budgetSubline}
-                            >
-                              {budgetSubline}
-                            </p>
-                          ) : null}
-                        </div>
-
-                        {setAsideTotal > 0.005 && !isPaidForMonth ? (
+                        <div className="flex w-full min-w-0 items-center gap-1.5 py-1 pl-1 pr-1.5 sm:gap-2 sm:pr-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedRowKeys.has(rk)}
+                            onChange={() => toggleRowSelected(rk)}
+                            className={timelineCheckboxClass}
+                            aria-label={`Select ${item.name} for bulk actions`}
+                          />
                           <button
                             type="button"
-                            disabled={fundClearPendingId === item._id}
-                            title={`Clear all funding for this bill (${formatCurrency(setAsideTotal)})`}
-                            aria-label={`Clear funding for ${item.name}`}
-                            onClick={() => {
-                              void (async () => {
-                                setFundClearPendingId(item._id);
-                                try {
-                                  await removeAllBillFunding({
-                                    userId,
-                                    budgetItemId: item._id,
-                                    monthKey: budgetMonth,
-                                  });
-                                  setActionBanner({
-                                    kind: "success",
-                                    message: `Cleared funding for ${item.name}.`,
-                                  });
-                                } catch (e) {
-                                  setActionBanner({
-                                    kind: "error",
-                                    message:
-                                      e instanceof Error ? e.message : "Could not clear funding",
-                                  });
-                                } finally {
-                                  setFundClearPendingId(null);
-                                }
-                              })();
-                            }}
-                            className="shrink-0 rounded-md p-1 text-rose-600 transition-colors hover:bg-rose-100/80 disabled:opacity-50"
-                          >
-                            <CircleMinus className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
-                          </button>
-                        ) : null}
-                        {!isPaidForMonth && item.amount > 0.005 ? (
-                          quickFundRemaining != null ? (
-                            <button
-                              type="button"
-                              disabled={fundQuickPendingId === item._id}
-                              title={`Fund ${formatCurrency(quickFundRemaining)} toward this bill`}
-                              aria-label={
-                                fundingLevel === "none"
-                                  ? `Fund ${item.name} — add set-aside for this month`
-                                  : `Finish funding ${item.name} (${formatCurrency(quickFundRemaining)} left)`
+                            onClick={async () => {
+                              setPaidTogglePendingKey(rk);
+                              try {
+                                await setBudgetPaidForMonth({
+                                  id: item._id,
+                                  userId,
+                                  monthKey: budgetMonth,
+                                  paid: !isPaidForMonth,
+                                });
+                              } finally {
+                                setPaidTogglePendingKey(null);
                               }
-                              onClick={() => {
-                                void (async () => {
-                                  setFundQuickPendingId(item._id);
-                                  try {
-                                    await fundBudgetBill(item);
-                                  } catch (e) {
-                                    setActionBanner({
-                                      kind: "error",
-                                      message:
-                                        e instanceof Error ? e.message : "Could not fund",
-                                    });
-                                  } finally {
-                                    setFundQuickPendingId(null);
-                                  }
-                                })();
-                              }}
-                              className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors disabled:opacity-50 sm:text-[11px] ${
-                                fundingLevel === "none"
-                                  ? "border border-rose-200/90 bg-rose-100 text-rose-900 hover:bg-rose-200/50"
-                                  : "border border-amber-200/90 bg-amber-50 text-amber-950 hover:bg-amber-100/90"
-                              }`}
-                            >
-                              {fundQuickPendingId === item._id
-                                ? "…"
-                                : fundingLevel === "none"
-                                  ? "Waiting"
-                                  : "Partly funded"}
-                            </button>
-                          ) : fundingLevel === "full" ? (
-                            <span
-                              className="shrink-0 rounded-md border border-amber-200/90 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-950 sm:text-[11px]"
-                              title="Bill amount fully funded this month"
-                            >
-                              Funded
-                            </span>
-                          ) : null
-                        ) : null}
+                            }}
+                            disabled={paidTogglePendingKey === rk}
+                            aria-pressed={isPaidForMonth}
+                            title={
+                              isPaidForMonth
+                                ? `Paid for ${formatMonth(budgetMonth)} — click to clear`
+                                : `Mark as paid — bill settled this month`
+                            }
+                            aria-label={
+                              isPaidForMonth
+                                ? `Mark ${item.name} not paid for ${formatMonth(budgetMonth)}`
+                                : `Mark ${item.name} paid for ${formatMonth(budgetMonth)}`
+                            }
+                            className={`shrink-0 rounded-md p-0.5 transition-colors disabled:opacity-50 ${
+                              isPaidForMonth
+                                ? "text-emerald-600 hover:bg-emerald-100/80 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+                                : "text-slate-300 hover:bg-teal-50 hover:text-teal-600 dark:text-slate-500 dark:hover:bg-teal-950/40 dark:hover:text-teal-400"
+                            }`}
+                          >
+                            {isPaidForMonth ? (
+                              <CheckCircle2
+                                className="h-4 w-4 sm:h-[18px] sm:h-[18px]"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <Circle
+                                className="h-4 w-4 sm:h-[18px] sm:h-[18px]"
+                                aria-hidden="true"
+                              />
+                            )}
+                          </button>
 
-                        <span
-                          className="shrink-0 tabular-nums text-xs sm:text-sm font-semibold text-slate-800"
-                          title={
-                            isPaidForMonth && displayAmount !== item.amount
-                              ? `Planned ${formatCurrency(item.amount)} · paid ${formatCurrency(displayAmount)}`
-                              : undefined
-                          }
-                        >
-                          {formatCurrency(displayAmount)}
-                        </span>
+                          <div
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                            style={{ backgroundColor: `${color}26` }}
+                            title={cat?.name ?? "Category"}
+                            aria-label={cat?.name ?? "Category"}
+                          >
+                            {IconComp ? (
+                              <IconComp className="h-3 w-3" style={{ color }} aria-hidden="true" />
+                            ) : (
+                              <span className="text-[10px] leading-none" aria-hidden="true">
+                                {iconName ?? "💰"}
+                              </span>
+                            )}
+                          </div>
 
-                        <TimelineRowActionsMenu
-                          rowKey={rk}
-                          menuOpenKey={rowMenuKey}
-                          setMenuOpenKey={setRowMenuKey}
-                        >
+                          <div className="flex min-w-0 flex-1 flex-col gap-0 overflow-hidden">
+                            <div className="min-w-0 truncate text-xs font-medium text-slate-800 dark:text-slate-100 sm:text-sm">
+                              {item.name}
+                            </div>
+                            {budgetSubline ? (
+                              <p
+                                className="truncate text-[10px] leading-snug text-slate-500 dark:text-slate-400"
+                                title={budgetSubline}
+                              >
+                                {budgetSubline}
+                              </p>
+                            ) : null}
+                          </div>
+
                           {setAsideTotal > 0.005 && !isPaidForMonth ? (
                             <button
                               type="button"
-                              role="menuitem"
-                              className="block w-full px-3 py-1.5 text-left text-sm font-medium text-rose-700 hover:bg-rose-50"
+                              disabled={fundClearPendingId === item._id}
+                              title={`Clear all funding for this bill (${formatCurrency(setAsideTotal)})`}
+                              aria-label={`Clear funding for ${item.name}`}
                               onClick={() => {
-                                setRowMenuKey(null);
                                 void (async () => {
+                                  setFundClearPendingId(item._id);
                                   try {
                                     await removeAllBillFunding({
                                       userId,
@@ -1281,68 +1340,176 @@ export function ExpenseTimeline({
                                       message:
                                         e instanceof Error ? e.message : "Could not clear funding",
                                     });
+                                  } finally {
+                                    setFundClearPendingId(null);
                                   }
                                 })();
                               }}
+                              className="shrink-0 rounded-md p-1 text-rose-600 transition-colors hover:bg-rose-100/80 disabled:opacity-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
                             >
-                              Clear all funding
+                              <CircleMinus className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
                             </button>
                           ) : null}
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="block w-full px-3 py-1.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-                            onClick={() => {
-                              setFundAdjustTarget(item);
-                              setRowMenuKey(null);
-                            }}
+                          {!isPaidForMonth && item.amount > 0.005 ? (
+                            quickFundRemaining != null ? (
+                              <button
+                                type="button"
+                                disabled={fundQuickPendingId === item._id}
+                                title={`Fund ${formatCurrency(quickFundRemaining)} toward this bill`}
+                                aria-label={
+                                  fundingLevel === "none"
+                                    ? `Fund ${item.name} — add set-aside for this month`
+                                    : `Finish funding ${item.name} (${formatCurrency(quickFundRemaining)} left)`
+                                }
+                                onClick={() => {
+                                  void (async () => {
+                                    setFundQuickPendingId(item._id);
+                                    try {
+                                      await fundBudgetBill(item);
+                                    } catch (e) {
+                                      setActionBanner({
+                                        kind: "error",
+                                        message:
+                                          e instanceof Error ? e.message : "Could not fund",
+                                      });
+                                    } finally {
+                                      setFundQuickPendingId(null);
+                                    }
+                                  })();
+                                }}
+                                className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors disabled:opacity-50 sm:text-[11px] ${
+                                  fundingLevel === "none"
+                                    ? "border border-rose-200/90 bg-rose-100 text-rose-900 hover:bg-rose-200/50 dark:border-rose-500/35 dark:bg-rose-950/50 dark:text-rose-100 dark:hover:bg-rose-950/80"
+                                    : "border border-amber-200/90 bg-amber-50 text-amber-950 hover:bg-amber-100/90 dark:border-amber-500/35 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/70"
+                                }`}
+                              >
+                                {fundQuickPendingId === item._id
+                                  ? "…"
+                                  : fundingLevel === "none"
+                                    ? "Waiting"
+                                    : "Partly funded"}
+                              </button>
+                            ) : fundingLevel === "full" ? (
+                              <span
+                                className="shrink-0 rounded-md border border-amber-200/90 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-950 dark:border-amber-500/35 dark:bg-amber-950/45 dark:text-amber-100 sm:text-[11px]"
+                                title="Bill amount fully funded this month"
+                              >
+                                Funded
+                              </span>
+                            ) : null
+                          ) : null}
+
+                          <span
+                            className="shrink-0 tabular-nums text-xs font-semibold text-slate-800 dark:text-slate-100 sm:text-sm"
+                            title={
+                              isPaidForMonth && displayAmount !== item.amount
+                                ? `Planned ${formatCurrency(item.amount)} · paid ${formatCurrency(displayAmount)}`
+                                : undefined
+                            }
                           >
-                            Fund / adjust amount
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="block w-full px-3 py-1.5 text-left text-sm font-medium text-teal-700 hover:bg-teal-50"
-                            onClick={() => {
-                              setEditTarget(item);
-                              setRowMenuKey(null);
-                            }}
+                            {formatCurrency(displayAmount)}
+                          </span>
+
+                          <TimelineRowActionsMenu
+                            rowKey={rk}
+                            menuOpenKey={rowMenuKey}
+                            setMenuOpenKey={setRowMenuKey}
                           >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="block w-full px-3 py-1.5 text-left text-sm font-medium text-rose-600 hover:bg-rose-50"
-                            onClick={() => {
-                              setArchivePendingId(
-                                archivePendingId === item._id ? null : item._id
-                              );
-                              setRowMenuKey(null);
-                            }}
-                          >
-                            Archive
-                          </button>
-                        </TimelineRowActionsMenu>
+                            {setAsideTotal > 0.005 && !isPaidForMonth ? (
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="block w-full px-3 py-1.5 text-left text-sm font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                                onClick={() => {
+                                  setRowMenuKey(null);
+                                  void (async () => {
+                                    try {
+                                      await removeAllBillFunding({
+                                        userId,
+                                        budgetItemId: item._id,
+                                        monthKey: budgetMonth,
+                                      });
+                                      setActionBanner({
+                                        kind: "success",
+                                        message: `Cleared funding for ${item.name}.`,
+                                      });
+                                    } catch (e) {
+                                      setActionBanner({
+                                        kind: "error",
+                                        message:
+                                          e instanceof Error ? e.message : "Could not clear funding",
+                                      });
+                                    }
+                                  })();
+                                }}
+                              >
+                                Clear all funding
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="block w-full px-3 py-1.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                              onClick={() => {
+                                setFundAdjustTarget(item);
+                                setRowMenuKey(null);
+                              }}
+                            >
+                              Fund / adjust amount
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="block w-full px-3 py-1.5 text-left text-sm font-medium text-teal-700 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-950/50"
+                              onClick={() => {
+                                setEditTarget(item);
+                                setRowMenuKey(null);
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="block w-full px-3 py-1.5 text-left text-sm font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                              onClick={() => {
+                                setArchivePendingId(
+                                  archivePendingId === item._id ? null : item._id
+                                );
+                                setRowMenuKey(null);
+                              }}
+                            >
+                              Archive
+                            </button>
+                          </TimelineRowActionsMenu>
+                        </div>
+                        <div className="px-2 pb-2 pt-0">
+                          <TimelineFundingBar
+                            pct={barPct}
+                            fillClassName={barFillClass}
+                            fillStyle={barFillStyle}
+                            label={barLabel}
+                          />
+                        </div>
                       </div>
 
                       {archivePendingId === item._id && (
-                        <div className="mt-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
-                          <p className="text-xs text-rose-700">
+                        <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 dark:border-rose-500/35 dark:bg-rose-950/45">
+                          <p className="text-xs text-rose-700 dark:text-rose-100">
                             Archive <strong>{item.name}</strong>? It will be hidden from active planning.
                           </p>
-                          <div className="flex gap-2 shrink-0">
+                          <div className="flex shrink-0 gap-2">
                             <button
                               type="button"
                               onClick={() => handleArchive(item._id)}
-                              className="text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 px-2.5 py-1 rounded-lg"
+                              className="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700"
                             >
                               Archive
                             </button>
                             <button
                               type="button"
                               onClick={() => setArchivePendingId(null)}
-                              className="text-xs text-slate-600 bg-white px-2.5 py-1 rounded-lg border border-slate-200"
+                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200"
                             >
                               Cancel
                             </button>
@@ -1385,10 +1552,10 @@ export function ExpenseTimeline({
           onClick={() => setEditTarget(null)}
         >
           <div
-            className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="timeline-edit-title" className="font-semibold text-slate-800 mb-4">
+            <h2 id="timeline-edit-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">
               Edit expense
             </h2>
             <BudgetItemManager
@@ -1411,19 +1578,22 @@ export function ExpenseTimeline({
           onClick={() => setEditDebtId(null)}
         >
           <div
-            className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="timeline-debt-edit-title" className="font-semibold text-slate-800 mb-4">
+            <h2 id="timeline-debt-edit-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">
               Edit debt
             </h2>
             {(() => {
               const d = debts?.find((x) => x._id === editDebtId);
               if (!d) {
                 return (
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
                     This debt is not available to edit. Try again from the{" "}
-                    <Link href="/debts" className="font-medium text-teal-600 hover:text-teal-700">
+                    <Link
+                      href="/debts"
+                      className="font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"
+                    >
                       Debts
                     </Link>{" "}
                     page.

@@ -10,6 +10,7 @@
 
 import type * as accountBalance from "../accountBalance.js";
 import type * as accounts from "../accounts.js";
+import type * as authUser from "../authUser.js";
 import type * as autoFundMonth from "../autoFundMonth.js";
 import type * as bucketMonthFundings from "../bucketMonthFundings.js";
 import type * as buckets from "../buckets.js";
@@ -33,6 +34,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   accountBalance: typeof accountBalance;
   accounts: typeof accounts;
+  authUser: typeof authUser;
   autoFundMonth: typeof autoFundMonth;
   bucketMonthFundings: typeof bucketMonthFundings;
   buckets: typeof buckets;

@@ -71,7 +71,7 @@ function QuickLinkCard({
 
   return (
     <li className="h-full min-h-[152px]">
-      <div className="relative h-full min-h-[152px] rounded-2xl border border-slate-100 shadow-sm overflow-hidden border-l-[3px] border-l-teal-600">
+      <div className="relative h-full min-h-[152px] rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm overflow-hidden border-l-[3px] border-l-teal-600">
         <a
           href={row.url}
           target="_blank"
@@ -107,7 +107,7 @@ function QuickLinkCard({
           <button
             type="button"
             onClick={onEdit}
-            className="p-1.5 rounded-lg bg-white/95 text-slate-600 shadow-sm border border-slate-200/90 hover:bg-white hover:text-teal-700 transition-colors"
+            className="p-1.5 rounded-lg bg-white/95 dark:bg-slate-900/95 text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200/90 dark:border-white/15 hover:bg-white dark:hover:bg-slate-800 hover:text-teal-700 dark:hover:text-teal-400 transition-colors"
             aria-label={`Edit ${row.label}`}
           >
             <Pencil className="w-3.5 h-3.5" aria-hidden />
@@ -115,7 +115,7 @@ function QuickLinkCard({
           <button
             type="button"
             onClick={onRequestDelete}
-            className="p-1.5 rounded-lg bg-white/95 text-red-600 shadow-sm border border-red-100 hover:bg-red-50 transition-colors"
+            className="p-1.5 rounded-lg bg-white/95 dark:bg-slate-900/95 text-red-600 dark:text-red-400 shadow-sm border border-red-100 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors"
             aria-label={`Remove ${row.label}`}
           >
             <Trash2 className="w-3.5 h-3.5" aria-hidden />
@@ -217,11 +217,11 @@ export default function QuickLinksPage() {
     <div className="w-full space-y-5 lg:space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Quick links</h1>
-          <p className="text-slate-400 text-sm mt-1 max-w-2xl">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Quick links</h1>
+          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1 max-w-2xl">
             Shortcuts to your banks and financial sites. The whole card opens the link in a new tab;
             previews use each site&apos;s Open Graph image when available. You can paste{" "}
-            <span className="text-slate-600">chase.com</span> or a full URL — https is added when
+            <span className="text-slate-600 dark:text-slate-300">chase.com</span> or a full URL — https is added when
             needed.
           </p>
         </div>
@@ -230,7 +230,7 @@ export default function QuickLinksPage() {
             type="button"
             onClick={handleAddSuggested}
             disabled={busy || !user}
-            className="bg-white text-slate-700 border border-slate-200 text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-50 disabled:opacity-50 transition-all shadow-sm"
+            className="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10 text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-all shadow-sm"
           >
             Add suggested links
           </button>
@@ -247,13 +247,16 @@ export default function QuickLinksPage() {
       </div>
 
       {showForm && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="font-semibold text-slate-800 mb-5">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm p-6">
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-5">
             {editId ? "Edit link" : "New link"}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
             <div>
-              <label htmlFor="ql-label" className="block text-sm font-medium text-slate-700 mb-1">
+              <label
+                htmlFor="ql-label"
+                className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+              >
                 Name
               </label>
               <input
@@ -261,12 +264,15 @@ export default function QuickLinksPage() {
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="Chase"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+                className="w-full rounded-xl border border-slate-200 dark:border-white/10 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
                 autoComplete="off"
               />
             </div>
             <div>
-              <label htmlFor="ql-url" className="block text-sm font-medium text-slate-700 mb-1">
+              <label
+                htmlFor="ql-url"
+                className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+              >
                 URL
               </label>
               <input
@@ -274,7 +280,7 @@ export default function QuickLinksPage() {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://www.chase.com or chase.com"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+                className="w-full rounded-xl border border-slate-200 dark:border-white/10 dark:bg-slate-800 dark:text-slate-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
                 autoComplete="off"
                 inputMode="url"
               />
@@ -290,7 +296,7 @@ export default function QuickLinksPage() {
               <button
                 type="button"
                 onClick={resetForm}
-                className="text-slate-600 text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-100 transition-colors"
+                className="text-slate-600 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 Cancel
               </button>
@@ -304,15 +310,15 @@ export default function QuickLinksPage() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="bg-white rounded-2xl border border-slate-100 min-h-[152px] animate-pulse border-l-[3px] border-l-teal-600"
+              className="bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-100 dark:border-white/10 min-h-[152px] animate-pulse border-l-[3px] border-l-teal-600"
             />
           ))}
         </div>
       ) : links.length === 0 && !showForm ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
-          <Link2 className="w-12 h-12 text-slate-300 mx-auto mb-3" aria-hidden="true" />
-          <p className="text-slate-500 mb-1 font-medium">No quick links yet</p>
-          <p className="text-slate-500 text-sm mb-5">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 p-12 text-center">
+          <Link2 className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" aria-hidden="true" />
+          <p className="text-slate-500 dark:text-slate-400 mb-1 font-medium">No quick links yet</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mb-5">
             Add your own or use suggested links for Chase, USAA, and other common financial sites.
           </p>
           <div className="flex flex-wrap justify-center gap-2">
@@ -320,7 +326,7 @@ export default function QuickLinksPage() {
               type="button"
               onClick={handleAddSuggested}
               disabled={busy || !user}
-              className="bg-white text-slate-700 border border-slate-200 text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-slate-50 disabled:opacity-50 transition-all"
+              className="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10 text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-all"
             >
               Add suggested links
             </button>
@@ -354,18 +360,18 @@ export default function QuickLinksPage() {
           aria-modal="true"
           aria-labelledby="delete-ql-title"
         >
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
-            <h2 id="delete-ql-title" className="text-lg font-semibold text-slate-900">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 border border-slate-100 dark:border-white/10">
+            <h2 id="delete-ql-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Remove this link?
             </h2>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               You can add it again anytime. This does not affect your budget data.
             </p>
             <div className="flex gap-2 justify-end pt-2">
               <button
                 type="button"
                 onClick={() => setDeletePendingId(null)}
-                className="text-slate-600 text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-100"
+                className="text-slate-600 dark:text-slate-300 text-sm font-medium px-4 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 Cancel
               </button>

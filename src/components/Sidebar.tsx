@@ -16,9 +16,74 @@ import {
   Link2,
   Menu,
   X,
+  Sun,
+  Moon,
+  Monitor,
+  MoreHorizontal,
 } from "lucide-react";
 import { LogoMark } from "@/components/LogoMark";
 import { useTransactionModal } from "@/components/TransactionModalProvider";
+import { useTheme } from "@/components/providers/ThemeProvider";
+
+function ThemeToggle({ className }: { className?: string }) {
+  const { theme, setTheme } = useTheme();
+  const btn =
+    "w-8 h-8 flex items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950";
+
+  return (
+    <div
+      className={cn(
+        "flex items-center rounded-lg border border-white/10 bg-white/5 p-0.5 gap-0.5",
+        className
+      )}
+      role="group"
+      aria-label="Color theme"
+    >
+      <button
+        type="button"
+        onClick={() => setTheme("light")}
+        className={cn(
+          btn,
+          theme === "light"
+            ? "bg-white/15 text-white"
+            : "text-slate-400 hover:text-white hover:bg-white/10"
+        )}
+        aria-label="Use light theme"
+        aria-pressed={theme === "light"}
+      >
+        <Sun className="w-4 h-4 shrink-0" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setTheme("dark")}
+        className={cn(
+          btn,
+          theme === "dark"
+            ? "bg-white/15 text-white"
+            : "text-slate-400 hover:text-white hover:bg-white/10"
+        )}
+        aria-label="Use dark theme"
+        aria-pressed={theme === "dark"}
+      >
+        <Moon className="w-4 h-4 shrink-0" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setTheme("system")}
+        className={cn(
+          btn,
+          theme === "system"
+            ? "bg-white/15 text-white"
+            : "text-slate-400 hover:text-white hover:bg-white/10"
+        )}
+        aria-label="Use system theme"
+        aria-pressed={theme === "system"}
+      >
+        <Monitor className="w-4 h-4 shrink-0" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -29,6 +94,14 @@ const NAV_LINKS = [
   { href: "/accounts", label: "Accounts", icon: Wallet },
   { href: "/quick-links", label: "Links", icon: Link2 },
   { href: "/add-transaction", label: "Add", icon: PlusCircle },
+];
+
+// Primary bottom-nav tabs: Dashboard, Categories, [Add FAB], Buckets, More
+const PRIMARY_NAV = [
+  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+  { href: "/categories", label: "Categories", icon: Tags },
+  // Add Transaction is rendered separately as the center FAB
+  { href: "/buckets", label: "Buckets", icon: Boxes },
 ];
 
 export function Sidebar() {
@@ -108,9 +181,12 @@ export function Sidebar() {
           })}
         </nav>
 
-        <div className="shrink-0 px-4 py-4 border-t border-white/5 flex items-center gap-3">
-          <UserButton />
-          <span className="text-sm text-slate-400 truncate">Account</span>
+        <div className="shrink-0 px-4 py-4 border-t border-white/5 flex flex-col gap-3">
+          <ThemeToggle className="self-start" />
+          <div className="flex items-center gap-3 min-w-0">
+            <UserButton />
+            <span className="text-sm text-slate-400 truncate">Account</span>
+          </div>
         </div>
       </aside>
 
@@ -149,7 +225,8 @@ export function Sidebar() {
             aria-hidden="true"
           />
           <div className="relative w-72 max-w-[85vw] bg-slate-950 flex flex-col h-full shadow-2xl">
-            <div className="px-5 py-5 border-b border-white/5 flex items-center justify-between">
+            {/* Drawer header */}
+            <div className="px-5 py-5 border-b border-white/5 flex items-center justify-between gap-2">
               <span className="font-bold text-white text-base tracking-tight">Menu</span>
               <button
                 onClick={() => setDrawerOpen(false)}
@@ -159,7 +236,9 @@ export function Sidebar() {
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
-            <nav className="flex-1 px-3 py-4 space-y-1">
+
+            {/* Drawer nav */}
+            <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 space-y-1">
               {NAV_LINKS.map(({ href, label, icon: Icon }) => {
                 const active = pathname === href;
                 const isAdd = href === "/add-transaction";
@@ -206,48 +285,94 @@ export function Sidebar() {
                 );
               })}
             </nav>
+
+            {/* Drawer footer: theme toggle */}
+            <div className="shrink-0 px-5 py-5 border-t border-white/5 flex items-center gap-3">
+              <ThemeToggle />
+              <span className="text-sm text-slate-400">Theme</span>
+            </div>
           </div>
         </div>
       )}
 
       {/* ── Mobile bottom nav ── */}
+      {/*
+        5-slot layout: [Home] [Categories] [Add FAB] [Buckets] [More]
+        Add is a raised teal FAB in the center slot.
+      */}
       <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-slate-950 border-t border-white/8 flex"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-slate-950 border-t border-white/8 flex pb-[env(safe-area-inset-bottom)]"
         aria-label="Bottom navigation"
       >
-        {NAV_LINKS.map(({ href, label, icon: Icon }) => {
+        {/* Slot 1 & 2: primary nav items before Add */}
+        {PRIMARY_NAV.slice(0, 2).map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
-          const isAdd = href === "/add-transaction";
-          const addActive = isAdd && pathname === "/add-transaction";
-          const className = cn(
-            "flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors min-h-[3.5rem]",
-            active || addActive ? "text-teal-400" : "text-slate-500 hover:text-slate-300"
-          );
-          if (isAdd) {
-            return (
-              <button
-                key={href}
-                type="button"
-                onClick={openAddTransaction}
-                className={className}
-              >
-                <Icon className="w-5 h-5" aria-hidden="true" />
-                <span>{label}</span>
-              </button>
-            );
-          }
           return (
             <Link
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className={className}
+              className={cn(
+                "flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors min-h-[3.5rem]",
+                active ? "text-teal-400" : "text-slate-500 hover:text-slate-300"
+              )}
             >
               <Icon className="w-5 h-5" aria-hidden="true" />
               <span>{label}</span>
             </Link>
           );
         })}
+
+        {/* Center slot: Add Transaction FAB */}
+        <div className="flex-1 flex flex-col items-center justify-center gap-1 min-h-[3.5rem]">
+          <button
+            type="button"
+            onClick={openAddTransaction}
+            aria-label="Add transaction"
+            className="w-12 h-12 rounded-full bg-teal-500 hover:bg-teal-400 active:bg-teal-600 flex items-center justify-center shadow-lg shadow-teal-900/40 transition-colors -translate-y-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+          >
+            <PlusCircle className="w-6 h-6 text-white" aria-hidden="true" />
+          </button>
+          <span className="text-[10px] font-medium text-slate-500 -mt-2">Add</span>
+        </div>
+
+        {/* Slot 4: Buckets */}
+        {PRIMARY_NAV.slice(2).map(({ href, label, icon: Icon }) => {
+          const active = pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors min-h-[3.5rem]",
+                active ? "text-teal-400" : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              <Icon className="w-5 h-5" aria-hidden="true" />
+              <span>{label}</span>
+            </Link>
+          );
+        })}
+
+        {/* Slot 5: More (opens drawer) */}
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="More navigation options"
+          aria-expanded={drawerOpen}
+          aria-controls="mobile-nav-drawer"
+          className={cn(
+            "flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors min-h-[3.5rem]",
+            // Highlight "More" when the active page isn't in the primary nav
+            !PRIMARY_NAV.some((n) => n.href === pathname) && pathname !== "/add-transaction"
+              ? "text-teal-400"
+              : "text-slate-500 hover:text-slate-300"
+          )}
+        >
+          <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
+          <span>More</span>
+        </button>
       </nav>
     </>
   );

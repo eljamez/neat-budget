@@ -55,8 +55,8 @@ export default function DebtsPage() {
     <div className="w-full space-y-5 pb-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Debts</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Debts</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             Loans and installment balances—sorted by due date. Credit cards live on the Cards page.
           </p>
         </div>
@@ -76,14 +76,17 @@ export default function DebtsPage() {
       {debts === undefined ? (
         <div className="space-y-2">
           {[1, 2].map((i) => (
-            <div key={i} className="h-20 bg-white rounded-xl border border-slate-100 animate-pulse" />
+            <div
+              key={i}
+              className="h-20 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-white/10 animate-pulse"
+            />
           ))}
         </div>
       ) : debts.length === 0 && !debtModalOpen ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
-          <Landmark className="w-12 h-12 text-slate-300 mx-auto mb-3" aria-hidden="true" />
-          <p className="text-slate-600 font-medium mb-1">No debts tracked yet</p>
-          <p className="text-slate-400 text-sm mb-5">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 p-12 text-center">
+          <Landmark className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" aria-hidden="true" />
+          <p className="text-slate-600 dark:text-slate-300 font-medium mb-1">No debts tracked yet</p>
+          <p className="text-slate-400 dark:text-slate-500 text-sm mb-5">
             Add loans here; use Credit cards for revolving balances.
           </p>
           <button
@@ -114,7 +117,7 @@ export default function DebtsPage() {
             return (
               <li key={d._id}>
                 <div
-                  className="rounded-xl border border-slate-100 bg-white pl-3 pr-3 py-2.5 sm:py-2 shadow-sm"
+                  className="rounded-xl border border-slate-100 dark:border-white/10 bg-white dark:bg-slate-900 pl-3 pr-3 py-2.5 sm:py-2 shadow-sm"
                   style={{ borderLeftWidth: 3, borderLeftColor: color }}
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
@@ -127,23 +130,23 @@ export default function DebtsPage() {
                       </div>
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                          <p className="font-semibold text-slate-900 truncate">{d.name}</p>
-                          <p className="text-xs text-slate-500 shrink-0">{dueLabel}</p>
+                          <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">{d.name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 shrink-0">{dueLabel}</p>
                         </div>
                         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                          <span className="text-lg sm:text-xl font-bold text-slate-900 tabular-nums">
+                          <span className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-50 tabular-nums">
                             {formatCurrency(d.balance)}
                           </span>
-                          <span className="text-xs text-slate-500">owed</span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400">owed</span>
                           {original != null && (
                             <>
                               <span className="text-slate-300 text-sm mx-0.5" aria-hidden="true">
                                 ·
                               </span>
-                              <span className="text-lg sm:text-xl font-semibold text-slate-800 tabular-nums">
+                              <span className="text-lg sm:text-xl font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
                                 {formatCurrency(original)}
                               </span>
-                              <span className="text-xs text-slate-500">original</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">original</span>
                             </>
                           )}
                           {showMonthlyPlan && (
@@ -151,10 +154,10 @@ export default function DebtsPage() {
                               <span className="text-slate-300 text-sm mx-0.5" aria-hidden="true">
                                 ·
                               </span>
-                              <span className="text-lg sm:text-xl font-semibold text-slate-800 tabular-nums">
+                              <span className="text-lg sm:text-xl font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
                                 {formatCurrency(monthlyPlan)}
                               </span>
-                              <span className="text-xs text-slate-500">/mo plan</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">/mo plan</span>
                             </>
                           )}
                           {apr && (
@@ -167,13 +170,13 @@ export default function DebtsPage() {
                           )}
                         </div>
                         {needsPlanHint && (
-                          <p className="text-[11px] text-slate-400">
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500">
                             For loans and plans, set the monthly payment in Edit; for other debts, set
                             planned paydown or minimum—then add a due day for the Categories timeline.
                           </p>
                         )}
                         <p className="text-[11px] leading-snug">
-                          <span className="text-slate-400 font-medium">Paid:</span>{" "}
+                          <span className="text-slate-400 dark:text-slate-500 font-medium">Paid:</span>{" "}
                           <DebtMonthlyPaidGlance debtId={d._id} />
                         </p>
                         <DebtPaydownBar
@@ -190,7 +193,7 @@ export default function DebtsPage() {
                           setEditId(d._id);
                           setDebtModalOpen(true);
                         }}
-                        className="text-xs sm:text-sm text-teal-600 hover:text-teal-700 px-2.5 py-1.5 rounded-lg hover:bg-teal-50 font-medium border border-transparent"
+                        className="text-xs sm:text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 font-medium border border-transparent"
                       >
                         Edit
                       </button>
@@ -199,7 +202,7 @@ export default function DebtsPage() {
                         onClick={() =>
                           setArchiveDebtId(archiveDebtId === d._id ? null : d._id)
                         }
-                        className="text-xs sm:text-sm text-slate-500 hover:text-rose-600 px-2.5 py-1.5 rounded-lg hover:bg-rose-50 border border-slate-100 sm:border-transparent"
+                        className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 px-2.5 py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-100 dark:border-white/10 sm:border-transparent dark:sm:border-transparent"
                       >
                         Archive
                       </button>
@@ -208,8 +211,8 @@ export default function DebtsPage() {
                 </div>
 
                 {archiveDebtId === d._id && (
-                  <div className="mt-1.5 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2.5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                    <p className="text-sm text-rose-700">
+                  <div className="mt-1.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 rounded-xl px-3 py-2.5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                    <p className="text-sm text-rose-700 dark:text-rose-300">
                       Archive <strong>{d.name}</strong>? It will be hidden from active planning. Balances
                       are unchanged.
                     </p>
@@ -226,7 +229,7 @@ export default function DebtsPage() {
                       </button>
                       <button
                         type="button"
-                        className="text-sm text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50"
+                        className="text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 px-3 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
                         onClick={() => setArchiveDebtId(null)}
                       >
                         Cancel
@@ -252,10 +255,10 @@ export default function DebtsPage() {
           }}
         >
           <div
-            className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6"
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="debt-dialog-title" className="font-semibold text-slate-800 mb-5">
+            <h2 id="debt-dialog-title" className="font-semibold text-slate-800 dark:text-slate-100 mb-5">
               {editId ? "Edit debt" : "New debt"}
             </h2>
             <DebtManager

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, startTransition, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -19,7 +20,25 @@ const PERIOD_LABEL: Record<Bucket["period"], string> = {
   yearly: "Yearly",
 };
 
-export default function BucketsPage() {
+function BucketsPageFallback() {
+  return (
+    <div className="w-full space-y-5 lg:space-y-6">
+      <div className="h-8 w-48 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <div
+            key={i}
+            className="h-24 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BucketsPageContent() {
+  const searchParams = useSearchParams();
+  const processedEditParam = useRef<string | null>(null);
   const { user } = useUser();
   const buckets = useQuery(api.buckets.getBuckets, user ? { userId: user.id } : "skip");
   const categories = useQuery(api.categories.list, user ? { userId: user.id } : "skip");
@@ -42,6 +61,21 @@ export default function BucketsPage() {
 
   const editBucket = sortedBuckets.find((b) => b._id === editId) ?? null;
 
+  useEffect(() => {
+    const q = searchParams.get("edit");
+    if (!q || buckets === undefined) return;
+    if (processedEditParam.current === q) return;
+    const found = buckets.find((b) => b._id === q);
+    processedEditParam.current = q;
+    if (found) {
+      startTransition(() => {
+        setEditId(found._id);
+        setShowForm(true);
+      });
+    }
+    window.history.replaceState({}, "", "/buckets");
+  }, [buckets, searchParams]);
+
   const handleDeleteConfirm = async () => {
     if (!deletePendingId || !user) return;
     const id = deletePendingId;
@@ -62,11 +96,14 @@ export default function BucketsPage() {
     <div className="w-full space-y-5 lg:space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Buckets</h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Buckets</h1>
+          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
             Discretionary envelopes (groceries, fun money, and so on). Targets and category links are
             always-on setup—monthly funding and spend in context live on the{" "}
-            <Link href="/dashboard" className="text-teal-600 font-medium hover:text-teal-700">
+            <Link
+              href="/dashboard"
+              className="text-teal-600 dark:text-teal-400 font-medium hover:text-teal-700 dark:hover:text-teal-300"
+            >
               dashboard
             </Link>
             .
@@ -87,8 +124,8 @@ export default function BucketsPage() {
       </div>
 
       {showForm && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="font-semibold text-slate-800 mb-5">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm p-6">
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-5">
             {editId ? "Edit bucket" : "New bucket"}
           </h2>
           <BucketManager
@@ -106,14 +143,17 @@ export default function BucketsPage() {
       {buckets === undefined ? (
         <div className="space-y-3">
           {[1, 2].map((i) => (
-            <div key={i} className="bg-white rounded-2xl border border-slate-100 h-24 animate-pulse" />
+            <div
+              key={i}
+              className="bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-100 dark:border-white/10 h-24 animate-pulse"
+            />
           ))}
         </div>
       ) : sortedBuckets.length === 0 && !showForm ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
-          <Boxes className="w-12 h-12 text-slate-300 mx-auto mb-3" aria-hidden="true" />
-          <p className="text-slate-500 mb-1 font-medium">No buckets yet</p>
-          <p className="text-slate-500 text-sm mb-5 max-w-md mx-auto">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 p-12 text-center">
+          <Boxes className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" aria-hidden="true" />
+          <p className="text-slate-500 dark:text-slate-400 mb-1 font-medium">No buckets yet</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mb-5 max-w-md mx-auto">
             Create a bucket for each discretionary area you want to cap. Targets are goals, not due
             bills like planned expenses under Categories.
           </p>
@@ -130,7 +170,7 @@ export default function BucketsPage() {
           {sortedBuckets.map((b) => (
             <li key={b._id}>
               <div
-                className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-4 flex items-center justify-between gap-3"
+                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm px-4 py-4 flex items-center justify-between gap-3"
                 style={{ borderLeft: `3px solid ${ACCENT_COLOR_FALLBACK.category}` }}
               >
                 <div className="flex items-start gap-3 min-w-0">
@@ -141,17 +181,18 @@ export default function BucketsPage() {
                     <Boxes className="w-5 h-5 text-teal-600" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-800">{b.name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="font-semibold text-slate-800 dark:text-slate-100">{b.name}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                       {PERIOD_LABEL[b.period]}
                       {b.rollover ? " · rolls over" : ""}
                       {b.categoryId ? ` · ${categoryNameById.get(b.categoryId) ?? "Category"}` : ""}
                     </p>
-                    <p className="text-lg font-bold text-slate-900 mt-1 tabular-nums">
-                      {formatCurrency(b.targetAmount)} <span className="text-sm font-medium text-slate-500">target</span>
+                    <p className="text-lg font-bold text-slate-900 dark:text-slate-50 mt-1 tabular-nums">
+                      {formatCurrency(b.targetAmount)}{" "}
+                      <span className="text-sm font-medium text-slate-500 dark:text-slate-400">target</span>
                     </p>
                     {b.note ? (
-                      <p className="text-xs text-slate-500 mt-1.5 line-clamp-2">{b.note}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2">{b.note}</p>
                     ) : null}
                   </div>
                 </div>
@@ -162,7 +203,7 @@ export default function BucketsPage() {
                       setEditId(b._id);
                       setShowForm(true);
                     }}
-                    className="text-sm text-teal-600 hover:text-teal-700 px-3 py-2 rounded-lg hover:bg-teal-50 font-medium"
+                    className="text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 px-3 py-2 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 font-medium"
                   >
                     Edit
                   </button>
@@ -171,7 +212,7 @@ export default function BucketsPage() {
                     onClick={() =>
                       setDeletePendingId(deletePendingId === b._id ? null : b._id)
                     }
-                    className="text-sm text-slate-500 hover:text-rose-600 px-3 py-2 rounded-lg hover:bg-rose-50"
+                    className="text-sm text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 px-3 py-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
                   >
                     Delete
                   </button>
@@ -181,9 +222,9 @@ export default function BucketsPage() {
                 <div
                   role="region"
                   aria-label={`Confirm delete ${b.name}`}
-                  className="mt-1 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                  className="mt-1 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                 >
-                  <p className="text-sm text-rose-700">
+                  <p className="text-sm text-rose-700 dark:text-rose-300">
                     Permanently delete <strong>{b.name}</strong>? This cannot be undone.
                   </p>
                   <div className="flex gap-2 shrink-0">
@@ -197,7 +238,7 @@ export default function BucketsPage() {
                     <button
                       type="button"
                       onClick={() => setDeletePendingId(null)}
-                      className="text-sm font-medium text-slate-600 bg-white hover:bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200"
+                      className="text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10"
                     >
                       Cancel
                     </button>
@@ -209,5 +250,13 @@ export default function BucketsPage() {
         </ul>
       )}
     </div>
+  );
+}
+
+export default function BucketsPage() {
+  return (
+    <Suspense fallback={<BucketsPageFallback />}>
+      <BucketsPageContent />
+    </Suspense>
   );
 }

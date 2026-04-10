@@ -54,8 +54,8 @@ export default function CreditCardsPage() {
     <div className="w-full space-y-5 pb-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Credit cards</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Credit cards</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             Balances, utilization, and when you last paid—sorted by due date.
           </p>
         </div>
@@ -74,8 +74,10 @@ export default function CreditCardsPage() {
       </div>
 
       {showForm && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="font-semibold text-slate-800 mb-5">{editId ? "Edit card" : "New card"}</h2>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm p-6">
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-5">
+            {editId ? "Edit card" : "New card"}
+          </h2>
           <CreditCardManager
             key={editId ?? "new"}
             editCard={editId ? editCard : null}
@@ -94,14 +96,17 @@ export default function CreditCardsPage() {
       {cards === undefined ? (
         <div className="space-y-2">
           {[1, 2].map((i) => (
-            <div key={i} className="h-20 bg-white rounded-xl border border-slate-100 animate-pulse" />
+            <div
+              key={i}
+              className="h-20 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-white/10 animate-pulse"
+            />
           ))}
         </div>
       ) : cards.length === 0 && !showForm ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
-          <CreditCard className="w-12 h-12 text-slate-300 mx-auto mb-3" aria-hidden="true" />
-          <p className="text-slate-600 font-medium mb-1">No credit cards yet</p>
-          <p className="text-slate-400 text-sm mb-5">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 p-12 text-center">
+          <CreditCard className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" aria-hidden="true" />
+          <p className="text-slate-600 dark:text-slate-300 font-medium mb-1">No credit cards yet</p>
+          <p className="text-slate-400 dark:text-slate-500 text-sm mb-5">
             Add cards to track balance, limit, and payments.
           </p>
           <button
@@ -133,7 +138,7 @@ export default function CreditCardsPage() {
             return (
               <li key={c._id}>
                 <div
-                  className="rounded-xl border border-slate-100 bg-white pl-3 pr-3 py-2.5 sm:py-2 shadow-sm"
+                  className="rounded-xl border border-slate-100 dark:border-white/10 bg-white dark:bg-slate-900 pl-3 pr-3 py-2.5 sm:py-2 shadow-sm"
                   style={{ borderLeftWidth: 3, borderLeftColor: color }}
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
@@ -146,23 +151,23 @@ export default function CreditCardsPage() {
                       </div>
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                          <p className="font-semibold text-slate-900 truncate">{c.name}</p>
-                          <p className="text-xs text-slate-500 shrink-0">{dueLabel}</p>
+                          <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">{c.name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 shrink-0">{dueLabel}</p>
                         </div>
                         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                          <span className="text-lg sm:text-xl font-bold text-slate-900 tabular-nums">
+                          <span className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-50 tabular-nums">
                             {formatCurrency(c.balance)}
                           </span>
-                          <span className="text-xs text-slate-500">owed</span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400">owed</span>
                           {limit != null && (
                             <>
                               <span className="text-slate-300 text-sm mx-0.5" aria-hidden="true">
                                 ·
                               </span>
-                              <span className="text-lg sm:text-xl font-semibold text-slate-800 tabular-nums">
+                              <span className="text-lg sm:text-xl font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
                                 {formatCurrency(limit)}
                               </span>
-                              <span className="text-xs text-slate-500">limit</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">limit</span>
                             </>
                           )}
                           {apr && (
@@ -177,7 +182,7 @@ export default function CreditCardsPage() {
                         {limit != null && utilizationPct != null && (
                           <div className="space-y-0.5">
                             <div
-                              className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden"
+                              className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-white/8 overflow-hidden"
                               role="img"
                               aria-label={`${utilizationPct}% of credit limit used`}
                             >
@@ -186,16 +191,20 @@ export default function CreditCardsPage() {
                                 style={{ width: barWidth }}
                               />
                             </div>
-                            <p className={`text-[11px] font-medium tabular-nums ${utilizationPct >= 100 ? "text-red-600" : utilizationPct >= 80 ? "text-amber-700" : "text-slate-500"}`}>
+                            <p
+                              className={`text-[11px] font-medium tabular-nums ${utilizationPct >= 100 ? "text-red-600 dark:text-red-400" : utilizationPct >= 80 ? "text-amber-700 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}
+                            >
                               {utilizationPct}% used
                             </p>
                           </div>
                         )}
                         {limit == null && (
-                          <p className="text-[11px] text-slate-400">Add a limit in Edit to see utilization.</p>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                            Add a limit in Edit to see utilization.
+                          </p>
                         )}
                         <p className="text-[11px] leading-snug">
-                          <span className="text-slate-400 font-medium">Paid:</span>{" "}
+                          <span className="text-slate-400 dark:text-slate-500 font-medium">Paid:</span>{" "}
                           <CreditCardMonthlyPaidGlance creditCardId={c._id} />
                         </p>
                       </div>
@@ -207,14 +216,14 @@ export default function CreditCardsPage() {
                           setEditId(c._id);
                           setShowForm(true);
                         }}
-                        className="text-xs sm:text-sm text-teal-600 hover:text-teal-700 px-2.5 py-1.5 rounded-lg hover:bg-teal-50 font-medium border border-transparent"
+                        className="text-xs sm:text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 font-medium border border-transparent"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => setArchiveId(archiveId === c._id ? null : c._id)}
-                        className="text-xs sm:text-sm text-slate-500 hover:text-rose-600 px-2.5 py-1.5 rounded-lg hover:bg-rose-50 border border-slate-100 sm:border-transparent"
+                        className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 px-2.5 py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-100 dark:border-white/10 sm:border-transparent dark:sm:border-transparent"
                       >
                         Archive
                       </button>
@@ -223,8 +232,8 @@ export default function CreditCardsPage() {
                 </div>
 
                 {archiveId === c._id && (
-                  <div className="mt-1.5 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2.5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                    <p className="text-sm text-rose-700">
+                  <div className="mt-1.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 rounded-xl px-3 py-2.5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                    <p className="text-sm text-rose-700 dark:text-rose-300">
                       Archive <strong>{c.name}</strong>? It will be hidden from active planning. Balances
                       are unchanged.
                     </p>
@@ -241,7 +250,7 @@ export default function CreditCardsPage() {
                       </button>
                       <button
                         type="button"
-                        className="text-sm text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50"
+                        className="text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 px-3 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700"
                         onClick={() => setArchiveId(null)}
                       >
                         Cancel

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { ConvexClerkProvider } from "@/components/providers/ConvexClerkProvider";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { AppShell } from "@/components/AppShell";
 
 const geist = Geist({ subsets: ["latin"] });
@@ -27,14 +28,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={`${geist.className} bg-slate-50`}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geist.className} bg-background text-foreground`}>
         <a href="#main-content" className="skip-to-content">
           Skip to main content
         </a>
-        <ConvexClerkProvider>
-          <AppShell>{children}</AppShell>
-        </ConvexClerkProvider>
+        <ThemeProvider>
+          <ConvexClerkProvider>
+            <AppShell>{children}</AppShell>
+          </ConvexClerkProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

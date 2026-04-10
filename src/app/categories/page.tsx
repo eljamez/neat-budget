@@ -74,9 +74,10 @@ function CategoryExpensesSection({
   const { user } = useUser();
   const archiveItem = useMutation(api.budgetItems.archive);
   const updateExpenseRow = useMutation(api.budgetItems.update);
-  const expenses = useQuery(api.budgetItems.listByCategory, {
-    categoryId: category._id,
-  });
+  const expenses = useQuery(
+    api.budgetItems.listByCategory,
+    user ? { categoryId: category._id, userId: user.id } : "skip"
+  );
   const accounts = useQuery(api.accounts.list, user ? { userId: user.id } : "skip");
   const expensesSortedByDueDay = useMemo(() => {
     if (!expenses) return [];
@@ -115,13 +116,13 @@ function CategoryExpensesSection({
       {expenses === undefined ? (
         <div className="py-2 space-y-1">
           {[1, 2].map((i) => (
-            <div key={i} className="h-9 bg-slate-100 rounded-lg animate-pulse" />
+            <div key={i} className="h-9 bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse" />
           ))}
         </div>
       ) : (
         <>
           {expenses.length === 0 && !showForm && (
-            <p className="text-xs text-slate-400 py-2">
+            <p className="text-xs text-slate-400 dark:text-slate-500 py-2">
               No expenses yet — add recurring bills below, or drag one here from another category.
             </p>
           )}
@@ -143,18 +144,18 @@ function CategoryExpensesSection({
                       onExpenseDragStart(item._id, category._id);
                     }}
                     onDragEnd={onExpenseDragEnd}
-                    className={`flex items-center gap-1.5 rounded-xl px-2 py-2 border border-slate-100 bg-white hover:border-slate-200/90 group transition-colors cursor-grab active:cursor-grabbing select-none ${
-                      isDragging ? "opacity-60 ring-2 ring-teal-300" : ""
+                    className={`flex items-center gap-1.5 rounded-xl px-2 py-2 border border-slate-100 dark:border-white/10 bg-white dark:bg-slate-800/80 hover:border-slate-200/90 dark:hover:border-white/15 group transition-colors cursor-grab active:cursor-grabbing select-none ${
+                      isDragging ? "opacity-60 ring-2 ring-teal-300 dark:ring-teal-600" : ""
                     }`}
                   >
                     <GripVertical
-                      className="w-4 h-4 text-slate-300 flex-shrink-0 group-hover:text-slate-400"
+                      className="w-4 h-4 text-slate-300 dark:text-slate-600 flex-shrink-0 group-hover:text-slate-400 dark:group-hover:text-slate-500"
                       aria-hidden="true"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-slate-800">{item.name}</span>
-                        <span className="text-sm font-semibold text-slate-600">
+                        <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{item.name}</span>
+                        <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
                           {formatCurrency(item.amount)}
                         </span>
                         {accountFunded ? (
@@ -214,7 +215,7 @@ function CategoryExpensesSection({
                         }
                       }}
                       aria-label={`Paid from account for ${item.name}`}
-                      className="max-w-[9.5rem] shrink-0 rounded-lg border border-slate-200 bg-white py-1 pl-2 pr-1 text-[11px] font-medium text-slate-700 disabled:opacity-50 sm:max-w-[11rem] sm:text-xs"
+                      className="max-w-[9.5rem] shrink-0 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 py-1 pl-2 pr-1 text-[11px] font-medium text-slate-700 dark:text-slate-200 disabled:opacity-50 sm:max-w-[11rem] sm:text-xs"
                     >
                       <option value="">Account…</option>
                       {accountsSorted.map((a) => (
@@ -224,7 +225,7 @@ function CategoryExpensesSection({
                       ))}
                     </select>
                     <label
-                      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50/90 px-2 py-1.5"
+                      className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-100 dark:border-white/10 bg-slate-50/90 dark:bg-slate-800/80 px-2 py-1.5"
                       title="Bill is on auto-pay with the payee"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -249,7 +250,7 @@ function CategoryExpensesSection({
                         className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 disabled:opacity-50"
                         aria-label={`Auto-pay for ${item.name}`}
                       />
-                      <span className="text-[11px] font-medium text-slate-600 whitespace-nowrap">
+                      <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
                         Auto-pay
                       </span>
                     </label>
@@ -262,7 +263,7 @@ function CategoryExpensesSection({
                           setEditExpense(item as BudgetExpense);
                           setShowForm(true);
                         }}
-                        className="text-xs text-teal-600 hover:text-teal-700 px-2 py-1 rounded-lg hover:bg-teal-50 transition-colors font-medium"
+                        className="text-xs text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 px-2 py-1 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-colors font-medium"
                       >
                         Edit
                       </button>
@@ -273,7 +274,7 @@ function CategoryExpensesSection({
                           e.stopPropagation();
                           setArchivePendingId(archivePendingId === item._id ? null : item._id);
                         }}
-                        className="text-xs text-slate-400 hover:text-rose-600 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors"
+                        className="text-xs text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 px-2 py-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
                       >
                         Archive
                       </button>
@@ -281,8 +282,8 @@ function CategoryExpensesSection({
                   </div>
 
                   {archivePendingId === item._id && (
-                    <div className="mt-1 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
-                      <p className="text-xs text-rose-700">
+                    <div className="mt-1 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+                      <p className="text-xs text-rose-700 dark:text-rose-300">
                         Archive <strong>{item.name}</strong>? It will be hidden from active planning.
                       </p>
                       <div className="flex gap-2">
@@ -296,7 +297,7 @@ function CategoryExpensesSection({
                         <button
                           type="button"
                           onClick={() => setArchivePendingId(null)}
-                          className="text-xs text-slate-600 bg-white hover:bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors"
+                          className="text-xs text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-white/10 transition-colors"
                         >
                           Cancel
                         </button>
@@ -309,8 +310,8 @@ function CategoryExpensesSection({
           </div>
 
           {showForm ? (
-            <div className="mt-2 bg-slate-50 border border-slate-200 rounded-xl p-4">
-              <p className="text-xs font-semibold text-slate-600 mb-3">
+            <div className="mt-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-white/10 rounded-xl p-4">
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-3">
                 {editExpense ? "Edit expense" : "New expense"}
               </p>
               <BudgetItemManager
@@ -483,11 +484,14 @@ export default function CategoriesPage() {
     <div className="w-full max-w-none space-y-5 lg:space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-slate-900">Categories</h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Categories</h1>
+          <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
             Your budget groups and recurring bills—amounts and due days apply every month. Drag an expense onto
             another category to move it. Use the{" "}
-            <Link href="/dashboard" className="text-teal-600 font-medium hover:text-teal-700">
+            <Link
+              href="/dashboard"
+              className="text-teal-600 dark:text-teal-400 font-medium hover:text-teal-700 dark:hover:text-teal-300"
+            >
               dashboard
             </Link>{" "}
             to pick a month, fund bills, and work the timeline (including cards and loans).
@@ -503,7 +507,7 @@ export default function CategoriesPage() {
                     setNewExpenseCategoryId(categories[0]._id);
                     setShowNewExpenseModal(true);
                   }}
-                  className="inline-flex items-center justify-center gap-1.5 border border-teal-200 bg-white text-teal-800 text-sm font-medium px-4 py-2 rounded-xl hover:bg-teal-50 active:scale-[0.97] transition-all shadow-sm w-full sm:w-auto"
+                  className="inline-flex items-center justify-center gap-1.5 border border-teal-200 dark:border-teal-800/60 bg-white dark:bg-slate-900 text-teal-800 dark:text-teal-200 text-sm font-medium px-4 py-2 rounded-xl hover:bg-teal-50 dark:hover:bg-teal-950/50 active:scale-[0.97] transition-all shadow-sm w-full sm:w-auto"
                 >
                   <Plus className="w-4 h-4" aria-hidden="true" />
                   New expense
@@ -523,8 +527,8 @@ export default function CategoriesPage() {
 
       {/* Create/Edit Form */}
       {showForm && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <h2 className="font-semibold text-slate-800 mb-5">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm p-6">
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-5">
             {editCategory ? "Edit Category" : "New Category"}
           </h2>
           <CategoryManager
@@ -539,14 +543,19 @@ export default function CategoriesPage() {
       {categories === undefined ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-2xl border border-slate-100 h-18 animate-pulse" />
+            <div
+              key={i}
+              className="bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-100 dark:border-white/10 h-18 animate-pulse"
+            />
           ))}
         </div>
       ) : categories.length === 0 && !showForm ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
-          <FolderOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" aria-hidden="true" />
-          <p className="text-slate-500 mb-1 font-medium">No categories yet</p>
-          <p className="text-slate-500 text-sm mb-5">Create budget categories to start tracking your spending</p>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 p-12 text-center">
+          <FolderOpen className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" aria-hidden="true" />
+          <p className="text-slate-500 dark:text-slate-400 mb-1 font-medium">No categories yet</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mb-5">
+            Create budget categories to start tracking your spending
+          </p>
           <button
             onClick={handleNewCategory}
             className="bg-teal-600 text-white text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-teal-700 active:scale-[0.97] transition-all"
@@ -569,8 +578,8 @@ export default function CategoriesPage() {
             return (
               <div key={cat._id}>
                 <div
-                  className={`bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden transition-shadow ${
-                    showDropRing ? "ring-2 ring-teal-400 ring-offset-2" : ""
+                  className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm overflow-hidden transition-shadow ${
+                    showDropRing ? "ring-2 ring-teal-400 ring-offset-2 dark:ring-offset-slate-950" : ""
                   }`}
                   style={{ borderLeft: `3px solid ${color}` }}
                   onDragOver={(e) => handleCategoryDragOver(e, cat._id)}
@@ -578,7 +587,7 @@ export default function CategoriesPage() {
                   onDrop={(e) => handleCategoryDrop(e, cat._id)}
                 >
                   {/* Category header row */}
-                  <div className="px-4 py-3.5 flex items-center justify-between group hover:bg-slate-50 transition-colors">
+                  <div className="px-4 py-3.5 flex items-center justify-between group hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                     <button
                       onClick={() => toggleExpand(cat._id)}
                       className="flex items-center gap-3 flex-1 min-w-0 text-left"
@@ -598,15 +607,15 @@ export default function CategoriesPage() {
                         })()}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold text-slate-800">{cat.name}</p>
-                        <p className="text-sm text-slate-500">
+                        <p className="font-semibold text-slate-800 dark:text-slate-100">{cat.name}</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
                           {formatCurrency(plannedSum)} / month from expenses
                         </p>
-                        <p className="text-xs text-slate-400 mt-0.5">
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                           Sum of recurring expenses in this category
                         </p>
                       </div>
-                      <div className="ml-2 text-slate-400 flex-shrink-0">
+                      <div className="ml-2 text-slate-400 dark:text-slate-500 flex-shrink-0">
                         {isExpanded
                           ? <ChevronDown className="w-4 h-4" aria-hidden="true" />
                           : <ChevronRight className="w-4 h-4" aria-hidden="true" />
@@ -617,14 +626,14 @@ export default function CategoriesPage() {
                     <div className="flex gap-1 flex-shrink-0 ml-2">
                       <button
                         onClick={() => handleEdit(cat)}
-                        className="text-sm text-teal-600 hover:text-teal-700 px-3 py-2 lg:py-1.5 rounded-lg hover:bg-teal-50 transition-colors font-medium min-h-[2.75rem] lg:min-h-0 flex items-center"
+                        className="text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 px-3 py-2 lg:py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-colors font-medium min-h-[2.75rem] lg:min-h-0 flex items-center"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => setArchivePendingId(archivePendingId === cat._id ? null : cat._id)}
                         aria-expanded={archivePendingId === cat._id}
-                        className="text-sm text-slate-500 hover:text-rose-600 px-3 py-2 lg:py-1.5 rounded-lg hover:bg-rose-50 transition-colors min-h-[2.75rem] lg:min-h-0 flex items-center"
+                        className="text-sm text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 px-3 py-2 lg:py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors min-h-[2.75rem] lg:min-h-0 flex items-center"
                       >
                         Archive
                       </button>
@@ -649,9 +658,9 @@ export default function CategoriesPage() {
                   <div
                     role="region"
                     aria-label={`Confirm archive for ${cat.name}`}
-                    className="mt-1 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3"
+                    className="mt-1 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 rounded-xl px-4 py-3 flex items-center justify-between gap-3"
                   >
-                    <p className="text-sm text-rose-700">
+                    <p className="text-sm text-rose-700 dark:text-rose-300">
                       Archive <strong>{cat.name}</strong>? It will no longer appear in your dashboard.
                     </p>
                     <div className="flex gap-2 flex-shrink-0">
@@ -663,7 +672,7 @@ export default function CategoriesPage() {
                       </button>
                       <button
                         onClick={() => setArchivePendingId(null)}
-                        className="text-sm font-medium text-slate-600 bg-white hover:bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 transition-colors"
+                        className="text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 transition-colors"
                       >
                         Cancel
                       </button>
@@ -685,21 +694,24 @@ export default function CategoriesPage() {
           onClick={() => setShowNewExpenseModal(false)}
         >
           <div
-            className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6"
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="new-expense-dialog-title" className="font-semibold text-slate-800 mb-4">
+            <h2 id="new-expense-dialog-title" className="font-semibold text-slate-800 dark:text-slate-100 mb-4">
               New expense
             </h2>
             <div className="mb-4">
-              <label htmlFor="new-expense-category" className="block text-xs font-medium text-slate-600 mb-1.5">
+              <label
+                htmlFor="new-expense-category"
+                className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5"
+              >
                 Category
               </label>
               <select
                 id="new-expense-category"
                 value={newExpenseCategoryId}
                 onChange={(e) => setNewExpenseCategoryId(e.target.value as Id<"categories">)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+                className="w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors"
               >
                 {categories.map((c) => (
                   <option key={c._id} value={c._id}>

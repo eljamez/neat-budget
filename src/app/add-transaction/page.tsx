@@ -53,7 +53,7 @@ function SuccessBanner() {
 
   return (
     <div
-      className="relative bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex items-center gap-4 overflow-hidden"
+      className="relative bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl p-5 flex items-center gap-4 overflow-hidden"
       style={prefersReducedMotion ? undefined : { animation: "pop-in 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards" }}
     >
       {/* Confetti burst */}
@@ -100,8 +100,8 @@ function SuccessBanner() {
       </div>
 
       <div>
-        <p className="font-semibold text-emerald-800">Transaction logged!</p>
-        <p className="text-sm text-emerald-600 mt-0.5">Your budget is up to date.</p>
+        <p className="font-semibold text-emerald-800 dark:text-emerald-200">Transaction logged!</p>
+        <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-0.5">Your budget is up to date.</p>
       </div>
     </div>
   );
@@ -125,18 +125,18 @@ export default function AddTransactionPage() {
       <div>
         <Link
           href="/dashboard"
-          className="text-slate-400 hover:text-slate-600 text-sm font-medium mb-4 flex items-center gap-1 transition-colors"
+          className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-sm font-medium mb-4 flex items-center gap-1 transition-colors"
         >
           <ArrowLeft size={14} aria-hidden="true" />
           Back to Dashboard
         </Link>
-        <h1 className="text-2xl font-bold text-slate-900">Add Transaction</h1>
-        <p className="text-slate-500 text-sm mt-1">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Add Transaction</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
           Same fields as the quick modal.{" "}
           <button
             type="button"
             onClick={openAddTransaction}
-            className="text-teal-600 font-medium hover:text-teal-700 underline-offset-2 hover:underline"
+            className="text-teal-600 dark:text-teal-400 font-medium hover:text-teal-700 dark:hover:text-teal-300 underline-offset-2 hover:underline"
           >
             Open as modal
           </button>
@@ -148,7 +148,7 @@ export default function AddTransactionPage() {
         {success && <SuccessBanner />}
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm p-6">
         <TransactionForm onSuccess={handleSuccess} />
       </div>
     </div>
