@@ -119,9 +119,9 @@ export default function DashboardPage() {
   const [monthFundingOpen, setMonthFundingOpen] = useState(false);
   const [autoFundPending, setAutoFundPending] = useState(false);
   const [fundingNotice, setFundingNotice] = useState<string | null>(null);
-  const [openHelpTooltip, setOpenHelpTooltip] = useState<"timeline" | "buckets" | "accounts" | null>(
-    null
-  );
+  const [openHelpTooltip, setOpenHelpTooltip] = useState<
+    "timeline" | "buckets" | "accounts" | "creditCards" | "debts" | null
+  >(null);
 
   const autoFundMonth = useMutation(api.autoFundMonth.run);
 
@@ -751,12 +751,12 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Accounts: below timeline; balances + link to Accounts page */}
+      {/* Accounts: below timeline; balances + Manage → Accounts page */}
       {accounts !== undefined && accounts.length > 0 && (
-        <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-linear-to-br from-slate-50/95 via-white to-teal-50/35 dark:from-slate-950/90 dark:via-slate-900 dark:to-teal-950/25 shadow-sm p-5 sm:p-6 w-full">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-6">
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 shadow-sm w-full">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4">
             <div className="flex items-start gap-2 min-w-0">
-              <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Your accounts</h2>
+              <h2 className="font-semibold text-slate-800 dark:text-slate-100">Your accounts</h2>
               <span className="relative shrink-0 group z-10">
                 <button
                   type="button"
@@ -787,18 +787,25 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/accounts"
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 shrink-0 rounded-lg px-2 py-1 -mr-2 hover:bg-teal-50/80 dark:hover:bg-teal-950/50 transition-colors"
+              className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium shrink-0"
             >
-              All accounts <ArrowRight size={15} aria-hidden="true" />
+              Manage <ArrowRight size={13} aria-hidden="true" />
             </Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {accounts.map((acc) => {
               const isAsset = accountIsAssetForAvailability(acc.accountType);
+              const accent =
+                acc.accountType === "credit_card"
+                  ? ACCENT_COLOR_FALLBACK.creditCard
+                  : isAsset
+                    ? ACCENT_COLOR_FALLBACK.category
+                    : ACCENT_COLOR_FALLBACK.debtCard;
               return (
                 <div
                   key={acc._id}
-                  className="relative overflow-hidden rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-slate-900 px-4 py-4 shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)] transition-shadow hover:shadow-md hover:border-slate-300/90 dark:hover:border-white/15"
+                  className="rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50/90 dark:bg-slate-800/50 px-4 py-4"
+                  style={{ borderLeft: `3px solid ${accent}` }}
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="min-w-0">
@@ -819,10 +826,7 @@ export default function DashboardPage() {
 
                   {!isAsset ? (
                     <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                      <Link href="/accounts" className="font-medium text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 underline-offset-2 hover:underline">
-                        Accounts
-                      </Link>
-                      <span className="text-slate-400 dark:text-slate-500"> · liability</span>
+                      Liability — not included in the dashboard cash total.
                     </p>
                   ) : null}
                 </div>
@@ -832,90 +836,45 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Hero Stats — cash budget vs spending; category targets live in Budget Categories below */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
-        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 sm:p-6 shadow-sm" style={{ borderLeft: `3px solid ${ACCENT_COLOR_FALLBACK.successStrong}` }}>
-          <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">Cash budget</p>
-          <p className="text-4xl sm:text-5xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums">
-            {cashBudgetAmount !== null ? formatCurrency(cashBudgetAmount) : "—"}
-          </p>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-            Same as header: combined asset account balances.
-          </p>
-          <div className="mt-4">
-            <div className="flex justify-between text-sm text-slate-400 dark:text-slate-500 mb-1.5">
-              <span>
-                {cashBudgetAmount !== null && cashBudgetAmount > 0.005
-                  ? `${Math.round(cashPercentUsed)}% of cash spent`
-                  : "—"}
-              </span>
-              <span>
-                {cashAfterSpent !== null
-                  ? `${formatCurrency(cashAfterSpent)} cash left`
-                  : "—"}
-              </span>
-            </div>
-            <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
-              <div
-                className="h-1.5 rounded-full bg-emerald-500 transition-all duration-500"
-                style={{ width: `${cashOverallPercent}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 sm:p-6 shadow-sm">
-          <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">Total Spent</p>
-          <p className="text-4xl sm:text-5xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums">
-            {formatCurrency(totalSpent)}
-          </p>
-          <p className="text-base text-slate-400 dark:text-slate-500 mt-3">
-            across {categories?.length ?? 0} categories
-          </p>
-        </div>
-
-        <div
-          className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 sm:p-6 shadow-sm"
-          style={{
-            borderLeft: `3px solid ${
-              cashAfterSpent !== null && cashAfterSpent < -0.005
-                ? ACCENT_COLOR_FALLBACK.danger
-                : ACCENT_COLOR_FALLBACK.success
-            }`,
-          }}
-        >
-          <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">Cash after spending</p>
-          <p
-            className={`text-4xl sm:text-5xl font-bold tracking-tight tabular-nums ${
-              cashAfterSpent !== null && cashAfterSpent < -0.005 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
-            }`}
-          >
-            {cashAfterSpent !== null ? formatCurrency(Math.abs(cashAfterSpent)) : "—"}
-          </p>
-          <p
-            className={`text-base mt-3 ${
-              cashAfterSpent !== null && cashAfterSpent < -0.005 ? "text-rose-400 dark:text-rose-300" : "text-emerald-400 dark:text-emerald-500"
-            }`}
-          >
-            {cashAfterSpent === null
-              ? "—"
-              : cashAfterSpent < -0.005
-                ? "spent more than cash on hand"
-                : "left in accounts this month"}
-          </p>
-        </div>
-      </div>
-
       {creditCards !== undefined && creditCards.length > 0 && (
         <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
-              Credit cards
-            </h2>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4">
+            <div className="flex items-start gap-2 min-w-0">
+              <h2 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" aria-hidden="true" />
+                Credit cards
+              </h2>
+              <span className="relative shrink-0 group z-10">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenHelpTooltip((prev) => (prev === "creditCards" ? null : "creditCards"))
+                  }
+                  className="rounded-full p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                  aria-label="How credit card balances work in Neat Budget"
+                  aria-describedby="credit-cards-help-tooltip"
+                  aria-expanded={openHelpTooltip === "creditCards"}
+                  aria-controls="credit-cards-help-tooltip"
+                >
+                  <Info className="w-4 h-4" aria-hidden="true" />
+                </button>
+                <span
+                  id="credit-cards-help-tooltip"
+                  role="tooltip"
+                  className={cn(
+                    "pointer-events-none absolute left-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
+                    openHelpTooltip === "creditCards" && "opacity-100 visible translate-y-0"
+                  )}
+                >
+                  Each card&apos;s <span className="font-semibold text-indigo-200">balance</span> is what you owe. Log
+                  charges and payments to keep it current. Paydown plans show as{" "}
+                  <span className="font-semibold text-white">planned monthly</span> amounts separate from category cash.
+                </span>
+              </span>
+            </div>
             <Link
               href="/credit-cards"
-              className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium"
+              className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium shrink-0"
             >
               Manage <ArrowRight size={13} aria-hidden="true" />
             </Link>
@@ -926,17 +885,20 @@ export default function DashboardPage() {
               return (
                 <div
                   key={c._id}
-                  className="rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50/90 dark:bg-slate-800/50 px-4 py-3"
+                  className="rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50/90 dark:bg-slate-800/50 px-4 py-4"
                   style={{ borderLeft: `3px solid ${c.color ?? ACCENT_COLOR_FALLBACK.creditCard}` }}
                 >
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{c.name}</p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-                    {formatCreditCardUsageMode(c.usageMode)}
-                  </p>
-                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100 tabular-nums mt-1">
+                  <div className="mb-2 min-w-0">
+                    <p className="font-semibold text-slate-800 dark:text-slate-100 truncate text-sm sm:text-base">{c.name}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      {formatCreditCardUsageMode(c.usageMode)}
+                    </p>
+                  </div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">Balance</p>
+                  <p className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums leading-none">
                     {formatCurrency(c.balance)}
                   </p>
-                  {apr && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{apr}</p>}
+                  {apr && <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{apr}</p>}
                   {c.plannedMonthlyPayment != null && c.plannedMonthlyPayment > 0 && (
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       Plan {formatCurrency(c.plannedMonthlyPayment)}/mo
@@ -951,11 +913,38 @@ export default function DashboardPage() {
 
       {debts !== undefined && debts.length > 0 && (
         <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Debts & loans</h2>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4">
+            <div className="flex items-start gap-2 min-w-0">
+              <h2 className="font-semibold text-slate-800 dark:text-slate-100">Debts & loans</h2>
+              <span className="relative shrink-0 group z-10">
+                <button
+                  type="button"
+                  onClick={() => setOpenHelpTooltip((prev) => (prev === "debts" ? null : "debts"))}
+                  className="rounded-full p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                  aria-label="How debt balances work in Neat Budget"
+                  aria-describedby="debts-help-tooltip"
+                  aria-expanded={openHelpTooltip === "debts"}
+                  aria-controls="debts-help-tooltip"
+                >
+                  <Info className="w-4 h-4" aria-hidden="true" />
+                </button>
+                <span
+                  id="debts-help-tooltip"
+                  role="tooltip"
+                  className={cn(
+                    "pointer-events-none absolute left-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
+                    openHelpTooltip === "debts" && "opacity-100 visible translate-y-0"
+                  )}
+                >
+                  <span className="font-semibold text-slate-200">Balances</span> drop when you log paydown
+                  transactions. <span className="font-semibold text-slate-200">Planned monthly</span> amounts tie into
+                  your budget planner alongside categories and buckets.
+                </span>
+              </span>
+            </div>
             <Link
               href="/debts"
-              className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium"
+              className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium shrink-0"
             >
               Manage <ArrowRight size={13} aria-hidden="true" />
             </Link>
@@ -967,15 +956,18 @@ export default function DashboardPage() {
               return (
                 <div
                   key={d._id}
-                  className="rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50/90 dark:bg-slate-800/50 px-4 py-3"
+                  className="rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50/90 dark:bg-slate-800/50 px-4 py-4"
                   style={{ borderLeft: `3px solid ${d.color ?? ACCENT_COLOR_FALLBACK.debtCard}` }}
                 >
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{d.name}</p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{formatDebtType(d.debtType)}</p>
-                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100 tabular-nums mt-1">
+                  <div className="mb-2 min-w-0">
+                    <p className="font-semibold text-slate-800 dark:text-slate-100 truncate text-sm sm:text-base">{d.name}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{formatDebtType(d.debtType)}</p>
+                  </div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">Balance</p>
+                  <p className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums leading-none">
                     {formatCurrency(d.balance)}
                   </p>
-                  {apr && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{apr}</p>}
+                  {apr && <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{apr}</p>}
                   {planMo > 0 && (
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       Plan {formatCurrency(planMo)}/mo
