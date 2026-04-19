@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { TransactionForm } from "@/components/TransactionForm";
 import { useTransactionModal } from "@/components/TransactionModalProvider";
+import { usePrefersReducedMotion } from "@/lib/hooks";
 
 const CONFETTI_COLORS = [
   "#0d9488", "#14b8a6", "#3b82f6", "#f59e0b",
@@ -14,20 +15,6 @@ const CONFETTI_COLORS = [
 function seededUnit(seed: number) {
   const x = Math.sin(seed * 12.9898) * 43758.5453;
   return x - Math.floor(x);
-}
-
-function usePrefersReducedMotion() {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setPrefersReducedMotion(mediaQuery.matches);
-    update();
-    mediaQuery.addEventListener("change", update);
-    return () => mediaQuery.removeEventListener("change", update);
-  }, []);
-
-  return prefersReducedMotion;
 }
 
 function SuccessBanner() {

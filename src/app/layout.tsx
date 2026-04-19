@@ -1,11 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ConvexClerkProvider } from "@/components/providers/ConvexClerkProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { AppShell } from "@/components/AppShell";
 
 const geist = Geist({ subsets: ["latin"] });
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  variable: "--font-jakarta",
+  display: "swap",
+});
 
 export const viewport: Viewport = {
   themeColor: "#0d9488",
@@ -29,7 +35,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geist.className} bg-background text-foreground`}>
+      <body className={`${geist.className} ${jakarta.variable} bg-background text-foreground`}>
         <a href="#main-content" className="skip-to-content">
           Skip to main content
         </a>

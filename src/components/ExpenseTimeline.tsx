@@ -21,12 +21,19 @@ import {
   dateInBudgetMonth,
   startOfLocalDay,
   expenseHasPayFromAccount,
-  debtPlannerMonthlyAmount,
   expenseFundingLevel,
   budgetBillFundRemainingForMonth,
   ACCENT_COLOR_FALLBACK,
 } from "@/lib/utils";
+import type {
+  TimelineExpense,
+  PlannerBudgetRow,
+  PlannerDebtRow,
+  PlannerCreditCardRow,
+  PlannerRow,
+} from "@/lib/planner";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
+import { usePrefersReducedMotion } from "@/lib/hooks";
 import { BudgetItemManager } from "@/components/BudgetItemManager";
 import { BudgetAllocationModal } from "@/components/BudgetAllocationModal";
 import { DebtManager } from "@/components/DebtManager";
@@ -45,54 +52,6 @@ export interface TimelineCategory {
   color?: string;
   icon?: string;
 }
-
-export interface TimelineExpense {
-  _id: Id<"budgetItems">;
-  categoryId: Id<"categories">;
-  name: string;
-  amount: number;
-  paymentDayOfMonth: number;
-  paidFrom?: string;
-  accountId?: Id<"accounts">;
-  markedPaidForMonth?: string;
-  status?: "unfunded" | "funded" | "paid";
-  fundedDate?: number;
-  paidDate?: number;
-  isAutopay?: boolean;
-  note?: string;
-}
-
-export type PlannerBudgetRow = TimelineExpense & { rowKind: "budget" };
-
-export type PlannerDebtRow = {
-  rowKind: "debt";
-  debtId: Id<"debts">;
-  name: string;
-  amount: number;
-  paymentDayOfMonth: number;
-  markedPaidForMonth?: string;
-  accentColor?: string;
-  isAutopay?: boolean;
-  paymentAccountId?: Id<"accounts">;
-  /** False when due day was defaulted for timeline placement — user should set on Debts page. */
-  hasConfiguredDueDay?: boolean;
-};
-
-export type PlannerCreditCardRow = {
-  rowKind: "creditCard";
-  creditCardId: Id<"creditCards">;
-  name: string;
-  amount: number;
-  paymentDayOfMonth: number;
-  markedPaidForMonth?: string;
-  accentColor?: string;
-  isAutopay?: boolean;
-  usageMode: "paying_off" | "active_use";
-  paymentAccountId?: Id<"accounts">;
-  hasConfiguredDueDay?: boolean;
-};
-
-export type PlannerRow = PlannerBudgetRow | PlannerDebtRow | PlannerCreditCardRow;
 
 type TimelineFundState = "waiting" | "funded" | "paid";
 
@@ -126,6 +85,43 @@ function timelineRowSurfaceClasses(state: TimelineFundState): string {
   }
 }
 
+function PaidCheckMark({
+  animate,
+  onAnimationEnd,
+}: {
+  animate: boolean;
+  onAnimationEnd?: () => void;
+}) {
+  if (!animate) {
+    return <CheckCircle2 className="h-4 w-4 sm:h-[18px] sm:w-[18px]" aria-hidden="true" />;
+  }
+  return (
+    <span
+      className="inline-flex h-4 w-4 sm:h-[18px] sm:w-[18px]"
+      style={{ animation: "check-circle-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both" }}
+      onAnimationEnd={onAnimationEnd}
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 18 18" fill="none" className="w-full h-full">
+        <circle
+          cx="9" cy="9" r="8"
+          className="fill-emerald-100 stroke-emerald-600 dark:fill-emerald-950 dark:stroke-emerald-400"
+          strokeWidth="1.25"
+        />
+        <path
+          d="M5.5 9l2.5 2.5L12.5 6"
+          className="stroke-emerald-600 dark:stroke-emerald-400"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray="11"
+          style={{ animation: "draw-check-sm 0.28s ease-out 0.15s both", strokeDashoffset: 11 }}
+        />
+      </svg>
+    </span>
+  );
+}
+
 /** Mockup-style track + fill; `fillStyle` when using category hex */
 function TimelineFundingBar({
   pct,
@@ -149,8 +145,8 @@ function TimelineFundingBar({
       aria-label={label}
     >
       <div
-        className={`h-full rounded-full transition-[width] duration-200 ${fillClassName ?? ""}`}
-        style={{ width: `${w}%`, ...fillStyle }}
+        className={`h-full w-full origin-left transition-transform duration-200 ${fillClassName ?? ""}`}
+        style={{ transform: `scaleX(${w / 100})`, ...fillStyle }}
       />
     </div>
   );
@@ -310,6 +306,8 @@ export function ExpenseTimeline({
     null
   );
   const [paidTogglePendingKey, setPaidTogglePendingKey] = useState<string | null>(null);
+  const [justPaidKeys, setJustPaidKeys] = useState<Set<string>>(() => new Set());
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [fundAdjustTarget, setFundAdjustTarget] =
     useState<TimelineExpense | null>(null);
   const [rowMenuKey, setRowMenuKey] = useState<string | null>(null);
@@ -815,6 +813,9 @@ export function ExpenseTimeline({
                             <button
                               type="button"
                               onClick={async () => {
+                                if (!isPaidForMonth) {
+                                  setJustPaidKeys(prev => { const s = new Set(prev); s.add(rk); return s; });
+                                }
                                 setPaidTogglePendingKey(rk);
                                 try {
                                   await setCreditCardPaidForMonth({
@@ -846,9 +847,9 @@ export function ExpenseTimeline({
                               }`}
                             >
                               {isPaidForMonth ? (
-                                <CheckCircle2
-                                  className="h-4 w-4 sm:h-[18px] sm:w-[18px]"
-                                  aria-hidden="true"
+                                <PaidCheckMark
+                                  animate={justPaidKeys.has(rk) && !prefersReducedMotion}
+                                  onAnimationEnd={() => setJustPaidKeys(prev => { const s = new Set(prev); s.delete(rk); return s; })}
                                 />
                               ) : (
                                 <Circle
@@ -994,6 +995,9 @@ export function ExpenseTimeline({
                             <button
                               type="button"
                               onClick={async () => {
+                                if (!isPaidForMonth) {
+                                  setJustPaidKeys(prev => { const s = new Set(prev); s.add(rk); return s; });
+                                }
                                 setPaidTogglePendingKey(rk);
                                 try {
                                   await setDebtPaidForMonth({
@@ -1025,9 +1029,9 @@ export function ExpenseTimeline({
                               }`}
                             >
                               {isPaidForMonth ? (
-                                <CheckCircle2
-                                  className="h-4 w-4 sm:h-[18px] sm:w-[18px]"
-                                  aria-hidden="true"
+                                <PaidCheckMark
+                                  animate={justPaidKeys.has(rk) && !prefersReducedMotion}
+                                  onAnimationEnd={() => setJustPaidKeys(prev => { const s = new Set(prev); s.delete(rk); return s; })}
                                 />
                               ) : (
                                 <Circle
@@ -1243,6 +1247,9 @@ export function ExpenseTimeline({
                           <button
                             type="button"
                             onClick={async () => {
+                              if (!isPaidForMonth) {
+                                setJustPaidKeys(prev => { const s = new Set(prev); s.add(rk); return s; });
+                              }
                               setPaidTogglePendingKey(rk);
                               try {
                                 await setBudgetPaidForMonth({
@@ -1274,13 +1281,13 @@ export function ExpenseTimeline({
                             }`}
                           >
                             {isPaidForMonth ? (
-                              <CheckCircle2
-                                className="h-4 w-4 sm:h-[18px] sm:h-[18px]"
-                                aria-hidden="true"
+                              <PaidCheckMark
+                                animate={justPaidKeys.has(rk) && !prefersReducedMotion}
+                                onAnimationEnd={() => setJustPaidKeys(prev => { const s = new Set(prev); s.delete(rk); return s; })}
                               />
                             ) : (
                               <Circle
-                                className="h-4 w-4 sm:h-[18px] sm:h-[18px]"
+                                className="h-4 w-4 sm:h-[18px] sm:w-[18px]"
                                 aria-hidden="true"
                               />
                             )}
@@ -1616,64 +1623,3 @@ export function ExpenseTimeline({
   );
 }
 
-function clampPlannerDueDay(d: number | undefined | null): { day: number; configured: boolean } {
-  if (d != null && d >= 1 && d <= 31) {
-    return { day: d, configured: true };
-  }
-  return { day: 28, configured: false };
-}
-
-function debtPlannerAmount(d: Doc<"debts">): number {
-  return debtPlannerMonthlyAmount(d);
-}
-
-function cardPlannerAmount(c: Doc<"creditCards">): number {
-  const planned = c.plannedMonthlyPayment ?? 0;
-  if (planned > 0) return planned;
-  return c.minimumPayment ?? 0;
-}
-
-export function buildPlannerRows(
-  allBudgetItems: Doc<"budgetItems">[] | undefined,
-  debts: Doc<"debts">[] | undefined,
-  creditCards: Doc<"creditCards">[] | undefined
-): PlannerRow[] {
-  const budget: PlannerRow[] = (allBudgetItems ?? []).map((i) => ({
-    ...i,
-    rowKind: "budget" as const,
-  }));
-  const cardRows: PlannerRow[] = (creditCards ?? []).map((c) => {
-    const { day, configured } = clampPlannerDueDay(c.dueDayOfMonth);
-    return {
-      rowKind: "creditCard" as const,
-      creditCardId: c._id,
-      name: c.name,
-      amount: cardPlannerAmount(c),
-      paymentDayOfMonth: day,
-      markedPaidForMonth: c.markedPaidForMonth,
-      accentColor: c.color,
-      isAutopay: c.isAutopay,
-      paymentAccountId: c.paymentAccountId,
-      hasConfiguredDueDay: configured,
-      usageMode: (c.usageMode === "paying_off" ? "paying_off" : "active_use") as
-        | "paying_off"
-        | "active_use",
-    };
-  });
-  const debtRows: PlannerRow[] = (debts ?? []).map((d) => {
-    const { day, configured } = clampPlannerDueDay(d.dueDayOfMonth);
-    return {
-      rowKind: "debt" as const,
-      debtId: d._id,
-      name: d.name,
-      amount: debtPlannerAmount(d),
-      paymentDayOfMonth: day,
-      markedPaidForMonth: d.markedPaidForMonth,
-      accentColor: d.color,
-      isAutopay: d.isAutopay,
-      paymentAccountId: d.paymentAccountId,
-      hasConfiguredDueDay: configured,
-    };
-  });
-  return [...budget, ...cardRows, ...debtRows];
-}
