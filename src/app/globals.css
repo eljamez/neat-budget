@@ -3,8 +3,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #fafaf9;
+  --foreground: #1a1a18;
 }
 
 .dark {
@@ -16,6 +16,10 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
+  --font-heading: var(--font-jakarta);
+  --animate-slide-up: slide-up-fade-in 0.35s cubic-bezier(0.25, 1, 0.5, 1) both;
+  --animate-slide-in-left: slide-in-left 0.28s cubic-bezier(0.25, 1, 0.5, 1) both;
+  --animate-fade-in: fade-in 0.2s ease-out both;
 }
 
 body {
@@ -37,6 +41,11 @@ body {
   to   { stroke-dashoffset: 0; }
 }
 
+@keyframes draw-check-sm {
+  from { stroke-dashoffset: 11; }
+  to   { stroke-dashoffset: 0; }
+}
+
 @keyframes check-circle-in {
   from { transform: scale(0.5); opacity: 0; }
   60%  { transform: scale(1.12); opacity: 1; }
@@ -53,6 +62,16 @@ body {
 @keyframes slide-up-fade-in {
   from { transform: translateY(6px); opacity: 0; }
   to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

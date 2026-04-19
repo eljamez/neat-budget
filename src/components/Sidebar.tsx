@@ -7,7 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard,
   Tags,
@@ -112,6 +112,10 @@ export function Sidebar() {
   const { isSignedIn, userId } = useAuth();
   const { openAddTransaction } = useTransactionModal();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isCreatingBudget, setIsCreatingBudget] = useState(false);
+  const [newBudgetName, setNewBudgetName] = useState("");
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const prevOpenRef = useRef(false);
   const budgets = useQuery(api.budgets.list, userId ? { userId } : "skip");
   const ensureDefaultBudget = useMutation(api.budgets.ensureDefault);
   const setActiveBudget = useMutation(api.budgets.setActive);
@@ -132,6 +136,33 @@ export function Sidebar() {
     return () => document.removeEventListener("keydown", handler);
   }, [drawerOpen]);
 
+  // Focus management for mobile drawer
+  useEffect(() => {
+    if (!drawerOpen) {
+      if (prevOpenRef.current) menuButtonRef.current?.focus();
+      prevOpenRef.current = false;
+      return;
+    }
+    prevOpenRef.current = true;
+    const drawerEl = document.getElementById("mobile-nav-drawer");
+    if (!drawerEl) return;
+    const sel = 'button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
+    const getFocusable = () => Array.from(drawerEl.querySelectorAll<HTMLElement>(sel));
+    requestAnimationFrame(() => getFocusable()[0]?.focus());
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const els = getFocusable();
+      if (!els.length) return;
+      if (e.shiftKey) {
+        if (document.activeElement === els[0]) { e.preventDefault(); els[els.length - 1]?.focus(); }
+      } else {
+        if (document.activeElement === els[els.length - 1]) { e.preventDefault(); els[0]?.focus(); }
+      }
+    };
+    document.addEventListener("keydown", trap);
+    return () => document.removeEventListener("keydown", trap);
+  }, [drawerOpen]);
+
   if (!isSignedIn) return null;
   if (pathname === "/") return null;
 
@@ -147,7 +178,7 @@ export function Sidebar() {
         <div className="shrink-0 px-5 py-6 border-b border-white/5">
           <Link href="/dashboard" className="flex items-center gap-2.5">
             <LogoMark size={32} />
-            <span className="font-bold text-white text-base tracking-tight">Neat Budget</span>
+            <span className="font-heading font-bold text-white text-base tracking-tight">Neat Budget</span>
           </Link>
           <div className="mt-4">
             <label htmlFor="budget-select-desktop" className="block text-xs text-slate-400 mb-1">
@@ -168,21 +199,52 @@ export function Sidebar() {
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              onClick={() => {
-                if (!userId) return;
-                const name = window.prompt("Name your new budget");
-                if (!name?.trim()) return;
-                void (async () => {
-                  const budgetId = await createBudget({ userId, name: name.trim() });
-                  await setActiveBudget({ userId, budgetId });
-                })();
-              }}
-              className="mt-2 text-xs text-teal-300 hover:text-teal-200"
-            >
-              + New budget
-            </button>
+            {isCreatingBudget ? (
+              <form
+                className="mt-2 flex flex-col gap-1.5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newBudgetName.trim() || !userId) return;
+                  void (async () => {
+                    const budgetId = await createBudget({ userId, name: newBudgetName.trim() });
+                    await setActiveBudget({ userId, budgetId });
+                    setIsCreatingBudget(false);
+                    setNewBudgetName("");
+                  })();
+                }}
+              >
+                <input
+                  autoFocus
+                  type="text"
+                  value={newBudgetName}
+                  onChange={(e) => setNewBudgetName(e.target.value)}
+                  placeholder="Budget name"
+                  maxLength={80}
+                  aria-label="New budget name"
+                  className="w-full rounded-md border border-white/15 bg-white/5 px-2.5 py-1.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-400"
+                />
+                <div className="flex gap-1.5">
+                  <button type="submit" className="flex-1 rounded-md bg-teal-600 px-2 py-1 text-xs font-medium text-white hover:bg-teal-500">
+                    Create
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsCreatingBudget(false); setNewBudgetName(""); }}
+                    className="flex-1 rounded-md border border-white/10 px-2 py-1 text-xs text-slate-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsCreatingBudget(true)}
+                className="mt-2 text-xs text-teal-300 hover:text-teal-200"
+              >
+                + New budget
+              </button>
+            )}
           </div>
         </div>
 
@@ -240,7 +302,7 @@ export function Sidebar() {
       </aside>
 
       {/* ── Mobile top bar ── */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-slate-950 border-b border-white/8 h-14 flex items-center justify-between px-4">
+      <header role="banner" className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-slate-950 border-b border-white/8 h-14 flex items-center justify-between px-4">
         <Link href="/dashboard" className="flex items-center gap-2">
           <LogoMark size={28} />
           <span className="font-bold text-white text-sm tracking-tight">Neat Budget</span>
@@ -248,6 +310,7 @@ export function Sidebar() {
         <div className="flex items-center gap-2">
           <UserButton />
           <button
+            ref={menuButtonRef}
             onClick={() => setDrawerOpen(true)}
             aria-label="Open navigation menu"
             aria-expanded={drawerOpen}
@@ -269,11 +332,11 @@ export function Sidebar() {
           id="mobile-nav-drawer"
         >
           <div
-            className="absolute inset-0 bg-black/60"
+            className="absolute inset-0 bg-black/60 animate-fade-in"
             onClick={() => setDrawerOpen(false)}
             aria-hidden="true"
           />
-          <div className="relative w-72 max-w-[85vw] bg-slate-950 flex flex-col h-full shadow-2xl">
+          <div className="animate-slide-in-left relative w-72 max-w-[85vw] bg-slate-950 flex flex-col h-full shadow-2xl">
             {/* Drawer header */}
             <div className="px-5 py-5 border-b border-white/5 flex items-center justify-between gap-2">
               <span className="font-bold text-white text-base tracking-tight">Menu</span>

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { formatCurrency, ACCENT_COLOR_FALLBACK, cn } from "@/lib/utils";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
 
@@ -18,7 +19,7 @@ interface BudgetCardProps {
   onViewTransactions?: () => void;
 }
 
-export function BudgetCard({
+export const BudgetCard = memo(function BudgetCard({
   name,
   monthlyLimit,
   spent,
@@ -43,8 +44,13 @@ export function BudgetCard({
 
   return (
     <div
-      className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-white/10 overflow-hidden hover:shadow-md dark:hover:border-white/15 transition-all duration-200 group"
-      style={{ borderLeft: `4px solid ${color}`, cursor: onViewTransactions ? "pointer" : "default" }}
+      className={cn(
+        "bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-white/10 overflow-hidden hover:shadow-md dark:hover:border-white/15 transition-all duration-200 group",
+        onViewTransactions
+          ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+          : "cursor-default"
+      )}
+      style={{ borderLeft: `4px solid ${color}` }}
       role={onViewTransactions ? "button" : undefined}
       tabIndex={onViewTransactions ? 0 : undefined}
       aria-label={onViewTransactions ? `View transactions for ${name}` : undefined}
@@ -86,7 +92,7 @@ export function BudgetCard({
           {onEdit && (
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="opacity-0 group-hover:opacity-100 text-xs text-slate-400 dark:text-slate-500 hover:text-teal-600 dark:hover:text-teal-400 px-2 py-1 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-all"
+              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-xs text-slate-400 dark:text-slate-500 hover:text-teal-600 dark:hover:text-teal-400 px-2 py-1 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-all"
             >
               Edit
             </button>
@@ -117,8 +123,8 @@ export function BudgetCard({
 
         <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
           <div
-            className="h-1.5 rounded-full transition-all duration-500"
-            style={{ width: `${displayPercent}%`, backgroundColor: progressColor }}
+            className="h-full w-full origin-left transition-transform duration-500"
+            style={{ transform: `scaleX(${displayPercent / 100})`, backgroundColor: progressColor }}
           />
         </div>
 
@@ -137,4 +143,4 @@ export function BudgetCard({
       </div>
     </div>
   );
-}
+});

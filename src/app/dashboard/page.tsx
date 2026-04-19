@@ -4,7 +4,22 @@ import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { BudgetCard } from "@/components/BudgetCard";
-import { ExpenseTimeline, buildPlannerRows } from "@/components/ExpenseTimeline";
+import dynamic from "next/dynamic";
+import { buildPlannerRows } from "@/lib/planner";
+
+const ExpenseTimeline = dynamic(
+  () => import("@/components/ExpenseTimeline").then((m) => ({ default: m.ExpenseTimeline })),
+  {
+    loading: () => (
+      <div className="space-y-3">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-16 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-white/10 animate-pulse" />
+        ))}
+      </div>
+    ),
+    ssr: false,
+  }
+);
 import {
   cn,
   formatCurrency,
@@ -25,11 +40,13 @@ import {
 } from "@/lib/utils";
 import { BucketFundingModal } from "@/components/BucketFundingModal";
 import { MonthFundingModal } from "@/components/MonthFundingModal";
+import { InfoTooltip } from "@/components/InfoTooltip";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
 import { useTransactionModal } from "@/components/TransactionModalProvider";
 import Link from "next/link";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { usePrefersReducedMotion } from "@/lib/hooks";
 import { redirect } from "next/navigation";
 import {
   CheckCircle2,
@@ -42,7 +59,6 @@ import {
   Landmark,
   Receipt,
   Boxes,
-  Info,
   Sparkles,
   Pencil,
   CircleAlert,
@@ -106,6 +122,26 @@ function getHeaderMoodMessage(
   return null;
 }
 
+const CONFETTI_COLORS = [
+  "#0d9488", "#14b8a6", "#3b82f6", "#f59e0b",
+  "#ec4899", "#10b981", "#f97316", "#6366f1",
+];
+function seededUnit(seed: number) {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+const CONFETTI_PIECES = Array.from({ length: 22 }, (_, i) => ({
+  id: i,
+  color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+  tx: (seededUnit(i + 3) - 0.5) * 180,
+  ty: -(seededUnit(i + 17) * 80 + 30),
+  rot: seededUnit(i + 31) * 720 - 360,
+  delay: seededUnit(i + 41) * 0.18,
+  duration: 0.5 + seededUnit(i + 53) * 0.3,
+  w: 5 + seededUnit(i + 67) * 6,
+  h: 3 + seededUnit(i + 79) * 3,
+}));
+
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
   const { openAddTransaction, openEditTransaction } = useTransactionModal();
@@ -122,6 +158,10 @@ export default function DashboardPage() {
   const [openHelpTooltip, setOpenHelpTooltip] = useState<
     "timeline" | "buckets" | "accounts" | "creditCards" | "debts" | null
   >(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const categoriesFirstLoadedRef = useRef(false);
+  const prevAllOnTrackRef = useRef(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const autoFundMonth = useMutation(api.autoFundMonth.run);
 
@@ -234,6 +274,27 @@ export default function DashboardPage() {
     setFundingNotice(null);
   }, [selectedMonth]);
 
+  useEffect(() => {
+    if (categories === undefined) return;
+    const spent = Object.values(spendingByCategory ?? {}).reduce((a: number, b: number) => a + b, 0);
+    const over = (categories ?? []).filter(
+      (c) => (spendingByCategory?.[c._id] ?? 0) > (plannedByCategory[c._id] ?? 0)
+    ).length;
+    const onTrack = categories.length > 0 && over === 0 && spent > 0;
+    if (!categoriesFirstLoadedRef.current) {
+      categoriesFirstLoadedRef.current = true;
+      prevAllOnTrackRef.current = onTrack;
+      return;
+    }
+    if (onTrack && !prevAllOnTrackRef.current && !prefersReducedMotion) {
+      setShowConfetti(true);
+      const t = setTimeout(() => setShowConfetti(false), 2800);
+      prevAllOnTrackRef.current = true;
+      return () => clearTimeout(t);
+    }
+    prevAllOnTrackRef.current = onTrack;
+  }, [categories, spendingByCategory, plannedByCategory, prefersReducedMotion]);
+
   const categoryBudgetCap = (categoryId: string) =>
     plannedByCategory[categoryId] ?? 0;
 
@@ -298,7 +359,7 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between w-full">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                <h1 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
                   Good {getTimeOfDay()}, {user.firstName ?? "there"}
                 </h1>
                 {headerMood ? (
@@ -362,8 +423,7 @@ export default function DashboardPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
               <div
-                className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 sm:p-6 shadow-sm"
-                style={{ borderLeft: `3px solid ${ACCENT_COLOR_FALLBACK.successStrong}` }}
+                className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 border-l-[3px] border-l-emerald-600 p-5 sm:p-6 shadow-sm"
               >
                 <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">
                   Budget
@@ -396,16 +456,10 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div
-                className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 sm:p-6 shadow-sm"
-                style={{
-                  borderLeft: `3px solid ${
-                    headerAvailableToFund === null
-                      ? ACCENT_COLOR_FALLBACK.success
-                      : headerOverFunded
-                        ? ACCENT_COLOR_FALLBACK.danger
-                        : ACCENT_COLOR_FALLBACK.success
-                  }`,
-                }}
+                className={cn(
+                  "rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 border-l-[3px] p-5 sm:p-6 shadow-sm",
+                  headerOverFunded ? "border-l-rose-500" : "border-l-emerald-500"
+                )}
               >
                 <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">
                   Left to fund
@@ -518,44 +572,29 @@ export default function DashboardPage() {
           <div className="lg:col-span-2 w-full min-w-0 space-y-4">
             <div className="rounded-xl border border-teal-100 dark:border-teal-900/40 bg-linear-to-r from-teal-50/90 to-slate-50/80 dark:from-teal-950/50 dark:to-slate-900/80 px-4 py-3.5 sm:px-5 sm:py-4 shadow-sm">
               <div className="flex items-center gap-2 min-w-0">
-                <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-teal-950 dark:text-teal-100">
+                <h2 className="font-heading text-xl sm:text-2xl font-semibold tracking-tight text-teal-950 dark:text-teal-100">
                   {formatMonth(selectedMonth)}
                 </h2>
-                <span className="relative shrink-0 group z-10">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setOpenHelpTooltip((prev) => (prev === "timeline" ? null : "timeline"))
-                    }
-                    className="rounded-full p-1 text-teal-700/70 dark:text-teal-400 hover:text-teal-900 dark:hover:text-teal-100 hover:bg-teal-100/80 dark:hover:bg-teal-900/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
-                    aria-label="How the bill timeline works"
-                    aria-describedby="timeline-help-tooltip"
-                    aria-expanded={openHelpTooltip === "timeline"}
-                    aria-controls="timeline-help-tooltip"
-                  >
-                    <Info className="w-5 h-5 sm:w-[1.35rem] sm:h-[1.35rem]" aria-hidden="true" />
-                  </button>
-                  <span
-                    id="timeline-help-tooltip"
-                    role="tooltip"
-                    className={cn(
-                      "pointer-events-none absolute left-0 top-full mt-1.5 w-[min(22rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
-                      openHelpTooltip === "timeline" && "opacity-100 visible translate-y-0"
-                    )}
-                  >
-                    Bills are ordered by{" "}
-                    <span className="font-semibold text-white">when funds must be ready</span>. Row colors:{" "}
-                    <span className="font-semibold text-rose-300">red</span> = waiting (not funded),{" "}
-                    <span className="font-semibold text-amber-200">yellow</span> = funded or ready,{" "}
-                    <span className="font-semibold text-emerald-300">green</span> = paid.{" "}
-                    <span className="font-semibold text-teal-200">Bank ✓</span> = pay-from account set. Select rows to fund
-                    many bills at once, or tap{" "}
-                    <span className="font-semibold text-white">Waiting</span> /{" "}
-                    <span className="font-semibold text-white">Partly funded</span> on a row to fund the remainder, or clear funding with the toolbar or the{" "}
-                    <span className="font-semibold text-white">minus</span> icon on each row. Row menu →{" "}
-                    <span className="font-semibold text-white">Fund / adjust amount</span> for custom amounts. Funding is separate from marking paid.
-                  </span>
-                </span>
+                <InfoTooltip
+                  id="timeline-help-tooltip"
+                  label="How the bill timeline works"
+                  isOpen={openHelpTooltip === "timeline"}
+                  onToggle={() => setOpenHelpTooltip((prev) => (prev === "timeline" ? null : "timeline"))}
+                  variant="teal"
+                  maxWidth="22rem"
+                >
+                  Bills are ordered by{" "}
+                  <span className="font-semibold text-white">when funds must be ready</span>. Row colors:{" "}
+                  <span className="font-semibold text-rose-300">red</span> = waiting (not funded),{" "}
+                  <span className="font-semibold text-amber-200">yellow</span> = funded or ready,{" "}
+                  <span className="font-semibold text-emerald-300">green</span> = paid.{" "}
+                  <span className="font-semibold text-teal-200">Bank ✓</span> = pay-from account set. Select rows to fund
+                  many bills at once, or tap{" "}
+                  <span className="font-semibold text-white">Waiting</span> /{" "}
+                  <span className="font-semibold text-white">Partly funded</span> on a row to fund the remainder, or clear funding with the toolbar or the{" "}
+                  <span className="font-semibold text-white">minus</span> icon on each row. Row menu →{" "}
+                  <span className="font-semibold text-white">Fund / adjust amount</span> for custom amounts. Funding is separate from marking paid.
+                </InfoTooltip>
               </div>
             </div>
             {allBudgetItems === undefined || debts === undefined || creditCards === undefined ? (
@@ -579,36 +618,20 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Buckets</h2>
-                  <span className="relative shrink-0 group z-10">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpenHelpTooltip((prev) => (prev === "buckets" ? null : "buckets"))
-                      }
-                      className="rounded-full p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
-                      aria-label="How buckets work this month"
-                      aria-describedby="buckets-help-tooltip"
-                      aria-expanded={openHelpTooltip === "buckets"}
-                      aria-controls="buckets-help-tooltip"
-                    >
-                      <Info className="w-5 h-5 sm:w-[1.35rem] sm:h-[1.35rem]" aria-hidden="true" />
-                    </button>
-                    <span
-                      id="buckets-help-tooltip"
-                      role="tooltip"
-                      className={cn(
-                        "pointer-events-none absolute right-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white text-left shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
-                        openHelpTooltip === "buckets" && "opacity-100 visible translate-y-0"
-                      )}
-                    >
-                      Spending vs targets for{" "}
-                      <span className="font-semibold text-white">{formatMonth(selectedMonth)}</span>. Set a monthly fill
-                      amount on each bucket to cap how much you fund;{" "}
-                      <span className="font-semibold text-teal-200">funded</span> is separate from spent. Link a category to
-                      track spend.
-                    </span>
-                  </span>
+                  <h2 className="font-heading text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Buckets</h2>
+                  <InfoTooltip
+                    id="buckets-help-tooltip"
+                    label="How buckets work this month"
+                    isOpen={openHelpTooltip === "buckets"}
+                    onToggle={() => setOpenHelpTooltip((prev) => (prev === "buckets" ? null : "buckets"))}
+                    align="right"
+                  >
+                    Spending vs targets for{" "}
+                    <span className="font-semibold text-white">{formatMonth(selectedMonth)}</span>. Set a monthly fill
+                    amount on each bucket to cap how much you fund;{" "}
+                    <span className="font-semibold text-teal-200">funded</span> is separate from spent. Link a category to
+                    track spend.
+                  </InfoTooltip>
                 </div>
                 <Link
                   href="/buckets"
@@ -756,34 +779,18 @@ export default function DashboardPage() {
         <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 shadow-sm w-full">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4">
             <div className="flex items-start gap-2 min-w-0">
-              <h2 className="font-semibold text-slate-800 dark:text-slate-100">Your accounts</h2>
-              <span className="relative shrink-0 group z-10">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOpenHelpTooltip((prev) => (prev === "accounts" ? null : "accounts"))
-                  }
-                  className="rounded-full p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
-                  aria-label="How account balances work with your budget"
-                  aria-describedby="accounts-help-tooltip"
-                  aria-expanded={openHelpTooltip === "accounts"}
-                  aria-controls="accounts-help-tooltip"
-                >
-                  <Info className="w-4 h-4" aria-hidden="true" />
-                </button>
-                <span
-                  id="accounts-help-tooltip"
-                  role="tooltip"
-                  className={cn(
-                    "pointer-events-none absolute left-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
-                    openHelpTooltip === "accounts" && "opacity-100 visible translate-y-0"
-                  )}
-                >
-                  Balances update when you log transactions. The dashboard <span className="font-semibold text-teal-200">budget</span>{" "}
-                  is the sum of these asset balances. <span className="font-semibold text-teal-200">Funding</span> for{" "}
-                  <span className="font-semibold text-white">{formatMonth(selectedMonth)}</span> is capped by that total.
-                </span>
-              </span>
+              <h2 className="font-heading text-lg font-semibold text-slate-800 dark:text-slate-100">Your accounts</h2>
+              <InfoTooltip
+                id="accounts-help-tooltip"
+                label="How account balances work with your budget"
+                isOpen={openHelpTooltip === "accounts"}
+                onToggle={() => setOpenHelpTooltip((prev) => (prev === "accounts" ? null : "accounts"))}
+                iconSize="sm"
+              >
+                Balances update when you log transactions. The dashboard <span className="font-semibold text-teal-200">budget</span>{" "}
+                is the sum of these asset balances. <span className="font-semibold text-teal-200">Funding</span> for{" "}
+                <span className="font-semibold text-white">{formatMonth(selectedMonth)}</span> is capped by that total.
+              </InfoTooltip>
             </div>
             <Link
               href="/accounts"
@@ -795,17 +802,16 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {accounts.map((acc) => {
               const isAsset = accountIsAssetForAvailability(acc.accountType);
-              const accent =
+              const accentClass =
                 acc.accountType === "credit_card"
-                  ? ACCENT_COLOR_FALLBACK.creditCard
+                  ? "border-l-indigo-600"
                   : isAsset
-                    ? ACCENT_COLOR_FALLBACK.category
-                    : ACCENT_COLOR_FALLBACK.debtCard;
+                    ? "border-l-teal-600"
+                    : "border-l-slate-500";
               return (
                 <div
                   key={acc._id}
-                  className="rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50/90 dark:bg-slate-800/50 px-4 py-4"
-                  style={{ borderLeft: `3px solid ${accent}` }}
+                  className={cn("rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50/90 dark:bg-slate-800/50 px-4 py-4 border-l-[3px]", accentClass)}
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="min-w-0">
@@ -840,37 +846,21 @@ export default function DashboardPage() {
         <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 shadow-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4">
             <div className="flex items-start gap-2 min-w-0">
-              <h2 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <h2 className="font-heading text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" aria-hidden="true" />
                 Credit cards
               </h2>
-              <span className="relative shrink-0 group z-10">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOpenHelpTooltip((prev) => (prev === "creditCards" ? null : "creditCards"))
-                  }
-                  className="rounded-full p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
-                  aria-label="How credit card balances work in Neat Budget"
-                  aria-describedby="credit-cards-help-tooltip"
-                  aria-expanded={openHelpTooltip === "creditCards"}
-                  aria-controls="credit-cards-help-tooltip"
-                >
-                  <Info className="w-4 h-4" aria-hidden="true" />
-                </button>
-                <span
-                  id="credit-cards-help-tooltip"
-                  role="tooltip"
-                  className={cn(
-                    "pointer-events-none absolute left-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
-                    openHelpTooltip === "creditCards" && "opacity-100 visible translate-y-0"
-                  )}
-                >
-                  Each card&apos;s <span className="font-semibold text-indigo-200">balance</span> is what you owe. Log
-                  charges and payments to keep it current. Paydown plans show as{" "}
-                  <span className="font-semibold text-white">planned monthly</span> amounts separate from category cash.
-                </span>
-              </span>
+              <InfoTooltip
+                id="credit-cards-help-tooltip"
+                label="How credit card balances work in Neat Budget"
+                isOpen={openHelpTooltip === "creditCards"}
+                onToggle={() => setOpenHelpTooltip((prev) => (prev === "creditCards" ? null : "creditCards"))}
+                iconSize="sm"
+              >
+                Each card&apos;s <span className="font-semibold text-indigo-200">balance</span> is what you owe. Log
+                charges and payments to keep it current. Paydown plans show as{" "}
+                <span className="font-semibold text-white">planned monthly</span> amounts separate from category cash.
+              </InfoTooltip>
             </div>
             <Link
               href="/credit-cards"
@@ -915,32 +905,18 @@ export default function DashboardPage() {
         <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 shadow-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4">
             <div className="flex items-start gap-2 min-w-0">
-              <h2 className="font-semibold text-slate-800 dark:text-slate-100">Debts & loans</h2>
-              <span className="relative shrink-0 group z-10">
-                <button
-                  type="button"
-                  onClick={() => setOpenHelpTooltip((prev) => (prev === "debts" ? null : "debts"))}
-                  className="rounded-full p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
-                  aria-label="How debt balances work in Neat Budget"
-                  aria-describedby="debts-help-tooltip"
-                  aria-expanded={openHelpTooltip === "debts"}
-                  aria-controls="debts-help-tooltip"
-                >
-                  <Info className="w-4 h-4" aria-hidden="true" />
-                </button>
-                <span
-                  id="debts-help-tooltip"
-                  role="tooltip"
-                  className={cn(
-                    "pointer-events-none absolute left-0 top-full mt-1.5 w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-slate-900 px-3.5 py-3 text-xs font-normal leading-relaxed text-white shadow-lg opacity-0 invisible translate-y-0.5 transition-all duration-150 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 z-20",
-                    openHelpTooltip === "debts" && "opacity-100 visible translate-y-0"
-                  )}
-                >
-                  <span className="font-semibold text-slate-200">Balances</span> drop when you log paydown
-                  transactions. <span className="font-semibold text-slate-200">Planned monthly</span> amounts tie into
-                  your budget planner alongside categories and buckets.
-                </span>
-              </span>
+              <h2 className="font-heading text-lg font-semibold text-slate-800 dark:text-slate-100">Debts & loans</h2>
+              <InfoTooltip
+                id="debts-help-tooltip"
+                label="How debt balances work in Neat Budget"
+                isOpen={openHelpTooltip === "debts"}
+                onToggle={() => setOpenHelpTooltip((prev) => (prev === "debts" ? null : "debts"))}
+                iconSize="sm"
+              >
+                <span className="font-semibold text-slate-200">Balances</span> drop when you log paydown
+                transactions. <span className="font-semibold text-slate-200">Planned monthly</span> amounts tie into
+                your budget planner alongside categories and buckets.
+              </InfoTooltip>
             </div>
             <Link
               href="/debts"
@@ -982,7 +958,7 @@ export default function DashboardPage() {
 
       {/* Budget status strip */}
       {overBudgetCount > 0 ? (
-        <div role="alert" className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 rounded-2xl p-4 flex items-center gap-4" style={{ animation: "slide-up-fade-in 0.3s ease-out" }}>
+        <div role="alert" className="animate-slide-up bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 rounded-2xl p-4 flex items-center gap-4">
           <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 flex-shrink-0" aria-hidden="true" />
           <div className="flex-1">
             <p className="font-semibold text-rose-800 dark:text-rose-200">
@@ -995,9 +971,30 @@ export default function DashboardPage() {
           </Link>
         </div>
       ) : allOnTrack ? (
-        <div className="bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 rounded-2xl p-4 flex items-center gap-3" style={{ animation: "slide-up-fade-in 0.35s ease-out" }}>
-          <CheckCircle2 className="w-5 h-5 text-teal-600 dark:text-teal-400 flex-shrink-0" aria-hidden="true" />
-          <div className="flex-1">
+        <div className="animate-slide-up relative bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 rounded-2xl p-4 flex items-center gap-3 overflow-hidden">
+          {showConfetti && (
+            <div className="pointer-events-none absolute top-1/2 left-10" aria-hidden="true">
+              {CONFETTI_PIECES.map((p) => (
+                <div
+                  key={p.id}
+                  className="absolute rounded-sm"
+                  style={{
+                    backgroundColor: p.color,
+                    width: p.w,
+                    height: p.h,
+                    top: 0,
+                    left: 0,
+                    "--tx": `${p.tx}px`,
+                    "--ty": `${p.ty}px`,
+                    "--rot": `${p.rot}deg`,
+                    animation: `confetti-fly ${p.duration}s ease-out ${p.delay}s both`,
+                  } as React.CSSProperties}
+                />
+              ))}
+            </div>
+          )}
+          <CheckCircle2 className="w-5 h-5 text-teal-600 dark:text-teal-400 flex-shrink-0 relative z-10" aria-hidden="true" />
+          <div className="flex-1 relative z-10">
             <p className="font-semibold text-teal-800 dark:text-teal-200 text-sm">Every category is on track</p>
             <p className="text-xs text-teal-600 dark:text-teal-400 mt-0.5">
               {viewingCalendarMonth
@@ -1013,7 +1010,7 @@ export default function DashboardPage() {
         {/* Budget Categories */}
         <div className="lg:col-span-3">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Budget Categories</h2>
+            <h2 className="font-heading text-lg font-semibold text-slate-800 dark:text-slate-100">Budget Categories</h2>
             <Link href="/categories" className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium">
               Manage <ArrowRight size={13} aria-hidden="true" />
             </Link>
@@ -1056,7 +1053,7 @@ export default function DashboardPage() {
         {/* Recent Transactions */}
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">
+            <h2 className="font-heading text-lg font-semibold text-slate-800 dark:text-slate-100">
               Transactions · {formatMonth(selectedMonth)}
             </h2>
             <button
@@ -1202,18 +1199,18 @@ function DashboardSkeleton() {
   return (
     <div className="w-full space-y-8 animate-pulse">
       <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-xl w-56" />
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-teal-200 dark:bg-teal-900/50 rounded-2xl h-28" />
         <div className="bg-slate-200 dark:bg-slate-700 rounded-2xl h-28" />
         <div className="bg-slate-200 dark:bg-slate-700 rounded-2xl h-28" />
       </div>
-      <div className="grid grid-cols-5 gap-6">
-        <div className="col-span-3 space-y-3">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="lg:col-span-3 space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-slate-200 dark:bg-slate-700 rounded-2xl h-32" />
           ))}
         </div>
-        <div className="col-span-2 bg-slate-200 dark:bg-slate-700 rounded-2xl h-64" />
+        <div className="lg:col-span-2 bg-slate-200 dark:bg-slate-700 rounded-2xl h-64" />
       </div>
     </div>
   );

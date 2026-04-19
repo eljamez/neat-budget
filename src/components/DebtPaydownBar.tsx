@@ -90,7 +90,10 @@ export function DebtPaydownBar({
     <div className="mt-1.5 space-y-0.5">
       <div
         className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden"
-        role="img"
+        role="progressbar"
+        aria-valuenow={Math.round(remainingPct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
         aria-label={`${formatCurrency(currentBalance)} remaining, ${labelRemain}% of loan left to pay off`}
       >
         <div className={`h-full rounded-full transition-[width] ${barClass}`} style={{ width: widthPct }} />
