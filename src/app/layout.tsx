@@ -4,6 +4,7 @@ import "./globals.css";
 import { ConvexClerkProvider } from "@/components/providers/ConvexClerkProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { AppShell } from "@/components/AppShell";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const geist = Geist({ subsets: ["latin"] });
 const jakarta = Plus_Jakarta_Sans({
