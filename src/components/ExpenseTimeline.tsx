@@ -756,7 +756,7 @@ export function ExpenseTimeline({
               </div>
 
               {dayItems.length === 0 ? (
-                <li className="flex items-center gap-3 rounded-lg border border-dashed border-teal-300/70 bg-teal-50/40 px-3 py-2.5 dark:border-teal-600/30 dark:bg-teal-950/20">
+                <div className="flex items-center gap-3 rounded-lg border border-dashed border-teal-300/70 bg-teal-50/40 px-3 py-2.5 dark:border-teal-600/30 dark:bg-teal-950/20">
                   <span className="text-xs text-slate-500 dark:text-slate-400">Nothing due today</span>
                   <button
                     type="button"
@@ -768,7 +768,7 @@ export function ExpenseTimeline({
                     <Plus className="h-3 w-3" aria-hidden="true" />
                     New expense
                   </button>
-                </li>
+                </div>
               ) : null}
               <ul className="space-y-1.5 w-full min-w-0">
                 {dayItems.map((item) => {

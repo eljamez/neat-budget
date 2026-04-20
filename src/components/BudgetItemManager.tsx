@@ -204,7 +204,7 @@ export function BudgetItemManager({
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
-          <label htmlFor="item-name" className="block text-xs font-medium text-slate-600 mb-1">
+          <label htmlFor="item-name" className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400">
             Expense name
           </label>
           <input
@@ -214,13 +214,13 @@ export function BudgetItemManager({
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             placeholder="e.g. Rent, Netflix, Electric"
             maxLength={100}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-800"
             required
           />
         </div>
 
         <div>
-          <label htmlFor="item-amount" className="block text-xs font-medium text-slate-600 mb-1">
+          <label htmlFor="item-amount" className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400">
             Expected Amount ($)
           </label>
           <input
@@ -231,13 +231,13 @@ export function BudgetItemManager({
             value={form.amount}
             onChange={(e) => setForm({ ...form, amount: e.target.value })}
             placeholder="0.00"
-            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-800"
             required
           />
         </div>
 
         <div>
-          <label htmlFor="item-due-day" className="block text-xs font-medium text-slate-600 mb-1">
+          <label htmlFor="item-due-day" className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400">
             Due (day of month)
           </label>
           <input
@@ -248,20 +248,20 @@ export function BudgetItemManager({
             value={form.paymentDayOfMonth}
             onChange={(e) => setForm({ ...form, paymentDayOfMonth: e.target.value })}
             placeholder="1–31"
-            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-800"
             required
           />
         </div>
 
         <div className="col-span-2">
-          <label htmlFor="item-account" className="block text-xs font-medium text-slate-600 mb-1">
+          <label htmlFor="item-account" className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400">
             Paid from account <span className="text-slate-400 font-normal">(optional)</span>
           </label>
           <select
             id="item-account"
             value={form.accountId}
             onChange={(e) => setForm({ ...form, accountId: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-800"
           >
             <option value="">Not set</option>
             {accountsSorted.map((a) => (
@@ -282,7 +282,7 @@ export function BudgetItemManager({
         </div>
 
         <div className="col-span-2">
-          <label htmlFor="item-note" className="block text-xs font-medium text-slate-600 mb-1">
+          <label htmlFor="item-note" className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400">
             Note (optional)
           </label>
           <input
@@ -292,14 +292,14 @@ export function BudgetItemManager({
             onChange={(e) => setForm({ ...form, note: e.target.value })}
             placeholder="e.g. price went up in March"
             maxLength={200}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-800"
           />
         </div>
       </div>
 
       {monthEditorOpen ? (
-        <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 space-y-3">
-          <p className="text-xs font-semibold text-slate-700">
+        <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 space-y-3 dark:border-white/10 dark:bg-slate-800/40">
+          <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
             Timeline month · {formatMonth(transactionsMonthKey!)}
           </p>
           {!monthDataReady ? (
@@ -309,7 +309,7 @@ export function BudgetItemManager({
               <div>
                 <label
                   htmlFor="item-month-funded"
-                  className="block text-xs font-medium text-slate-600 mb-1"
+                  className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400"
                 >
                   Funded for this month ($)
                 </label>
@@ -320,9 +320,9 @@ export function BudgetItemManager({
                   min="0"
                   value={monthFundedStr}
                   onChange={(e) => setMonthFundedStr(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white transition-colors"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white transition-colors dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100 dark:focus:bg-slate-800"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="text-[11px] text-slate-500 mt-1 dark:text-slate-400">
                   Cash set aside for this bill in {formatMonth(transactionsMonthKey!)}. Cannot exceed
                   the expected amount above.
                 </p>
@@ -330,7 +330,7 @@ export function BudgetItemManager({
               <div>
                 <label
                   htmlFor="item-actual-paid"
-                  className="block text-xs font-medium text-slate-600 mb-1"
+                  className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400"
                 >
                   Actual amount paid ($)
                 </label>
@@ -341,9 +341,9 @@ export function BudgetItemManager({
                   min="0.01"
                   value={actualPaidStr}
                   onChange={(e) => setActualPaidStr(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white transition-colors"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white transition-colors dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100 dark:focus:bg-slate-800"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="text-[11px] text-slate-500 mt-1 dark:text-slate-400">
                   Defaults to what you funded this month, or the expected bill if nothing is funded
                   yet. Shown on the timeline when this bill is marked paid.
                 </p>
@@ -353,7 +353,7 @@ export function BudgetItemManager({
         </div>
       ) : null}
 
-      <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+      <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 dark:border-white/10 dark:bg-slate-800/40">
         <input
           type="checkbox"
           checked={form.isAutopay}
@@ -361,8 +361,8 @@ export function BudgetItemManager({
           className="mt-0.5 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
         />
         <span>
-          <span className="block text-sm font-medium text-slate-700">Auto-pay</span>
-          <span className="block text-xs text-slate-500 mt-0.5">
+          <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">Auto-pay</span>
+          <span className="block text-xs text-slate-500 mt-0.5 dark:text-slate-400">
             This bill is set to draft automatically from your bank or card (you still track it here).
           </span>
         </span>
@@ -370,7 +370,7 @@ export function BudgetItemManager({
 
       {/* Preview hint */}
       {!isNaN(dueDayPreview) && form.name && (
-        <p className="text-xs text-teal-700 bg-teal-50 border border-teal-100 rounded-xl px-3 py-2">
+        <p className="text-xs text-teal-700 bg-teal-50 border border-teal-100 rounded-xl px-3 py-2 dark:bg-teal-950/40 dark:border-teal-800/50 dark:text-teal-300">
           <strong>{form.name}</strong> — due on the <strong>{ordinal(dueDayPreview)}</strong>
           {form.accountId ? (
             <>
@@ -386,7 +386,7 @@ export function BudgetItemManager({
       )}
 
       {error && (
-        <p role="alert" className="text-sm text-rose-600 bg-rose-50 px-3 py-2 rounded-xl">
+        <p role="alert" className="text-sm text-rose-600 bg-rose-50 px-3 py-2 rounded-xl dark:bg-rose-950/40 dark:text-rose-300">
           {error}
         </p>
       )}
@@ -403,7 +403,7 @@ export function BudgetItemManager({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 bg-slate-100 text-slate-700 rounded-xl py-2 text-sm font-medium hover:bg-slate-200 transition-colors"
+            className="flex-1 bg-slate-100 text-slate-700 rounded-xl py-2 text-sm font-medium hover:bg-slate-200 transition-colors dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             Cancel
           </button>
