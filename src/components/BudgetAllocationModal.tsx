@@ -101,7 +101,7 @@ export function BudgetAllocationModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6 dark:bg-slate-900 dark:border-white/10"
+        className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 sm:p-6 dark:bg-slate-900 dark:border-white/10"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="alloc-modal-title" className="font-semibold text-slate-800 mb-1 dark:text-slate-100">

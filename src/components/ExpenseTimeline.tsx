@@ -1615,7 +1615,7 @@ export function ExpenseTimeline({
           onClick={() => setEditTarget(null)}
         >
           <div
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="timeline-edit-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">
@@ -1641,7 +1641,7 @@ export function ExpenseTimeline({
           onClick={() => setEditDebtId(null)}
         >
           <div
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="timeline-debt-edit-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">
@@ -1741,7 +1741,7 @@ export function ExpenseTimeline({
           onClick={() => { setQuickAddOpen(false); setQuickAddCategoryId(null); }}
         >
           <div
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="quick-add-expense-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">
