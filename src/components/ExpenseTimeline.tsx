@@ -44,6 +44,7 @@ import {
   CreditCard,
   Landmark,
   MoreVertical,
+  Plus,
 } from "lucide-react";
 
 export interface TimelineCategory {
@@ -272,6 +273,8 @@ export function ExpenseTimeline({
   }, [accounts]);
 
   const todayStart = startOfLocalDay(new Date());
+  const todayDayOfMonth = todayStart.getDate();
+  const todayLocalYearMonth = `${todayStart.getFullYear()}-${String(todayStart.getMonth() + 1).padStart(2, "0")}`;
   const categoryMap = useMemo(
     () => Object.fromEntries(categories.map((c) => [c._id, c])),
     [categories]
@@ -299,6 +302,16 @@ export function ExpenseTimeline({
       }));
   }, [items]);
 
+  const displayGroups = useMemo(() => {
+    const isCurrentMonth = todayLocalYearMonth === budgetMonth;
+    if (!isCurrentMonth) return groupedByDueDay;
+    const hasToday = groupedByDueDay.some(({ day }) => day === todayDayOfMonth);
+    if (hasToday) return groupedByDueDay;
+    return [...groupedByDueDay, { day: todayDayOfMonth, items: [] as PlannerRow[] }].sort(
+      (a, b) => a.day - b.day
+    );
+  }, [groupedByDueDay, todayLocalYearMonth, budgetMonth, todayDayOfMonth]);
+
   const [editTarget, setEditTarget] = useState<TimelineExpense | null>(null);
   const [editDebtId, setEditDebtId] = useState<Id<"debts"> | null>(null);
   const [archivePendingId, setArchivePendingId] = useState<Id<"budgetItems"> | null>(null);
@@ -310,6 +323,8 @@ export function ExpenseTimeline({
   const prefersReducedMotion = usePrefersReducedMotion();
   const [fundAdjustTarget, setFundAdjustTarget] =
     useState<TimelineExpense | null>(null);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddCategoryId, setQuickAddCategoryId] = useState<Id<"categories"> | null>(null);
   const [rowMenuKey, setRowMenuKey] = useState<string | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(() => new Set());
   const [bulkFundRunning, setBulkFundRunning] = useState(false);
@@ -663,7 +678,7 @@ export function ExpenseTimeline({
       />
 
       <ol className="space-y-6 w-full min-w-0">
-        {groupedByDueDay.map(({ day, items: dayItems }) => {
+        {displayGroups.map(({ day, items: dayItems }) => {
           const dueDateStart = dateInBudgetMonth(budgetMonth, day);
           const deltaNeeded = calendarDaysFromTo(todayStart, dueDateStart);
           const isToday = deltaNeeded === 0;
@@ -678,7 +693,11 @@ export function ExpenseTimeline({
           return (
             <li key={day} className="relative pl-9 sm:pl-10 w-full min-w-0">
               <div
-                className="absolute left-0 top-0.5 flex h-[22px] w-[22px] sm:h-[26px] sm:w-[26px] items-center justify-center rounded-md border border-slate-200/90 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:border-white/15 dark:bg-slate-950/90 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                className={`absolute left-0 top-0.5 flex h-[22px] w-[22px] sm:h-[26px] sm:w-[26px] items-center justify-center rounded-md border bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:bg-slate-950/90 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ${
+                  isToday
+                    ? "border-teal-400/70 ring-2 ring-teal-400/30 dark:border-teal-500/60 dark:ring-teal-500/25"
+                    : "border-slate-200/90 dark:border-white/15"
+                }`}
                 aria-hidden="true"
               >
                 <span className="relative flex h-full w-full flex-col items-center justify-center gap-0.5 pt-0.5">
@@ -717,21 +736,40 @@ export function ExpenseTimeline({
                     <span className="text-slate-300 dark:text-white/20" aria-hidden="true">
                       ·
                     </span>
-                    <span
-                      className={
-                        isToday
-                          ? "font-medium text-teal-700 dark:text-teal-400"
-                          : isPast
+                    {isToday ? (
+                      <span className="rounded-full bg-teal-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white dark:bg-teal-600">
+                        Today
+                      </span>
+                    ) : (
+                      <span
+                        className={
+                          isPast
                             ? "text-slate-400 dark:text-slate-500"
                             : "text-slate-500 dark:text-slate-400"
-                      }
-                    >
-                      {rel}
-                    </span>
+                        }
+                      >
+                        {rel}
+                      </span>
+                    )}
                   </>
                 )}
               </div>
 
+              {dayItems.length === 0 ? (
+                <div className="flex items-center gap-3 rounded-lg border border-dashed border-teal-300/70 bg-teal-50/40 px-3 py-2.5 dark:border-teal-600/30 dark:bg-teal-950/20">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Nothing due today</span>
+                  <button
+                    type="button"
+                    onClick={() => setQuickAddOpen(true)}
+                    title="Add a new expense due today"
+                    aria-label="Add a new expense due today"
+                    className="ml-auto flex items-center gap-1 rounded-md border border-teal-300/80 bg-white px-2 py-1 text-[11px] font-medium text-teal-700 shadow-sm transition-colors hover:bg-teal-50 hover:border-teal-400 dark:border-teal-600/50 dark:bg-slate-900 dark:text-teal-400 dark:hover:bg-teal-950/40"
+                  >
+                    <Plus className="h-3 w-3" aria-hidden="true" />
+                    New expense
+                  </button>
+                </div>
+              ) : null}
               <ul className="space-y-1.5 w-full min-w-0">
                 {dayItems.map((item) => {
                   const rk = rowKey(item);
@@ -1577,7 +1615,7 @@ export function ExpenseTimeline({
           onClick={() => setEditTarget(null)}
         >
           <div
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="timeline-edit-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">
@@ -1603,7 +1641,7 @@ export function ExpenseTimeline({
           onClick={() => setEditDebtId(null)}
         >
           <div
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="timeline-debt-edit-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">
@@ -1634,6 +1672,86 @@ export function ExpenseTimeline({
                 />
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {quickAddOpen && !quickAddCategoryId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="quick-add-category-title"
+          onClick={() => setQuickAddOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm max-h-[80vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="quick-add-category-title" className="mb-1 font-semibold text-slate-800 dark:text-slate-100">
+              Add expense
+            </h2>
+            <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
+              Pick a category for the new expense.
+            </p>
+            <ul className="space-y-1">
+              {categories.map((cat) => {
+                const IconComp = cat.icon ? CATEGORY_ICON_MAP[cat.icon] : null;
+                const color = cat.color ?? "#0d9488";
+                return (
+                  <li key={cat._id}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5"
+                      onClick={() => setQuickAddCategoryId(cat._id)}
+                    >
+                      <span
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+                        style={{ backgroundColor: `${color}26` }}
+                      >
+                        {IconComp ? (
+                          <IconComp className="h-3.5 w-3.5" style={{ color }} aria-hidden="true" />
+                        ) : (
+                          <span className="text-xs" aria-hidden="true">{cat.icon ?? "💰"}</span>
+                        )}
+                      </span>
+                      {cat.name}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <button
+              type="button"
+              onClick={() => setQuickAddOpen(false)}
+              className="mt-4 w-full rounded-xl border border-slate-200 py-2 text-sm text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/5"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {quickAddOpen && quickAddCategoryId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="quick-add-expense-title"
+          onClick={() => { setQuickAddOpen(false); setQuickAddCategoryId(null); }}
+        >
+          <div
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="quick-add-expense-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">
+              New expense
+            </h2>
+            <BudgetItemManager
+              categoryId={quickAddCategoryId}
+              onSuccess={() => { setQuickAddOpen(false); setQuickAddCategoryId(null); }}
+              onCancel={() => { setQuickAddOpen(false); setQuickAddCategoryId(null); }}
+            />
           </div>
         </div>
       )}

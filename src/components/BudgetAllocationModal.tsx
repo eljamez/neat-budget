@@ -101,33 +101,33 @@ export function BudgetAllocationModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6"
+        className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 sm:p-6 dark:bg-slate-900 dark:border-white/10"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="alloc-modal-title" className="font-semibold text-slate-800 mb-1">
+        <h2 id="alloc-modal-title" className="font-semibold text-slate-800 mb-1 dark:text-slate-100">
           Fund this bill
         </h2>
-        <p className="text-xs text-slate-500 mb-4">
-          <span className="font-medium text-slate-700">{expenseName}</span> · {formatMonth(monthKey)} · Bill{" "}
+        <p className="text-xs text-slate-500 mb-4 dark:text-slate-400">
+          <span className="font-medium text-slate-700 dark:text-slate-200">{expenseName}</span> · {formatMonth(monthKey)} · Bill{" "}
           {formatCurrency(expenseAmount)}
         </p>
-        <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
-          This sets aside part of your <strong className="text-slate-700">overall budget cash</strong> for this bill in{" "}
-          <strong className="text-slate-700">{formatMonth(monthKey)}</strong>. It does not change any bank
+        <p className="text-[11px] text-slate-500 mb-4 leading-relaxed dark:text-slate-400">
+          This sets aside part of your <strong className="text-slate-700 dark:text-slate-300">overall budget cash</strong> for this bill in{" "}
+          <strong className="text-slate-700 dark:text-slate-300">{formatMonth(monthKey)}</strong>. It does not change any bank
           balance — those update when you log transactions. Use{" "}
-          <strong className="text-slate-700">Adjust funding</strong> to add or remove lines; mark the bill{" "}
-          <strong className="text-slate-700">paid</strong> on the timeline when it settles.
+          <strong className="text-slate-700 dark:text-slate-300">Adjust funding</strong> to add or remove lines; mark the bill{" "}
+          <strong className="text-slate-700 dark:text-slate-300">paid</strong> on the timeline when it settles.
         </p>
 
-        <div className="rounded-xl border border-teal-100 bg-teal-50/60 px-3 py-2.5 mb-4">
-          <p className="text-xs text-teal-900 font-medium">
+        <div className="rounded-xl border border-teal-100 bg-teal-50/60 px-3 py-2.5 mb-4 dark:border-teal-800/50 dark:bg-teal-950/40">
+          <p className="text-xs text-teal-900 font-medium dark:text-teal-200">
             {formatCurrency(totalSetAside)} funded{" "}
-            <span className="font-normal text-teal-800/90">
+            <span className="font-normal text-teal-800/90 dark:text-teal-300/90">
               of {formatCurrency(expenseAmount)} for this month
             </span>
           </p>
           {remaining > 0.005 && (
-            <p className="text-[11px] text-teal-800/80 mt-1">
+            <p className="text-[11px] text-teal-800/80 mt-1 dark:text-teal-400">
               Up to {formatCurrency(remaining)} more can be funded.
             </p>
           )}
@@ -167,9 +167,9 @@ export function BudgetAllocationModal({
               return (
                 <li
                   key={line._id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2"
+                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 dark:border-white/8 dark:bg-slate-800/50"
                 >
-                  <span className="text-sm text-slate-700 truncate min-w-0" title={acc ? formatAccountType(acc.accountType) : undefined}>
+                  <span className="text-sm text-slate-700 truncate min-w-0 dark:text-slate-200" title={acc ? formatAccountType(acc.accountType) : undefined}>
                     {label}
                   </span>
                   <button
@@ -193,7 +193,7 @@ export function BudgetAllocationModal({
 
         <form onSubmit={handleAdd} className="space-y-3">
           <div>
-            <label htmlFor="alloc-amt" className="block text-xs font-medium text-slate-600 mb-1">
+            <label htmlFor="alloc-amt" className="block text-xs font-medium text-slate-600 mb-1 dark:text-slate-400">
               Amount ($)
             </label>
             <input
@@ -204,11 +204,11 @@ export function BudgetAllocationModal({
               value={amountStr}
               onChange={(e) => setAmountStr(e.target.value)}
               placeholder="0.00"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 bg-white"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 bg-white focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-800"
             />
           </div>
           {error && (
-            <p role="alert" className="text-xs text-rose-600 bg-rose-50 px-2 py-1.5 rounded-lg">
+            <p role="alert" className="text-xs text-rose-600 bg-rose-50 px-2 py-1.5 rounded-lg dark:bg-rose-950/40 dark:text-rose-300">
               {error}
             </p>
           )}
@@ -223,7 +223,7 @@ export function BudgetAllocationModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-slate-100 text-slate-700 rounded-xl py-2 text-sm font-medium"
+              className="flex-1 bg-slate-100 text-slate-700 rounded-xl py-2 text-sm font-medium hover:bg-slate-200 transition-colors dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             >
               Done
             </button>
