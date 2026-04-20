@@ -54,7 +54,7 @@ export default function CreditCardsPage() {
     <div className="w-full space-y-5 pb-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Credit cards</h1>
+          <h1 className="font-heading text-2xl font-bold text-slate-900 dark:text-slate-100">Credit cards</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             Balances, utilization, and when you last paid—sorted by due date.
           </p>
@@ -75,7 +75,7 @@ export default function CreditCardsPage() {
 
       {showForm && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm p-6">
-          <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-5">
+          <h2 className="font-heading font-semibold text-slate-800 dark:text-slate-100 mb-5">
             {editId ? "Edit card" : "New card"}
           </h2>
           <CreditCardManager

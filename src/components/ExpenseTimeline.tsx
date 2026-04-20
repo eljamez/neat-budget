@@ -797,7 +797,7 @@ export function ExpenseTimeline({
                     return (
                       <li key={rk} className="w-full min-w-0">
                         <div
-                          className={`group/row w-full min-w-0 overflow-hidden rounded-lg border shadow-sm transition-colors ${timelineRowSurfaceClasses(
+                          className={`group/row w-full min-w-0 overflow-visible rounded-lg border shadow-sm transition-colors ${timelineRowSurfaceClasses(
                             fundState
                           )}`}
                           style={{ borderLeftWidth: 3, borderLeftColor: color }}
@@ -889,6 +889,12 @@ export function ExpenseTimeline({
                               ) : null}
                             </div>
 
+                            {isPaidForMonth && (
+                              <span className="shrink-0 rounded-md border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-950/45 dark:text-emerald-200 sm:text-[11px]">
+                                Paid
+                              </span>
+                            )}
+
                             <span className="shrink-0 tabular-nums text-xs font-semibold text-slate-800 dark:text-slate-100 sm:text-sm">
                               {formatCurrency(item.amount)}
                             </span>
@@ -979,7 +985,7 @@ export function ExpenseTimeline({
                     return (
                       <li key={rk} className="w-full min-w-0">
                         <div
-                          className={`group/row w-full min-w-0 overflow-hidden rounded-lg border shadow-sm transition-colors ${timelineRowSurfaceClasses(
+                          className={`group/row w-full min-w-0 overflow-visible rounded-lg border shadow-sm transition-colors ${timelineRowSurfaceClasses(
                             fundState
                           )}`}
                           style={{ borderLeftWidth: 3, borderLeftColor: color }}
@@ -1070,6 +1076,12 @@ export function ExpenseTimeline({
                                 </p>
                               ) : null}
                             </div>
+
+                            {isPaidForMonth && (
+                              <span className="shrink-0 rounded-md border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-950/45 dark:text-emerald-200 sm:text-[11px]">
+                                Paid
+                              </span>
+                            )}
 
                             <span
                               className="shrink-0 tabular-nums text-xs font-semibold text-slate-800 dark:text-slate-100 sm:text-sm"
@@ -1229,7 +1241,7 @@ export function ExpenseTimeline({
                   return (
                     <li key={rk} className="w-full min-w-0">
                       <div
-                        className={`group/row w-full min-w-0 overflow-hidden rounded-lg border shadow-sm transition-colors ${
+                        className={`group/row w-full min-w-0 overflow-visible rounded-lg border shadow-sm transition-colors ${
                           isOverAllocated && !isPaidForMonth
                             ? `${timelineRowSurfaceClasses(fundState)} ring-2 ring-amber-500/50 ring-offset-2 ring-offset-white dark:ring-offset-slate-900`
                             : timelineRowSurfaceClasses(fundState)
@@ -1405,6 +1417,12 @@ export function ExpenseTimeline({
                               </span>
                             ) : null
                           ) : null}
+
+                          {isPaidForMonth && (
+                            <span className="shrink-0 rounded-md border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-950/45 dark:text-emerald-200 sm:text-[11px]">
+                              Paid
+                            </span>
+                          )}
 
                           <span
                             className="shrink-0 tabular-nums text-xs font-semibold text-slate-800 dark:text-slate-100 sm:text-sm"

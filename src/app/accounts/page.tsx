@@ -35,7 +35,7 @@ export default function AccountsPage() {
     <div className="w-full space-y-5 lg:space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Accounts</h1>
+          <h1 className="font-heading text-2xl font-bold text-slate-900 dark:text-slate-100">Accounts</h1>
           <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
             Track cash in each bank account or card. When you add a transaction and choose an account,
             the balance updates automatically. Edit the balance here if it drifts from your bank.
@@ -57,7 +57,7 @@ export default function AccountsPage() {
 
       {showForm && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm p-6">
-          <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-5">
+          <h2 className="font-heading font-semibold text-slate-800 dark:text-slate-100 mb-5">
             {editId ? "Edit account" : "New account"}
           </h2>
           <AccountManager
@@ -102,14 +102,34 @@ export default function AccountsPage() {
             <li key={acc._id}>
               <div
                 className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm px-4 py-4 flex items-center justify-between gap-3"
-                style={{ borderLeft: `3px solid ${ACCENT_COLOR_FALLBACK.category}` }}
+                style={{
+                  borderLeft: `3px solid ${
+                    acc.accountType === "credit_card"
+                      ? "#6366f1"
+                      : acc.accountType === "other"
+                      ? "#94a3b8"
+                      : ACCENT_COLOR_FALLBACK.category
+                  }`,
+                }}
               >
                 <div className="flex items-start gap-3 min-w-0">
                   <div
-                    className="w-10 h-10 rounded-xl bg-teal-500/10 flex items-center justify-center shrink-0"
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                      acc.accountType === "credit_card"
+                        ? "bg-indigo-500/10"
+                        : acc.accountType === "other"
+                        ? "bg-slate-500/10"
+                        : "bg-teal-500/10"
+                    }`}
                     aria-hidden="true"
                   >
-                    <Landmark className="w-5 h-5 text-teal-600" />
+                    <Landmark className={`w-5 h-5 ${
+                      acc.accountType === "credit_card"
+                        ? "text-indigo-600 dark:text-indigo-400"
+                        : acc.accountType === "other"
+                        ? "text-slate-500 dark:text-slate-400"
+                        : "text-teal-600 dark:text-teal-400"
+                    }`} />
                   </div>
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-800 dark:text-slate-100">{acc.name}</p>

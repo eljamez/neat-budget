@@ -77,6 +77,88 @@ export const create = mutation({
   },
 });
 
+export const rename = mutation({
+  args: {
+    userId: v.optional(v.string()),
+    budgetId: v.id("budgets"),
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
+    const budget = await ctx.db.get(args.budgetId);
+    if (!budget || budget.userId !== userId) throw new Error("Budget not found");
+    const name = args.name.trim();
+    if (!name) throw new Error("Budget name is required");
+    await ctx.db.patch(args.budgetId, { name });
+  },
+});
+
+export const remove = mutation({
+  args: {
+    userId: v.optional(v.string()),
+    budgetId: v.id("budgets"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
+    const budget = await ctx.db.get(args.budgetId);
+    if (!budget || budget.userId !== userId) throw new Error("Budget not found");
+
+    const all = await ctx.db
+      .query("budgets")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    if (all.length <= 1) throw new Error("Cannot delete the only budget");
+
+    if (budget.isActive) {
+      const next = all.find((b) => b._id !== args.budgetId);
+      if (next) await ctx.db.patch(next._id, { isActive: true });
+    }
+
+    const budgetScoped = [
+      "accounts",
+      "debts",
+      "creditCards",
+      "debtExpenses",
+      "categories",
+      "transactions",
+      "buckets",
+      "budgetItems",
+    ] as const;
+
+    for (const table of budgetScoped) {
+      const rows = await ctx.db
+        .query(table)
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+      for (const row of rows) {
+        if ((row as { budgetId?: string }).budgetId === args.budgetId) {
+          await ctx.db.delete(row._id);
+        }
+      }
+    }
+
+    const userMonthScoped = [
+      "bucketMonthFundings",
+      "expenseAllocations",
+      "budgetItemMonthOverrides",
+    ] as const;
+
+    for (const table of userMonthScoped) {
+      const rows = await ctx.db
+        .query(table)
+        .withIndex("by_user_month", (q) => q.eq("userId", userId))
+        .collect();
+      for (const row of rows) {
+        if ((row as { budgetId?: string }).budgetId === args.budgetId) {
+          await ctx.db.delete(row._id);
+        }
+      }
+    }
+
+    await ctx.db.delete(args.budgetId);
+  },
+});
+
 export const setActive = mutation({
   args: {
     userId: v.optional(v.string()),

@@ -484,7 +484,7 @@ export default function CategoriesPage() {
     <div className="w-full max-w-none space-y-5 lg:space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Categories</h1>
+          <h1 className="font-heading text-2xl font-bold text-slate-900 dark:text-slate-100">Categories</h1>
           <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
             Your budget groups and recurring bills—amounts and due days apply every month. Drag an expense onto
             another category to move it. Use the{" "}
@@ -528,7 +528,7 @@ export default function CategoriesPage() {
       {/* Create/Edit Form */}
       {showForm && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-white/10 shadow-sm p-6">
-          <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-5">
+          <h2 className="font-heading font-semibold text-slate-800 dark:text-slate-100 mb-5">
             {editCategory ? "Edit Category" : "New Category"}
           </h2>
           <CategoryManager

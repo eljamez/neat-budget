@@ -246,10 +246,11 @@ export const create = mutation({
     date: v.string(),
     note: v.optional(v.string()),
     accountId: v.optional(v.id("accounts")),
-    /** Exactly one of budgetItemId, debtId, or creditCardId must be set. */
+    /** Exactly one of budgetItemId, debtId, creditCardId, or bucketId must be set. */
     budgetItemId: v.optional(v.id("budgetItems")),
     debtId: v.optional(v.id("debts")),
     creditCardId: v.optional(v.id("creditCards")),
+    bucketId: v.optional(v.id("buckets")),
   },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
@@ -260,9 +261,10 @@ export const create = mutation({
     const nBudget = args.budgetItemId ? 1 : 0;
     const nDebt = args.debtId ? 1 : 0;
     const nCard = args.creditCardId ? 1 : 0;
-    if (nBudget + nDebt + nCard !== 1) {
+    const nBucket = args.bucketId ? 1 : 0;
+    if (nBudget + nDebt + nCard + nBucket !== 1) {
       throw new Error(
-        "Choose exactly one payee: a budget expense, a loan/debt, or a credit card"
+        "Choose exactly one payee: a budget expense, a loan/debt, a credit card, or a bucket"
       );
     }
 
@@ -288,6 +290,13 @@ export const create = mutation({
         throw new Error("Invalid credit card");
       }
       description = `Card payment · ${card.name}`;
+    } else if (args.bucketId) {
+      const bucket = await ctx.db.get(args.bucketId);
+      if (!bucket || bucket.userId !== userId || bucket.budgetId !== budgetId) {
+        throw new Error("Invalid bucket");
+      }
+      categoryId = bucket.categoryId;
+      description = `${bucket.name}`;
     }
 
     if (args.accountId) {
@@ -311,6 +320,7 @@ export const create = mutation({
       accountId: args.accountId,
       debtId: args.debtId,
       creditCardId: args.creditCardId,
+      bucketId: args.bucketId,
     });
 
     if (args.accountId) {
@@ -358,6 +368,7 @@ export const update = mutation({
     budgetItemId: v.optional(v.id("budgetItems")),
     debtId: v.optional(v.id("debts")),
     creditCardId: v.optional(v.id("creditCards")),
+    bucketId: v.optional(v.id("buckets")),
   },
   handler: async (ctx, args) => {
     const userId = await getEffectiveUserId(ctx, args.userId);
@@ -373,9 +384,10 @@ export const update = mutation({
     const nBudget = args.budgetItemId ? 1 : 0;
     const nDebt = args.debtId ? 1 : 0;
     const nCard = args.creditCardId ? 1 : 0;
-    if (nBudget + nDebt + nCard !== 1) {
+    const nBucket = args.bucketId ? 1 : 0;
+    if (nBudget + nDebt + nCard + nBucket !== 1) {
       throw new Error(
-        "Choose exactly one payee: a budget expense, a loan/debt, or a credit card"
+        "Choose exactly one payee: a budget expense, a loan/debt, a credit card, or a bucket"
       );
     }
 
@@ -401,6 +413,13 @@ export const update = mutation({
         throw new Error("Invalid credit card");
       }
       description = `Card payment · ${card.name}`;
+    } else if (args.bucketId) {
+      const bucket = await ctx.db.get(args.bucketId);
+      if (!bucket || bucket.userId !== userId || bucket.budgetId !== budgetId) {
+        throw new Error("Invalid bucket");
+      }
+      categoryId = bucket.categoryId;
+      description = `${bucket.name}`;
     }
 
     if (args.accountId) {
@@ -443,6 +462,7 @@ export const update = mutation({
       accountId: args.accountId,
       debtId: args.debtId,
       creditCardId: args.creditCardId,
+      bucketId: args.bucketId,
     });
 
     if (args.accountId) {

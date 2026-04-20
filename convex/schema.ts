@@ -175,6 +175,8 @@ export default defineSchema({
     debtMarkedPaidMonthKey: v.optional(v.string()),
     /** When set, this payment reduces the linked credit card balance. */
     creditCardId: v.optional(v.id("creditCards")),
+    /** When set, this spend is counted against a discretionary bucket (tracked via bucket's categoryId). */
+    bucketId: v.optional(v.id("buckets")),
   })
     .index("by_user", ["userId"])
     .index("by_user_date", ["userId", "date"])
@@ -182,7 +184,8 @@ export default defineSchema({
     .index("by_budget_item", ["budgetItemId"])
     .index("by_account", ["accountId"])
     .index("by_debt", ["debtId"])
-    .index("by_credit_card", ["creditCardId"]),
+    .index("by_credit_card", ["creditCardId"])
+    .index("by_bucket", ["bucketId"]),
 
   /**
    * Cash set aside from an account toward a **monthly** discretionary bucket for `monthKey`.
