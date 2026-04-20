@@ -461,7 +461,7 @@ export function Sidebar() {
         <div className="flex-1 flex flex-col items-center justify-center gap-1 min-h-[3.5rem]">
           <button
             type="button"
-            onClick={openAddTransaction}
+            onClick={() => openAddTransaction()}
             aria-label="Add transaction"
             className="w-12 h-12 rounded-full bg-teal-500 hover:bg-teal-400 active:bg-teal-600 flex items-center justify-center shadow-lg shadow-teal-900/40 transition-colors -translate-y-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           >
