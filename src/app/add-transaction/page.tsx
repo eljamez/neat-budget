@@ -122,7 +122,7 @@ export default function AddTransactionPage() {
           Same fields as the quick modal.{" "}
           <button
             type="button"
-            onClick={openAddTransaction}
+            onClick={() => openAddTransaction()}
             className="text-teal-600 dark:text-teal-400 font-medium hover:text-teal-700 dark:hover:text-teal-300 underline-offset-2 hover:underline"
           >
             Open as modal
