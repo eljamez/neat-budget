@@ -111,3 +111,8 @@ body {
   outline: 2px solid white;
   outline-offset: 2px;
 }
+
+.dark .skip-to-content:focus {
+  background: #0f766e;
+  outline-color: rgba(15, 23, 42, 0.6);
+}

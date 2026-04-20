@@ -8,9 +8,10 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { BucketManager } from "@/components/BucketManager";
+import { useTransactionModal } from "@/components/TransactionModalProvider";
 import { formatCurrency, ACCENT_COLOR_FALLBACK } from "@/lib/utils";
 import type { Bucket } from "@/types/bucket";
-import { Boxes } from "lucide-react";
+import { Boxes, Receipt } from "lucide-react";
 
 const PERIOD_LABEL: Record<Bucket["period"], string> = {
   weekly: "Weekly",
@@ -40,6 +41,7 @@ function BucketsPageContent() {
   const searchParams = useSearchParams();
   const processedEditParam = useRef<string | null>(null);
   const { user } = useUser();
+  const { openAddTransaction } = useTransactionModal();
   const buckets = useQuery(api.buckets.getBuckets, user ? { userId: user.id } : "skip");
   const categories = useQuery(api.categories.list, user ? { userId: user.id } : "skip");
   const deleteBucket = useMutation(api.buckets.deleteBucket);
@@ -199,11 +201,20 @@ function BucketsPageContent() {
                 <div className="flex gap-1 shrink-0">
                   <button
                     type="button"
+                    onClick={() => openAddTransaction(`bucket:${b._id}`)}
+                    className="flex items-center gap-1.5 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 px-3 py-2 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 font-medium"
+                    aria-label={`Add transaction for ${b.name}`}
+                  >
+                    <Receipt className="w-3.5 h-3.5" aria-hidden="true" />
+                    Add transaction
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => {
                       setEditId(b._id);
                       setShowForm(true);
                     }}
-                    className="text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 px-3 py-2 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 font-medium"
+                    className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-white/8 font-medium"
                   >
                     Edit
                   </button>

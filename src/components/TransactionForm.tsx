@@ -9,7 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 
 export interface TransactionFormProps {
   onSuccess?: () => void;
-  /** Preselect e.g. `expense:${id}`, `debt:${id}`, or `cc:${id}` */
+  /** Preselect e.g. `bucket:${id}`, `expense:${id}`, `debt:${id}`, or `cc:${id}` */
   defaultPayee?: string;
   /** When set, the form saves changes to this row instead of creating one. */
   editTransaction?: Doc<"transactions">;
@@ -34,6 +34,7 @@ export function TransactionForm({
   );
   const debts = useQuery(api.debts.list, user?.id ? { userId: user.id } : "skip");
   const creditCards = useQuery(api.creditCards.list, user?.id ? { userId: user.id } : "skip");
+  const buckets = useQuery(api.buckets.getBuckets, user?.id ? { userId: user.id } : "skip");
   const createTransaction = useMutation(api.transactions.create);
   const updateTransaction = useMutation(api.transactions.update);
 
@@ -55,7 +56,9 @@ export function TransactionForm({
         ? `debt:${editTransaction.debtId}`
         : editTransaction.creditCardId
           ? `cc:${editTransaction.creditCardId}`
-          : "";
+          : editTransaction.bucketId
+            ? `bucket:${editTransaction.bucketId}`
+            : "";
     setPayeeKey(payee);
     setForm({
       accountId: editTransaction.accountId ?? "",
@@ -81,9 +84,13 @@ export function TransactionForm({
       const id = payeeKey.slice("cc:".length);
       const c = creditCards?.find((x) => x._id === id);
       acc = c?.paymentAccountId ? String(c.paymentAccountId) : "";
+    } else if (payeeKey.startsWith("bucket:")) {
+      const id = payeeKey.slice("bucket:".length);
+      const b = buckets?.find((x) => x._id === id);
+      acc = b?.paymentAccountId ? String(b.paymentAccountId) : "";
     }
     setForm((f) => (f.accountId === acc ? f : { ...f, accountId: acc }));
-  }, [payeeKey, editTransaction, budgetItems, debts, creditCards]);
+  }, [payeeKey, editTransaction, budgetItems, debts, creditCards, buckets]);
 
   const categoryNameById = useMemo(() => {
     if (!categories) return {} as Record<string, string>;
@@ -93,6 +100,17 @@ export function TransactionForm({
   const payeeOptions = useMemo(() => {
     type Opt = { value: string; label: string; group: string };
     const out: Opt[] = [];
+
+    if (buckets?.length) {
+      const activeBuckets = [...buckets].filter((x) => !x.isArchived).sort((a, b) => a.name.localeCompare(b.name));
+      for (const b of activeBuckets) {
+        out.push({
+          value: `bucket:${b._id}`,
+          label: `${b.name} · ${formatCurrency(b.targetAmount)} target`,
+          group: "Bucket spend",
+        });
+      }
+    }
 
     if (budgetItems?.length) {
       const sorted = [...budgetItems].sort((a, b) => {
@@ -136,7 +154,7 @@ export function TransactionForm({
       return a.label.localeCompare(b.label);
     });
     return out;
-  }, [budgetItems, creditCards, debts, categoryNameById]);
+  }, [budgetItems, creditCards, debts, buckets, categoryNameById]);
 
   const groupedSelect = useMemo(() => {
     const groups: string[] = [];
@@ -158,6 +176,7 @@ export function TransactionForm({
     let budgetItemId: Id<"budgetItems"> | undefined;
     let debtId: Id<"debts"> | undefined;
     let creditCardId: Id<"creditCards"> | undefined;
+    let bucketId: Id<"buckets"> | undefined;
 
     if (payeeKey.startsWith("expense:")) {
       budgetItemId = payeeKey.slice("expense:".length) as Id<"budgetItems">;
@@ -165,8 +184,10 @@ export function TransactionForm({
       debtId = payeeKey.slice("debt:".length) as Id<"debts">;
     } else if (payeeKey.startsWith("cc:")) {
       creditCardId = payeeKey.slice("cc:".length) as Id<"creditCards">;
+    } else if (payeeKey.startsWith("bucket:")) {
+      bucketId = payeeKey.slice("bucket:".length) as Id<"buckets">;
     } else {
-      setError("Choose what this payment is for (expense, card, or loan)");
+      setError("Choose what this payment is for (bucket, expense, card, or loan)");
       return;
     }
 
@@ -194,6 +215,7 @@ export function TransactionForm({
           budgetItemId,
           debtId,
           creditCardId,
+          bucketId,
         });
       } else {
         await createTransaction({
@@ -205,6 +227,7 @@ export function TransactionForm({
           budgetItemId,
           debtId,
           creditCardId,
+          bucketId,
         });
         setPayeeKey(defaultPayee ?? "");
         setForm({
@@ -227,6 +250,7 @@ export function TransactionForm({
   };
 
   const noPayees =
+    (buckets?.filter((x) => !x.isArchived).length ?? 0) === 0 &&
     (budgetItems?.length ?? 0) === 0 &&
     (creditCards?.filter((x) => !x.isArchived).length ?? 0) === 0 &&
     (debts?.filter((x) => !x.isArchived).length ?? 0) === 0;
@@ -278,8 +302,7 @@ export function TransactionForm({
         </label>
         {noPayees ? (
           <p className="text-sm text-slate-500 dark:text-slate-400 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 px-3 py-2.5">
-            Add a recurring expense under a category, or add a debt / credit card first — then you can
-            log payments here.
+            Add a bucket, a recurring expense, a debt, or a credit card first — then you can log payments here.
           </p>
         ) : (
           <select
@@ -289,7 +312,7 @@ export function TransactionForm({
             className="w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors"
             required
           >
-            <option value="">Select expense, card, or loan…</option>
+            <option value="">Select bucket, expense, card, or loan…</option>
             {groupedSelect.map(({ group, options }) => (
               <optgroup key={group} label={group}>
                 {options.map((o) => (
@@ -302,7 +325,7 @@ export function TransactionForm({
           </select>
         )}
         <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-          Spending is recorded against a specific bill or debt — no separate category pick.
+          Spending is counted against a bucket, bill, or debt — no separate category pick.
         </p>
       </div>
 

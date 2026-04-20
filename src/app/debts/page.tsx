@@ -55,7 +55,7 @@ export default function DebtsPage() {
     <div className="w-full space-y-5 pb-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Debts</h1>
+          <h1 className="font-heading text-2xl font-bold text-slate-900 dark:text-slate-100">Debts</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             Loans and installment balances—sorted by due date. Credit cards live on the Cards page.
           </p>
@@ -258,7 +258,7 @@ export default function DebtsPage() {
             className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="debt-dialog-title" className="font-semibold text-slate-800 dark:text-slate-100 mb-5">
+            <h2 id="debt-dialog-title" className="font-heading font-semibold text-slate-800 dark:text-slate-100 mb-5">
               {editId ? "Edit debt" : "New debt"}
             </h2>
             <DebtManager

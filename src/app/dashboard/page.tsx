@@ -41,6 +41,7 @@ import {
 import { BucketFundingModal } from "@/components/BucketFundingModal";
 import { MonthFundingModal } from "@/components/MonthFundingModal";
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { SectionHeader } from "@/components/SectionHeader";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CATEGORY_ICON_MAP } from "@/lib/icons";
 import { useTransactionModal } from "@/components/TransactionModalProvider";
@@ -720,6 +721,14 @@ export default function DashboardPage() {
                                   </span>
                                 </span>
                               ) : null}
+                              <button
+                                type="button"
+                                onClick={() => openAddTransaction(`bucket:${b._id}`)}
+                                className="flex h-7 w-7 items-center justify-center rounded-md text-teal-600 transition-colors hover:bg-teal-500/15 dark:text-teal-400 dark:hover:bg-teal-500/10"
+                                aria-label={`Add transaction for ${b.name}`}
+                              >
+                                <Receipt className="h-3.5 w-3.5" aria-hidden="true" />
+                              </button>
                               <Link
                                 href={`/buckets?edit=${b._id}`}
                                 className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100"
@@ -777,28 +786,23 @@ export default function DashboardPage() {
       {/* Accounts: below timeline; balances + Manage → Accounts page */}
       {accounts !== undefined && accounts.length > 0 && (
         <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 shadow-sm w-full">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4">
-            <div className="flex items-start gap-2 min-w-0">
-              <h2 className="font-heading text-lg font-semibold text-slate-800 dark:text-slate-100">Your accounts</h2>
-              <InfoTooltip
-                id="accounts-help-tooltip"
-                label="How account balances work with your budget"
-                isOpen={openHelpTooltip === "accounts"}
-                onToggle={() => setOpenHelpTooltip((prev) => (prev === "accounts" ? null : "accounts"))}
-                iconSize="sm"
-              >
-                Balances update when you log transactions. The dashboard <span className="font-semibold text-teal-200">budget</span>{" "}
-                is the sum of these asset balances. <span className="font-semibold text-teal-200">Funding</span> for{" "}
-                <span className="font-semibold text-white">{formatMonth(selectedMonth)}</span> is capped by that total.
-              </InfoTooltip>
-            </div>
-            <Link
-              href="/accounts"
-              className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium shrink-0"
-            >
-              Manage <ArrowRight size={13} aria-hidden="true" />
-            </Link>
-          </div>
+          <SectionHeader
+            title="Your accounts"
+            tooltip={{
+              id: "accounts-help-tooltip",
+              label: "How account balances work with your budget",
+              isOpen: openHelpTooltip === "accounts",
+              onToggle: () => setOpenHelpTooltip((prev) => (prev === "accounts" ? null : "accounts")),
+              children: (
+                <>
+                  Balances update when you log transactions. The dashboard <span className="font-semibold text-teal-200">budget</span>{" "}
+                  is the sum of these asset balances. <span className="font-semibold text-teal-200">Funding</span> for{" "}
+                  <span className="font-semibold text-white">{formatMonth(selectedMonth)}</span> is capped by that total.
+                </>
+              ),
+            }}
+            action={{ kind: "link", href: "/accounts" }}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {accounts.map((acc) => {
               const isAsset = accountIsAssetForAvailability(acc.accountType);
@@ -844,31 +848,24 @@ export default function DashboardPage() {
 
       {creditCards !== undefined && creditCards.length > 0 && (
         <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4">
-            <div className="flex items-start gap-2 min-w-0">
-              <h2 className="font-heading text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" aria-hidden="true" />
-                Credit cards
-              </h2>
-              <InfoTooltip
-                id="credit-cards-help-tooltip"
-                label="How credit card balances work in Neat Budget"
-                isOpen={openHelpTooltip === "creditCards"}
-                onToggle={() => setOpenHelpTooltip((prev) => (prev === "creditCards" ? null : "creditCards"))}
-                iconSize="sm"
-              >
-                Each card&apos;s <span className="font-semibold text-indigo-200">balance</span> is what you owe. Log
-                charges and payments to keep it current. Paydown plans show as{" "}
-                <span className="font-semibold text-white">planned monthly</span> amounts separate from category cash.
-              </InfoTooltip>
-            </div>
-            <Link
-              href="/credit-cards"
-              className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium shrink-0"
-            >
-              Manage <ArrowRight size={13} aria-hidden="true" />
-            </Link>
-          </div>
+          <SectionHeader
+            title="Credit cards"
+            icon={<CreditCard className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" aria-hidden="true" />}
+            tooltip={{
+              id: "credit-cards-help-tooltip",
+              label: "How credit card balances work in Neat Budget",
+              isOpen: openHelpTooltip === "creditCards",
+              onToggle: () => setOpenHelpTooltip((prev) => (prev === "creditCards" ? null : "creditCards")),
+              children: (
+                <>
+                  Each card&apos;s <span className="font-semibold text-indigo-200">balance</span> is what you owe. Log
+                  charges and payments to keep it current. Paydown plans show as{" "}
+                  <span className="font-semibold text-white">planned monthly</span> amounts separate from category cash.
+                </>
+              ),
+            }}
+            action={{ kind: "link", href: "/credit-cards" }}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {creditCards.map((c) => {
               const apr = formatAprPercent(c.aprPercent);
@@ -903,28 +900,23 @@ export default function DashboardPage() {
 
       {debts !== undefined && debts.length > 0 && (
         <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4">
-            <div className="flex items-start gap-2 min-w-0">
-              <h2 className="font-heading text-lg font-semibold text-slate-800 dark:text-slate-100">Debts & loans</h2>
-              <InfoTooltip
-                id="debts-help-tooltip"
-                label="How debt balances work in Neat Budget"
-                isOpen={openHelpTooltip === "debts"}
-                onToggle={() => setOpenHelpTooltip((prev) => (prev === "debts" ? null : "debts"))}
-                iconSize="sm"
-              >
-                <span className="font-semibold text-slate-200">Balances</span> drop when you log paydown
-                transactions. <span className="font-semibold text-slate-200">Planned monthly</span> amounts tie into
-                your budget planner alongside categories and buckets.
-              </InfoTooltip>
-            </div>
-            <Link
-              href="/debts"
-              className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium shrink-0"
-            >
-              Manage <ArrowRight size={13} aria-hidden="true" />
-            </Link>
-          </div>
+          <SectionHeader
+            title="Debts & loans"
+            tooltip={{
+              id: "debts-help-tooltip",
+              label: "How debt balances work in Neat Budget",
+              isOpen: openHelpTooltip === "debts",
+              onToggle: () => setOpenHelpTooltip((prev) => (prev === "debts" ? null : "debts")),
+              children: (
+                <>
+                  <span className="font-semibold text-slate-200">Balances</span> drop when you log paydown
+                  transactions. <span className="font-semibold text-slate-200">Planned monthly</span> amounts tie into
+                  your budget planner alongside categories and buckets.
+                </>
+              ),
+            }}
+            action={{ kind: "link", href: "/debts" }}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {debts.map((d) => {
               const apr = formatAprPercent(d.aprPercent);
@@ -1009,12 +1001,10 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 lg:gap-6">
         {/* Budget Categories */}
         <div className="lg:col-span-3">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-heading text-lg font-semibold text-slate-800 dark:text-slate-100">Budget Categories</h2>
-            <Link href="/categories" className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium">
-              Manage <ArrowRight size={13} aria-hidden="true" />
-            </Link>
-          </div>
+          <SectionHeader
+            title="Budget Categories"
+            action={{ kind: "link", href: "/categories" }}
+          />
 
           {categories === undefined ? (
             <div className="space-y-3">
@@ -1052,18 +1042,15 @@ export default function DashboardPage() {
 
         {/* Recent Transactions */}
         <div className="lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-heading text-lg font-semibold text-slate-800 dark:text-slate-100">
-              Transactions · {formatMonth(selectedMonth)}
-            </h2>
-            <button
-              type="button"
-              onClick={openAddTransaction}
-              className="inline-flex items-center gap-1 text-sm text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium"
-            >
-              <Plus size={13} aria-hidden="true" /> Add
-            </button>
-          </div>
+          <SectionHeader
+            title={`Transactions · ${formatMonth(selectedMonth)}`}
+            action={{
+              kind: "button",
+              onClick: openAddTransaction,
+              label: "Add",
+              icon: <Plus size={13} aria-hidden="true" />,
+            }}
+          />
 
           {transactions === undefined ? (
             <div className="space-y-2">

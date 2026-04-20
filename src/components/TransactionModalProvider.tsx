@@ -13,7 +13,7 @@ import { TransactionForm } from "@/components/TransactionForm";
 import type { Doc } from "../../convex/_generated/dataModel";
 
 type TransactionModalContextValue = {
-  openAddTransaction: () => void;
+  openAddTransaction: (defaultPayee?: string) => void;
   closeAddTransaction: () => void;
   openEditTransaction: (tx: Doc<"transactions">) => void;
   closeEditTransaction: () => void;
@@ -33,10 +33,12 @@ function TransactionModal({
   open,
   onClose,
   editTransaction,
+  defaultPayee,
 }: {
   open: boolean;
   onClose: () => void;
   editTransaction: Doc<"transactions"> | null;
+  defaultPayee?: string;
 }) {
   const titleId = useId();
   const isEdit = Boolean(editTransaction);
@@ -74,25 +76,26 @@ function TransactionModal({
         aria-label="Close"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-lg max-h-[min(92vh,720px)] flex flex-col rounded-t-2xl sm:rounded-2xl bg-white shadow-xl border border-slate-100 mt-auto sm:mt-0 overflow-hidden">
-        <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
-          <h2 id={titleId} className="text-lg font-semibold text-slate-900">
+      <div className="relative w-full max-w-lg max-h-[min(92vh,720px)] flex flex-col rounded-t-2xl sm:rounded-2xl bg-white dark:bg-slate-900 shadow-xl border border-slate-100 dark:border-white/10 mt-auto sm:mt-0 overflow-hidden">
+        <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-white/10">
+          <h2 id={titleId} className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             {isEdit ? "Edit transaction" : "Add transaction"}
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="rounded-lg p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5">
           <TransactionForm
-            key={editTransaction?._id ?? "new"}
+            key={editTransaction?._id ?? (defaultPayee ?? "new")}
             onSuccess={onClose}
             editTransaction={editTransaction ?? undefined}
+            defaultPayee={editTransaction ? undefined : defaultPayee}
           />
         </div>
       </div>
@@ -102,6 +105,7 @@ function TransactionModal({
 
 export function TransactionModalProvider({ children }: { children: React.ReactNode }) {
   const [addOpen, setAddOpen] = useState(false);
+  const [defaultPayee, setDefaultPayee] = useState<string | undefined>(undefined);
   const [editTransaction, setEditTransaction] = useState<Doc<"transactions"> | null>(
     null
   );
@@ -109,17 +113,21 @@ export function TransactionModalProvider({ children }: { children: React.ReactNo
   const closeAll = useCallback(() => {
     setAddOpen(false);
     setEditTransaction(null);
+    setDefaultPayee(undefined);
   }, []);
 
-  const openAddTransaction = useCallback(() => {
+  const openAddTransaction = useCallback((payee?: string) => {
     setEditTransaction(null);
+    setDefaultPayee(typeof payee === "string" ? payee : undefined);
     setAddOpen(true);
   }, []);
   const closeAddTransaction = useCallback(() => {
     setAddOpen(false);
+    setDefaultPayee(undefined);
   }, []);
   const openEditTransaction = useCallback((tx: Doc<"transactions">) => {
     setAddOpen(false);
+    setDefaultPayee(undefined);
     setEditTransaction(tx);
   }, []);
   const closeEditTransaction = useCallback(() => {
@@ -142,6 +150,7 @@ export function TransactionModalProvider({ children }: { children: React.ReactNo
         open={modalOpen}
         onClose={closeAll}
         editTransaction={editTransaction}
+        defaultPayee={defaultPayee}
       />
     </TransactionModalContext.Provider>
   );

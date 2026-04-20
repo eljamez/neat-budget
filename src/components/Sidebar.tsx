@@ -23,6 +23,7 @@ import {
   Moon,
   Monitor,
   MoreHorizontal,
+  Settings,
 } from "lucide-react";
 import { LogoMark } from "@/components/LogoMark";
 import { useTransactionModal } from "@/components/TransactionModalProvider";
@@ -96,6 +97,7 @@ const NAV_LINKS = [
   { href: "/debts", label: "Debts", icon: TrendingDown },
   { href: "/accounts", label: "Accounts", icon: Wallet },
   { href: "/quick-links", label: "Links", icon: Link2 },
+  { href: "/settings", label: "Settings", icon: Settings },
   { href: "/add-transaction", label: "Add", icon: PlusCircle },
 ];
 
@@ -269,10 +271,10 @@ export function Sidebar() {
                 <button
                   key={href}
                   type="button"
-                  onClick={openAddTransaction}
-                  className={itemClass}
+                  onClick={() => openAddTransaction()}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 w-full text-left text-white bg-white/10 ring-1 ring-white/15 hover:bg-white/15 active:scale-[0.97] mt-1"
                 >
-                  <Icon className={iconClass} aria-hidden="true" />
+                  <Icon className="w-4 h-4 flex-shrink-0 text-teal-400" aria-hidden="true" />
                   Add Transaction
                 </button>
               );
@@ -395,9 +397,9 @@ export function Sidebar() {
                         openAddTransaction();
                         setDrawerOpen(false);
                       }}
-                      className={itemClass}
+                      className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-semibold transition-all duration-150 w-full text-left text-white bg-white/10 ring-1 ring-white/15 hover:bg-white/15 active:scale-[0.97] mt-1"
                     >
-                      <Icon className={iconClass} aria-hidden="true" />
+                      <Icon className="w-5 h-5 flex-shrink-0 text-teal-400" aria-hidden="true" />
                       Add Transaction
                     </button>
                   );
