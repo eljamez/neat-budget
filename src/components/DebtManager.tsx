@@ -270,24 +270,40 @@ export function DebtManager({ editDebt, onSuccess, onCancel }: DebtManagerProps)
         </div>
       </div>
 
-      <div>
-        <label htmlFor="debt-original" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-          Original loan amount ($) <span className="text-slate-400 font-normal">(optional)</span>
-        </label>
-        <input
-          id="debt-original"
-          type="number"
-          step="0.01"
-          min="0"
-          value={form.originalLoanAmount}
-          onChange={(e) => setForm({ ...form, originalLoanAmount: e.target.value })}
-          placeholder="Starting principal when the loan began"
-          className="w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors"
-        />
-        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-          Paydown progress uses this vs current balance. Leave blank to estimate from recorded payments
-          instead.
-        </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="debt-original" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+            Original loan amount ($) <span className="text-slate-400 font-normal">(optional)</span>
+          </label>
+          <input
+            id="debt-original"
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.originalLoanAmount}
+            onChange={(e) => setForm({ ...form, originalLoanAmount: e.target.value })}
+            placeholder="Starting principal when the loan began"
+            className="w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors"
+          />
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+            Paydown progress uses this vs current balance. Leave blank to estimate from recorded payments
+            instead.
+          </p>
+        </div>
+        <div>
+          <label htmlFor="debt-purpose" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+            What it&apos;s for <span className="text-slate-400 font-normal">(optional)</span>
+          </label>
+          <input
+            id="debt-purpose"
+            type="text"
+            value={form.purpose}
+            onChange={(e) => setForm({ ...form, purpose: e.target.value })}
+            placeholder="e.g. balance transfer, 2021 Civic"
+            maxLength={200}
+            className="w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -404,21 +420,6 @@ export function DebtManager({ editDebt, onSuccess, onCancel }: DebtManagerProps)
           Used prefilled on new payments and in &ldquo;left to fund&rdquo; on the dashboard. Pick checking or cash,
           not the liability account.
         </p>
-      </div>
-
-      <div>
-        <label htmlFor="debt-purpose" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-          What it&apos;s for <span className="text-slate-400 font-normal">(optional)</span>
-        </label>
-        <input
-          id="debt-purpose"
-          type="text"
-          value={form.purpose}
-          onChange={(e) => setForm({ ...form, purpose: e.target.value })}
-          placeholder="e.g. balance transfer, 2021 Civic"
-          maxLength={200}
-          className="w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors"
-        />
       </div>
 
       {!monthlyPlanFromMin && (

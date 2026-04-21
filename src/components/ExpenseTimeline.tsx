@@ -1861,14 +1861,14 @@ export function ExpenseTimeline({
 
       {editTarget && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="timeline-edit-title"
           onClick={() => setEditTarget(null)}
         >
           <div
-            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full sm:w-3/4 max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="timeline-edit-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">
@@ -1887,14 +1887,14 @@ export function ExpenseTimeline({
 
       {editDebtId && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="timeline-debt-edit-title"
           onClick={() => setEditDebtId(null)}
         >
           <div
-            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full sm:w-3/4 max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="timeline-debt-edit-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">
@@ -1939,14 +1939,14 @@ export function ExpenseTimeline({
 
       {quickAddOpen && !quickAddCategoryId && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="quick-add-category-title"
           onClick={() => setQuickAddOpen(false)}
         >
           <div
-            className="w-full max-w-sm max-h-[80vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-slate-900"
+            className="w-full sm:w-3/4 max-h-[80vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-slate-900"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="quick-add-category-title" className="mb-1 font-semibold text-slate-800 dark:text-slate-100">
@@ -1995,14 +1995,14 @@ export function ExpenseTimeline({
 
       {quickAddOpen && quickAddCategoryId && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="quick-add-expense-title"
           onClick={() => { setQuickAddOpen(false); setQuickAddCategoryId(null); }}
         >
           <div
-            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
+            className="w-full sm:w-3/4 max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="quick-add-expense-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">

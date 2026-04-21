@@ -305,7 +305,7 @@ export function BudgetItemManager({
           {!monthDataReady ? (
             <p className="text-xs text-slate-500">Loading this month…</p>
           ) : (
-            <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label
                   htmlFor="item-month-funded"
@@ -348,7 +348,7 @@ export function BudgetItemManager({
                   yet. Shown on the timeline when this bill is marked paid.
                 </p>
               </div>
-            </>
+            </div>
           )}
         </div>
       ) : null}

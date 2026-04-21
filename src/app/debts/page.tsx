@@ -245,7 +245,7 @@ export default function DebtsPage() {
 
       {debtModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="debt-dialog-title"
@@ -255,7 +255,7 @@ export default function DebtsPage() {
           }}
         >
           <div
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6"
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xl w-full sm:w-3/4 max-h-[90vh] overflow-y-auto p-5 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="debt-dialog-title" className="font-heading font-semibold text-slate-800 dark:text-slate-100 mb-5">

@@ -102,14 +102,14 @@ export function BucketFundingModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-900/40 p-4"
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="bucket-fund-modal-title"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6"
+        className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full sm:w-3/4 max-h-[90vh] overflow-y-auto p-5 sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="bucket-fund-modal-title" className="font-semibold text-slate-800 mb-1">
