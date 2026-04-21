@@ -11,4 +11,14 @@ alwaysApply: true
 - **Data isolation**: Convex functions take **`userId`** (Clerk id) as an argument. There is no automatic server identity injection—**every query/mutation must filter or scope by `userId`** (and `budgetId` when applicable) for user-owned data.
 - **Dates**: Transaction-style dates use ISO **`YYYY-MM-DD`** strings; month filters often use `String.startsWith("YYYY-MM")` in the client.
 - **Commands**: `npm run dev` (Next, port 3005), `npx convex dev`, or `npm run dev:all` for both. **No test suite** yet—use `npm run build` and `npm run lint` before shipping changes.
-- **Convex schema**: Single source of truth is **`convex/schema.ts`** (many tables; do not assume only users/categories/transactions).
+- **Convex schema**: Single source of truth is **`convex/schema.ts`**.
+
+## Budgeting model: Groups → Categories
+
+The core concept is the **category**. Every spending slot — groceries, rent, subscriptions, insurance — is a category. Categories belong to a **group**. The default group is **Expenses**. Groups are containers only; all funding targets and spending live on categories.
+
+- A category has an optional `monthlyTarget`, an optional `dueDayOfMonth` (makes it appear date-anchored on the timeline), and an optional `paymentAccountId`.
+- `rollover: true` carries unspent monthly balance forward.
+- `markedPaidForMonth` stores the `YYYY-MM` key when the user marks it paid for that month.
+- Debts and credit cards are separate tables but render on the same timeline as categories with due days.
+- **"Buckets" and "budget items" are legacy terms — they no longer exist as distinct concepts.** Migrations (`convex/migrations.ts`) converted them to categories.

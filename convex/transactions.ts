@@ -246,10 +246,13 @@ export const create = mutation({
     date: v.string(),
     note: v.optional(v.string()),
     accountId: v.optional(v.id("accounts")),
-    /** Exactly one of budgetItemId, debtId, creditCardId, or bucketId must be set. */
+    /** Primary payee: a budget category (new model). */
+    categoryId: v.optional(v.id("categories")),
+    /** @deprecated Legacy — use categoryId instead. */
     budgetItemId: v.optional(v.id("budgetItems")),
     debtId: v.optional(v.id("debts")),
     creditCardId: v.optional(v.id("creditCards")),
+    /** @deprecated Legacy — use categoryId instead. */
     bucketId: v.optional(v.id("buckets")),
   },
   handler: async (ctx, args) => {
@@ -258,20 +261,27 @@ export const create = mutation({
     assertValidAmount(args.amount);
     assertValidIsoDate(args.date);
 
+    const nCategory = args.categoryId ? 1 : 0;
     const nBudget = args.budgetItemId ? 1 : 0;
     const nDebt = args.debtId ? 1 : 0;
     const nCard = args.creditCardId ? 1 : 0;
     const nBucket = args.bucketId ? 1 : 0;
-    if (nBudget + nDebt + nCard + nBucket !== 1) {
+    if (nCategory + nBudget + nDebt + nCard + nBucket !== 1) {
       throw new Error(
-        "Choose exactly one payee: a budget expense, a loan/debt, a credit card, or a bucket"
+        "Choose exactly one payee: a category, a loan/debt, a credit card, or (legacy) a budget expense or bucket"
       );
     }
 
-    let categoryId: Id<"categories"> | undefined;
+    let categoryId: Id<"categories"> | undefined = args.categoryId;
     let description = "Payment";
 
-    if (args.budgetItemId) {
+    if (args.categoryId) {
+      const cat = await ctx.db.get(args.categoryId);
+      if (!cat || cat.userId !== userId || cat.budgetId !== budgetId) {
+        throw new Error("Invalid category");
+      }
+      description = cat.name;
+    } else if (args.budgetItemId) {
       const budgetItem = await ctx.db.get(args.budgetItemId);
       if (!budgetItem || budgetItem.userId !== userId || budgetItem.budgetId !== budgetId) {
         throw new Error("Invalid expense");
@@ -365,6 +375,7 @@ export const update = mutation({
     date: v.string(),
     note: v.optional(v.string()),
     accountId: v.optional(v.id("accounts")),
+    categoryId: v.optional(v.id("categories")),
     budgetItemId: v.optional(v.id("budgetItems")),
     debtId: v.optional(v.id("debts")),
     creditCardId: v.optional(v.id("creditCards")),
@@ -381,20 +392,27 @@ export const update = mutation({
       throw new Error("Transaction not found");
     }
 
+    const nCategory = args.categoryId ? 1 : 0;
     const nBudget = args.budgetItemId ? 1 : 0;
     const nDebt = args.debtId ? 1 : 0;
     const nCard = args.creditCardId ? 1 : 0;
     const nBucket = args.bucketId ? 1 : 0;
-    if (nBudget + nDebt + nCard + nBucket !== 1) {
+    if (nCategory + nBudget + nDebt + nCard + nBucket !== 1) {
       throw new Error(
-        "Choose exactly one payee: a budget expense, a loan/debt, a credit card, or a bucket"
+        "Choose exactly one payee: a category, a loan/debt, a credit card, or (legacy) a budget expense or bucket"
       );
     }
 
-    let categoryId: Id<"categories"> | undefined;
+    let categoryId: Id<"categories"> | undefined = args.categoryId;
     let description = "Payment";
 
-    if (args.budgetItemId) {
+    if (args.categoryId) {
+      const cat = await ctx.db.get(args.categoryId);
+      if (!cat || cat.userId !== userId || cat.budgetId !== budgetId) {
+        throw new Error("Invalid category");
+      }
+      description = cat.name;
+    } else if (args.budgetItemId) {
       const budgetItem = await ctx.db.get(args.budgetItemId);
       if (!budgetItem || budgetItem.userId !== userId || budgetItem.budgetId !== budgetId) {
         throw new Error("Invalid expense");

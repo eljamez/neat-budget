@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Shared agent rules (Cursor + Claude + others)
 
 - **`.cursor/rules/*.mdc`** — Stack, auth, Convex, and frontend conventions. Cursor loads these automatically; **follow them for implementation** in this repo even when using Claude Code. They use YAML frontmatter (`description`, `alwaysApply`, `globs`) plus Markdown.
-- **`AGENTS.md`** — Short index of where rules live so nothing is “Cursor-only” or “Claude-only” by accident.
+- **`AGENTS.md`** — Short index of where rules live so nothing is "Cursor-only" or "Claude-only" by accident.
 - **Product / UX voice and visual design** — This file (`CLAUDE.md`) remains the longer reference for brand personality and design principles.
 - If instructions conflict, prefer **`.cursor/rules`** for code/stack patterns and **this file** for product and UX tone unless a rule explicitly says otherwise.
 
@@ -34,18 +34,46 @@ Clerk handles auth. **`src/proxy.ts`** uses `clerkMiddleware` and protects all r
 
 **Important**: Convex functions receive `userId` as a plain string argument (the Clerk user ID) — there is no server-side auth identity extraction in the current mutations/queries. All data isolation relies on passing and filtering by `userId` (and budget scoping where applicable).
 
+### Core budgeting model: Groups → Categories
+
+The fundamental building block is the **category**. Everything the user wants to track — groceries, rent, streaming subscriptions, car insurance — is a category. Categories are funded monthly: you set a target, spend against it, and at month-end the cycle resets (or rolls over if rollover is enabled).
+
+**Groups** are organizational containers for categories. Every category belongs to exactly one group. The default group is called **Expenses** and is created automatically for new users. Categories can be moved between groups at any time.
+
+Key category properties:
+- `monthlyTarget` — how much to fund per month (optional)
+- `rollover` — when true, unspent balance carries forward to next month
+- `dueDayOfMonth` — optional; if set, the category appears as a date-anchored row on the timeline (e.g. rent due on the 1st)
+- `paymentAccountId` — optional bank account this category is typically paid from
+- `isAutopay` — flag for payments that are auto-drafted
+- `markedPaidForMonth` — stores the month key (`YYYY-MM`) when the user marks the category as paid
+- `isArchived` — soft-delete; archived categories are hidden from all active views
+
+**What is NOT a separate concept anymore**: "Buckets" and "budget items" were prior names for spending slots. They are gone. Categories replace both.
+
 ### Convex backend (`convex/`)
 
-- `schema.ts` — defines all tables (budgets, users, accounts, transactions, categories, buckets, debts, credit cards, etc.). **This file is the source of truth** for fields and indexes.
-- `transactions.date` / similar fields use ISO `YYYY-MM-DD` where applicable; month filtering is often done client-side via `String.startsWith("YYYY-MM")`.
-- `categories` supports soft-delete via `isArchived` where used.
-- Feature modules follow the existing `*.ts` files in `convex/` (CRUD + queries per domain).
+- `schema.ts` — defines all tables. **This is the source of truth** for fields and indexes.
+- `groups.ts` — CRUD for groups (list, create, update, archive)
+- `categories.ts` — CRUD + `getMonthlyProgress` (returns categories with spent/target/remaining for a given month)
+- `transactions.ts` — spending records; each transaction links to a `categoryId`, `debtId`, or `creditCardId` as the payee
+- `accounts.ts` — bank/cash accounts with running balances
+- `debts.ts` / `creditCards.ts` — loan and card tracking; both appear on the timeline like categories with due days
+- `migrations.ts` — idempotent one-time migration that converts legacy `budgetItems` + `buckets` rows to the new `categories` model
+- Dates use ISO `YYYY-MM-DD`; month filtering uses `String.startsWith("YYYY-MM")` client-side
 
 ### Frontend (`src/`)
 
-- `app/layout.tsx` — root layout wraps everything in `ConvexClerkProvider` + `Sidebar`
+- `app/layout.tsx` — root layout: `ConvexClerkProvider` + `Sidebar`
+- `app/dashboard/page.tsx` — main view: full-width expense timeline + category spending section
+- `app/categories/page.tsx` — Budget page: groups with categories, monthly targets, spending progress; month selector
 - Pages call Convex hooks directly (`useQuery`, `useMutation` from `convex/react`)
-- `src/lib/utils.ts` — shared formatting and color helpers used across components
+- `src/lib/utils.ts` — shared formatting and color helpers
+- `src/lib/planner.ts` — `PlannerRow` union type (`budget | debt | cc | category`) drives the timeline
+- `src/components/ExpenseTimeline.tsx` — renders the date-organized payment timeline; category rows with due days appear here alongside debts and credit cards
+- `src/components/CategoryEditModal.tsx` — reusable modal for creating/editing a category; fetches groups and accounts internally
+- `src/components/DebtManager.tsx` — form for creating/editing debts; used from both the Debts page and the timeline edit flow
+- `src/components/TransactionForm.tsx` — quick-add transaction form; payee is a category, debt, or credit card
 
 ### Environment variables required
 

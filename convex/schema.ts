@@ -15,7 +15,7 @@ const creditCardUsageModeValidator = v.union(
   v.literal("active_use")
 );
 
-/** Discretionary envelope periods (groceries, fun money, etc.). */
+/** @deprecated Only used by the legacy `buckets` table. */
 const bucketPeriodValidator = v.union(
   v.literal("weekly"),
   v.literal("biweekly"),
@@ -67,46 +67,29 @@ export default defineSchema({
     userId: v.string(),
     budgetId: v.optional(v.id("budgets")),
     name: v.string(),
-    /** Current amount owed. */
     balance: v.number(),
-    /**
-     * Original loan / starting principal when you began tracking (optional).
-     * Used for paydown % vs this amount; leave unset to estimate from balance + recorded payments.
-     */
     originalLoanAmount: v.optional(v.number()),
-    /** Annual interest rate (e.g. 19.99 = 19.99% APR). */
     aprPercent: v.optional(v.number()),
     debtType: debtTypeValidator,
     creditor: v.optional(v.string()),
     purpose: v.optional(v.string()),
     notes: v.optional(v.string()),
-    /** Typical minimum due each month (informational). */
     minimumPayment: v.optional(v.number()),
-    /** Day of month statement or payment is usually due (1–31). */
     dueDayOfMonth: v.optional(v.number()),
-    /** Amount you plan to pay toward this debt per month (budget planning). */
     plannedMonthlyPayment: v.optional(v.number()),
-    /** Legacy; credit cards use the `creditCards` table. */
     creditLimit: v.optional(v.number()),
-    /** Whether the typical payment is set to auto-pay with the lender. */
     isAutopay: v.optional(v.boolean()),
-    /** When set to `YYYY-MM`, the planned monthly payment was marked paid for that month. */
     markedPaidForMonth: v.optional(v.string()),
-    /** Checking/savings/cash you pay this debt from (for planning & transactions). */
+    fundedForMonth: v.optional(v.string()),
     paymentAccountId: v.optional(v.id("accounts")),
     color: v.optional(v.string()),
     isArchived: v.optional(v.boolean()),
   }).index("by_user", ["userId"]),
 
-  /**
-   * Credit cards (separate from installment debts). Balance drops on payments linked via `creditCardId`.
-   * `usageMode`: paying off vs actively charging day-to-day bills.
-   */
   creditCards: defineTable({
     userId: v.string(),
     budgetId: v.optional(v.id("budgets")),
     name: v.string(),
-    /** Current balance owed. */
     balance: v.number(),
     aprPercent: v.optional(v.number()),
     creditor: v.optional(v.string()),
@@ -118,8 +101,8 @@ export default defineSchema({
     creditLimit: v.optional(v.number()),
     isAutopay: v.optional(v.boolean()),
     markedPaidForMonth: v.optional(v.string()),
+    fundedForMonth: v.optional(v.string()),
     usageMode: creditCardUsageModeValidator,
-    /** Account you pay the card bill from (checking, etc.). */
     paymentAccountId: v.optional(v.id("accounts")),
     color: v.optional(v.string()),
     isArchived: v.optional(v.boolean()),
@@ -141,11 +124,14 @@ export default defineSchema({
     .index("by_debt", ["debtId"])
     .index("by_user", ["userId"]),
 
-  categories: defineTable({
+  /**
+   * Top-level budget containers (e.g. "Housing", "Food & Drink").
+   * Previously called `categories`; categories are now the line items within each group.
+   */
+  groups: defineTable({
     userId: v.string(),
     budgetId: v.optional(v.id("budgets")),
     name: v.string(),
-    monthlyLimit: v.optional(v.number()),
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
     isArchived: v.optional(v.boolean()),
@@ -153,29 +139,56 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_archived", ["userId", "isArchived"]),
 
+  /**
+   * Budget line items — each belongs to a group and carries an optional monthly spending target.
+   * Merges the old `budgetItems` (recurring bills) and `buckets` (discretionary envelopes) concepts.
+   *
+   * Legacy rows in this table (without `groupId`) were the old top-level "category/group" documents.
+   * New rows have `groupId` set.
+   */
+  categories: defineTable({
+    userId: v.string(),
+    budgetId: v.optional(v.id("budgets")),
+    /** Set on new line-item rows; absent on legacy "group" rows. */
+    groupId: v.optional(v.id("groups")),
+    name: v.string(),
+    /** Monthly spending target (optional). */
+    monthlyTarget: v.optional(v.number()),
+    /** Carry unused balance forward into the next month. */
+    rollover: v.optional(v.boolean()),
+    color: v.optional(v.string()),
+    icon: v.optional(v.string()),
+    note: v.optional(v.string()),
+    sortOrder: v.optional(v.number()),
+    dueDayOfMonth: v.optional(v.number()),
+    paymentAccountId: v.optional(v.id("accounts")),
+    markedPaidForMonth: v.optional(v.string()),
+    fundedForMonth: v.optional(v.string()),
+    isAutopay: v.optional(v.boolean()),
+    isArchived: v.optional(v.boolean()),
+    /** @deprecated Legacy field from old "category/group" rows. Use `monthlyTarget` on new rows. */
+    monthlyLimit: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_group", ["groupId"])
+    .index("by_user_archived", ["userId", "isArchived"]),
+
   transactions: defineTable({
     userId: v.string(),
     budgetId: v.optional(v.id("budgets")),
-    /** Copied from the budget item when `budgetItemId` is set; omitted for debt/card-only amounts. */
+    /** Points to the `categories` line item for this transaction. */
     categoryId: v.optional(v.id("categories")),
-    /** When set, this payment counts toward that recurring budget expense for the transaction month. */
+    /** @deprecated Legacy — budgetItem transactions. Stop setting on new rows. */
     budgetItemId: v.optional(v.id("budgetItems")),
     amount: v.number(),
     description: v.string(),
     date: v.string(), // ISO date string YYYY-MM-DD
     note: v.optional(v.string()),
-    /** When set, spending adjusts this account's balance. */
     accountId: v.optional(v.id("accounts")),
-    /** When set, this payment reduces the linked debt's balance. */
     debtId: v.optional(v.id("debts")),
-    /**
-     * When set with `debtId`, this row was created by marking the debt paid on the Categories
-     * timeline for calendar month `YYYY-MM` (see `debts.setPaidForMonth`). Used to undo on uncheck.
-     */
     debtMarkedPaidMonthKey: v.optional(v.string()),
-    /** When set, this payment reduces the linked credit card balance. */
     creditCardId: v.optional(v.id("creditCards")),
-    /** When set, this spend is counted against a discretionary bucket (tracked via bucket's categoryId). */
+    /** @deprecated Legacy — bucket transactions. Stop setting on new rows. */
     bucketId: v.optional(v.id("buckets")),
   })
     .index("by_user", ["userId"])
@@ -187,15 +200,12 @@ export default defineSchema({
     .index("by_credit_card", ["creditCardId"])
     .index("by_bucket", ["bucketId"]),
 
-  /**
-   * Cash set aside from an account toward a **monthly** discretionary bucket for `monthKey`.
-   * Separate from category spend tracking — this is envelope-style “funded for the month”.
-   */
+  /** @deprecated — replaced by the `categories` table (new line-item model). */
   bucketMonthFundings: defineTable({
     userId: v.string(),
     budgetId: v.optional(v.id("budgets")),
     bucketId: v.id("buckets"),
-    /** @deprecated Legacy rows only — month funding is budget-wide, not tied to an account. */
+    /** @deprecated Legacy rows only. */
     accountId: v.optional(v.id("accounts")),
     amount: v.number(),
     monthKey: v.string(),
@@ -203,15 +213,12 @@ export default defineSchema({
     .index("by_user_month", ["userId", "monthKey"])
     .index("by_bucket_month", ["bucketId", "monthKey"]),
 
-  /**
-   * Cash set aside from an account toward a recurring budget expense for a calendar month.
-   * Does not move money in the real world — planning only. `monthKey` is `YYYY-MM`.
-   */
+  /** @deprecated — replaced by the `categories` table (new line-item model). */
   expenseAllocations: defineTable({
     userId: v.string(),
     budgetId: v.optional(v.id("budgets")),
     budgetItemId: v.id("budgetItems"),
-    /** @deprecated Legacy rows only — funding is budget-wide, not taken from a specific account. */
+    /** @deprecated Legacy rows only. */
     accountId: v.optional(v.id("accounts")),
     amount: v.number(),
     monthKey: v.string(),
@@ -219,10 +226,7 @@ export default defineSchema({
     .index("by_user_month", ["userId", "monthKey"])
     .index("by_budget_month", ["budgetItemId", "monthKey"]),
 
-  /**
-   * Per–calendar-month tweaks for a budget bill: actual cash paid can differ from the planned amount.
-   * `markedPaidForMonth` on the expense still drives paid vs unpaid on the timeline.
-   */
+  /** @deprecated — replaced by the `categories` table (new line-item model). */
   budgetItemMonthOverrides: defineTable({
     userId: v.string(),
     budgetId: v.optional(v.id("budgets")),
@@ -233,10 +237,7 @@ export default defineSchema({
     .index("by_user_month", ["userId", "monthKey"])
     .index("by_budget_month", ["budgetItemId", "monthKey"]),
 
-  /**
-   * Discretionary spending targets (not fixed bills). Spending is tracked vs `targetAmount`
-   * over `period`; `rollover` can carry unused allowance forward (enforced in app logic).
-   */
+  /** @deprecated — replaced by the `categories` table (new line-item model). */
   buckets: defineTable({
     userId: v.string(),
     budgetId: v.optional(v.id("budgets")),
@@ -244,14 +245,8 @@ export default defineSchema({
     targetAmount: v.number(),
     period: bucketPeriodValidator,
     rollover: v.boolean(),
-    /** When set, associate this bucket with a budget category (same ownership as user). */
     categoryId: v.optional(v.id("categories")),
-    /**
-     * For monthly buckets: max cash to fund per calendar month for this envelope.
-     * If unset, month funding is capped at `targetAmount`.
-     */
     monthlyFillGoal: v.optional(v.number()),
-    /** Default account when funding this bucket (can override in the funding modal). */
     paymentAccountId: v.optional(v.id("accounts")),
     color: v.optional(v.string()),
     note: v.optional(v.string()),
@@ -260,29 +255,21 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_category", ["categoryId"]),
 
+  /** @deprecated — replaced by the `categories` table (new line-item model). */
   budgetItems: defineTable({
     userId: v.string(),
     budgetId: v.optional(v.id("budgets")),
     categoryId: v.id("categories"),
     name: v.string(),
-    amount: v.number(), // expected monthly amount
-    /** Day of month the bill is due (1–31). */
+    amount: v.number(),
     paymentDayOfMonth: v.number(),
-    /** Legacy; do not set. Cleared by `stripLegacyMoneyNeededByDay` / omitted on new rows. */
     moneyNeededByDay: v.optional(v.number()),
-    /** Account this expense is paid from (checking, cash, etc.). */
     accountId: v.optional(v.id("accounts")),
-    /** Legacy free-text paid-from (prefer `accountId`). */
     paidFrom: v.optional(v.string()),
-    /** When set to `YYYY-MM`, this expense was marked paid for that calendar month. */
     markedPaidForMonth: v.optional(v.string()),
-    /** Lifecycle: unfunded / paid via markedPaidForMonth. Legacy `funded` + fundedDate ignored for balance math. */
     status: v.optional(budgetExpenseStatusValidator),
-    /** Legacy; reserve flow removed — balance uses expenseAllocations only. */
     fundedDate: v.optional(v.number()),
-    /** When marked paid (ms), informational. */
     paidDate: v.optional(v.number()),
-    /** Payment is on auto-pay with the payee (informational). */
     isAutopay: v.optional(v.boolean()),
     note: v.optional(v.string()),
     isArchived: v.optional(v.boolean()),
@@ -296,9 +283,7 @@ export default defineSchema({
     label: v.string(),
     url: v.string(),
     sortOrder: v.number(),
-    /** Cached Open Graph / social share image for card backgrounds. */
     ogImageUrl: v.optional(v.string()),
-    /** When set, the client has already tried fetching preview metadata once. */
     ogFetchedAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),
 });

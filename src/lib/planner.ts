@@ -26,6 +26,8 @@ export type PlannerDebtRow = {
   amount: number;
   paymentDayOfMonth: number;
   markedPaidForMonth?: string;
+  fundedForMonth?: string;
+  hasPaidTransaction?: boolean;
   accentColor?: string;
   isAutopay?: boolean;
   paymentAccountId?: Id<"accounts">;
@@ -40,6 +42,8 @@ export type PlannerCreditCardRow = {
   amount: number;
   paymentDayOfMonth: number;
   markedPaidForMonth?: string;
+  fundedForMonth?: string;
+  hasPaidTransaction?: boolean;
   accentColor?: string;
   isAutopay?: boolean;
   usageMode: "paying_off" | "active_use";
@@ -47,7 +51,24 @@ export type PlannerCreditCardRow = {
   hasConfiguredDueDay?: boolean;
 };
 
-export type PlannerRow = PlannerBudgetRow | PlannerDebtRow | PlannerCreditCardRow;
+export type PlannerCategoryRow = {
+  rowKind: "category";
+  categoryId: Id<"categories">;
+  groupId?: string;
+  name: string;
+  monthlyTarget: number;
+  paymentDayOfMonth: number;
+  markedPaidForMonth?: string;
+  fundedForMonth?: string;
+  accentColor?: string;
+  icon?: string;
+  isAutopay?: boolean;
+  paymentAccountId?: Id<"accounts">;
+  hasConfiguredDueDay: boolean;
+  spent: number;
+};
+
+export type PlannerRow = PlannerBudgetRow | PlannerDebtRow | PlannerCreditCardRow | PlannerCategoryRow;
 
 function clampPlannerDueDay(d: number | undefined | null): { day: number; configured: boolean } {
   if (d != null && d >= 1 && d <= 31) {
@@ -84,6 +105,7 @@ export function buildPlannerRows(
       amount: cardPlannerAmount(c),
       paymentDayOfMonth: day,
       markedPaidForMonth: c.markedPaidForMonth,
+      fundedForMonth: c.fundedForMonth,
       accentColor: c.color,
       isAutopay: c.isAutopay,
       paymentAccountId: c.paymentAccountId,
@@ -102,6 +124,7 @@ export function buildPlannerRows(
       amount: debtPlannerAmount(d),
       paymentDayOfMonth: day,
       markedPaidForMonth: d.markedPaidForMonth,
+      fundedForMonth: d.fundedForMonth,
       accentColor: d.color,
       isAutopay: d.isAutopay,
       paymentAccountId: d.paymentAccountId,

@@ -13,10 +13,9 @@ async function backfillBudgetId(
     "debts",
     "creditCards",
     "debtExpenses",
+    "groups",
     "categories",
     "transactions",
-    "buckets",
-    "budgetItems",
   ] as const;
 
   for (const table of tables) {
@@ -119,10 +118,9 @@ export const remove = mutation({
       "debts",
       "creditCards",
       "debtExpenses",
+      "groups",
       "categories",
       "transactions",
-      "buckets",
-      "budgetItems",
     ] as const;
 
     for (const table of budgetScoped) {
