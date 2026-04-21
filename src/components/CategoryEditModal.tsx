@@ -8,6 +8,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { ToggleLeft, ToggleRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { CATEGORY_COLORS } from "@/lib/icons";
 
 export type CategoryProgressForEdit = {
   category: {
@@ -73,6 +74,7 @@ export function CategoryEditModal({
   const [paymentAccountId, setPaymentAccountId] = useState<string>(
     editCat?.paymentAccountId ?? ""
   );
+  const [color, setColor] = useState(editCat?.color ?? CATEGORY_COLORS[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -106,6 +108,7 @@ export function CategoryEditModal({
           groupId: groupId as Id<"groups">,
           monthlyTarget: target,
           rollover,
+          color,
           note: note.trim() || undefined,
           dueDayOfMonth: dueDayParsed,
           paymentAccountId: resolvedPaymentAccountId,
@@ -117,6 +120,7 @@ export function CategoryEditModal({
           name: name.trim(),
           monthlyTarget: target,
           rollover,
+          color,
           note: note.trim() || undefined,
           dueDayOfMonth: dueDayParsed,
           paymentAccountId: resolvedPaymentAccountId,
@@ -262,6 +266,25 @@ export function CategoryEditModal({
                   </option>
                 ))}
             </select>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Color</p>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Category color">
+              {CATEGORY_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setColor(c)}
+                  aria-pressed={color === c}
+                  className={`w-8 h-8 rounded-full border-2 transition-all ${
+                    color === c
+                      ? "border-slate-700 dark:border-slate-200 scale-110 ring-2 ring-offset-1 ring-slate-300 dark:ring-slate-500 dark:ring-offset-slate-900"
+                      : "border-transparent hover:scale-105"
+                  }`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
