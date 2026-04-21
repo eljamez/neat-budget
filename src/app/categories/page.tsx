@@ -12,7 +12,7 @@ import {
   formatMonth,
   ACCENT_COLOR_FALLBACK,
 } from "@/lib/utils";
-import { CATEGORY_ICON_MAP } from "@/lib/icons";
+import { CATEGORY_ICON_MAP, CATEGORY_COLORS } from "@/lib/icons";
 import {
   FolderOpen,
   Plus,
@@ -123,15 +123,23 @@ function GroupModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-              Color
-            </label>
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="w-10 h-10 rounded-lg border border-slate-200 dark:border-white/10 cursor-pointer"
-            />
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Color</p>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Group color">
+              {CATEGORY_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setColor(c)}
+                  aria-pressed={color === c}
+                  className={`w-8 h-8 rounded-full border-2 transition-all ${
+                    color === c
+                      ? "border-slate-700 dark:border-slate-200 scale-110 ring-2 ring-offset-1 ring-slate-300 dark:ring-slate-500 dark:ring-offset-slate-900"
+                      : "border-transparent hover:scale-105"
+                  }`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
           </div>
           {error && (
             <p className="text-sm text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 rounded-xl">

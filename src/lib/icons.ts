@@ -74,4 +74,27 @@ export const CATEGORY_COLORS = [
   "#0ea5e9", // sky
   "#64748b", // slate
   "#d946ef", // fuchsia
+  // neutrals
+  "#78716c", // warm gray
+  "#a8956a", // sand
+  "#92714a", // brown
+  "#44403c", // charcoal
+  "#6b7280", // cool gray
+  // vibrant
+  "#f87171", // coral
+  "#6ee7b7", // mint
+  "#fca5a5", // peach
+  "#c4b5fd", // lavender
+  "#fbbf24", // gold
+  "#166534", // forest green
+  "#1e3a5f", // navy
+  "#f472b6", // hot pink
+  "#38bdf8", // light blue
+  // muted / earthy
+  "#a3b899", // sage
+  "#b5896a", // terracotta
+  "#8b9e7a", // olive
+  "#c9a87c", // camel
+  "#7c9b8a", // eucalyptus
+  "#9e7b9b", // dusty mauve
 ];
