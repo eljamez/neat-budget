@@ -243,6 +243,26 @@ function dueDayForPaymentDate(doc: Doc<"debts">): number {
   return 28;
 }
 
+export const setFundedForMonth = mutation({
+  args: {
+    id: v.id("debts"),
+    userId: v.optional(v.string()),
+    monthKey: v.string(),
+    funded: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
+    const doc = await ctx.db.get(args.id);
+    if (!doc || doc.userId !== userId || doc.budgetId !== budgetId) {
+      throw new Error("Debt not found");
+    }
+    await ctx.db.patch(args.id, {
+      fundedForMonth: args.funded ? args.monthKey : undefined,
+    });
+  },
+});
+
 /** Mark or unmark planned monthly payment as paid for a calendar month (`YYYY-MM`). */
 export const setPaidForMonth = mutation({
   args: {

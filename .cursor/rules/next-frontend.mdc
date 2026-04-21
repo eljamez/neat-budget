@@ -6,8 +6,33 @@ alwaysApply: false
 
 # Next.js frontend (`src/`)
 
-- **Data**: Use `useQuery`, `useMutation`, `useAction` from **`convex/react`** with generated API from **`convex/_generated/api`**. Pass **`userId`** from Clerk (`useAuth` / session) into Convex calls as required by each function.
-- **Layout**: Root layout uses **`ConvexClerkProvider`** and app chrome (e.g. **`Sidebar`**). Match existing patterns in **`src/app/layout.tsx`** and **`src/components/`**.
-- **UI / UX**: **Teal accent `#0d9488`**, warm neutrals, calm spacing—**not** a cold corporate bank dashboard. Full **`CLAUDE.md` → Design Context** is authoritative for voice, light/dark feel, and anti-patterns (no gradient hero metric cards, etc.).
+- **Data**: Use `useQuery`, `useMutation`, `useAction` from **`convex/react`** with generated API from **`convex/_generated/api`**. Pass **`userId`** from Clerk (`useUser`) into Convex calls as required by each function.
+- **Layout**: Root layout uses **`ConvexClerkProvider`** and app chrome (**`Sidebar`**). Match existing patterns in **`src/app/layout.tsx`** and **`src/components/`**.
+- **UI / UX**: **Teal accent `#0d9488`**, warm neutrals, calm spacing — **not** a cold corporate bank dashboard. Full **`CLAUDE.md` → Design Context** is authoritative for voice, light/dark feel, and anti-patterns (no gradient hero metric cards, etc.).
 - **Utilities**: Prefer **`src/lib/utils.ts`** and **`src/lib/icons.ts`** for formatting and icons before adding one-off helpers.
 - **Accessibility & responsive**: Mobile-equal experience; touch-friendly controls on small screens.
+
+## Key pages and components
+
+| Path | Role |
+|------|------|
+| `app/dashboard/page.tsx` | Main view: full-width expense timeline + category spending section |
+| `app/categories/page.tsx` | Budget page: groups → categories with monthly targets and spending |
+| `app/accounts/page.tsx` | Bank/cash account management |
+| `app/debts/page.tsx` | Loan tracking |
+| `app/credit-cards/page.tsx` | Credit card tracking |
+| `components/ExpenseTimeline.tsx` | Date-organized timeline; renders debts, credit cards, and categories with due days as `PlannerRow` items |
+| `components/CategoryEditModal.tsx` | Reusable modal for creating/editing a category (fetches groups + accounts internally) |
+| `components/DebtManager.tsx` | Form for creating/editing a debt; used from Debts page and timeline edit flow |
+| `components/TransactionForm.tsx` | Quick-add spending form; payee = category, debt, or credit card |
+| `lib/planner.ts` | `PlannerRow` union type that drives the timeline (`budget \| debt \| cc \| category`) |
+
+## Dark mode
+
+All inputs, selects, and textareas use the standard pattern:
+```
+border-slate-200 dark:border-white/10
+text-slate-800 dark:text-slate-100
+bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900
+```
+Labels: `text-slate-600 dark:text-slate-400`. Hint text: `text-slate-400 dark:text-slate-500`. Errors: `text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40`.

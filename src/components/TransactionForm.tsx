@@ -9,7 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 
 export interface TransactionFormProps {
   onSuccess?: () => void;
-  /** Preselect e.g. `bucket:${id}`, `expense:${id}`, `debt:${id}`, or `cc:${id}` */
+  /** Preselect e.g. `category:${id}`, `debt:${id}`, or `cc:${id}` */
   defaultPayee?: string;
   /** When set, the form saves changes to this row instead of creating one. */
   editTransaction?: Doc<"transactions">;
@@ -21,20 +21,11 @@ export function TransactionForm({
   editTransaction,
 }: TransactionFormProps) {
   const { user } = useUser();
-  const categories = useQuery(api.categories.list, {
-    userId: user?.id ?? "",
-  });
-  const budgetItems = useQuery(
-    api.budgetItems.listByUser,
-    user?.id ? { userId: user.id } : "skip"
-  );
-  const accounts = useQuery(
-    api.accounts.list,
-    user?.id ? { userId: user.id } : "skip"
-  );
+  const groups = useQuery(api.groups.list, user?.id ? { userId: user.id } : "skip");
+  const categories = useQuery(api.categories.list, user?.id ? { userId: user.id } : "skip");
+  const accounts = useQuery(api.accounts.list, user?.id ? { userId: user.id } : "skip");
   const debts = useQuery(api.debts.list, user?.id ? { userId: user.id } : "skip");
   const creditCards = useQuery(api.creditCards.list, user?.id ? { userId: user.id } : "skip");
-  const buckets = useQuery(api.buckets.getBuckets, user?.id ? { userId: user.id } : "skip");
   const createTransaction = useMutation(api.transactions.create);
   const updateTransaction = useMutation(api.transactions.update);
 
@@ -50,15 +41,13 @@ export function TransactionForm({
 
   useEffect(() => {
     if (!editTransaction) return;
-    const payee = editTransaction.budgetItemId
-      ? `expense:${editTransaction.budgetItemId}`
+    const payee = editTransaction.categoryId
+      ? `category:${editTransaction.categoryId}`
       : editTransaction.debtId
         ? `debt:${editTransaction.debtId}`
         : editTransaction.creditCardId
           ? `cc:${editTransaction.creditCardId}`
-          : editTransaction.bucketId
-            ? `bucket:${editTransaction.bucketId}`
-            : "";
+          : "";
     setPayeeKey(payee);
     setForm({
       accountId: editTransaction.accountId ?? "",
@@ -72,10 +61,10 @@ export function TransactionForm({
   useEffect(() => {
     if (editTransaction) return;
     let acc = "";
-    if (payeeKey.startsWith("expense:")) {
-      const id = payeeKey.slice("expense:".length);
-      const item = budgetItems?.find((x) => x._id === id);
-      acc = item?.accountId ? String(item.accountId) : "";
+    if (payeeKey.startsWith("category:")) {
+      const id = payeeKey.slice("category:".length);
+      const c = categories?.find((x) => x._id === id);
+      acc = c?.paymentAccountId ? String(c.paymentAccountId) : "";
     } else if (payeeKey.startsWith("debt:")) {
       const id = payeeKey.slice("debt:".length);
       const d = debts?.find((x) => x._id === id);
@@ -84,47 +73,29 @@ export function TransactionForm({
       const id = payeeKey.slice("cc:".length);
       const c = creditCards?.find((x) => x._id === id);
       acc = c?.paymentAccountId ? String(c.paymentAccountId) : "";
-    } else if (payeeKey.startsWith("bucket:")) {
-      const id = payeeKey.slice("bucket:".length);
-      const b = buckets?.find((x) => x._id === id);
-      acc = b?.paymentAccountId ? String(b.paymentAccountId) : "";
     }
     setForm((f) => (f.accountId === acc ? f : { ...f, accountId: acc }));
-  }, [payeeKey, editTransaction, budgetItems, debts, creditCards, buckets]);
+  }, [payeeKey, editTransaction, categories, debts, creditCards]);
 
-  const categoryNameById = useMemo(() => {
-    if (!categories) return {} as Record<string, string>;
-    return Object.fromEntries(categories.map((c) => [c._id, c.name]));
-  }, [categories]);
+  const groupNameById = useMemo(() => {
+    if (!groups) return {} as Record<string, string>;
+    return Object.fromEntries(groups.map((g) => [g._id, g.name]));
+  }, [groups]);
 
   const payeeOptions = useMemo(() => {
     type Opt = { value: string; label: string; group: string };
     const out: Opt[] = [];
 
-    if (buckets?.length) {
-      const activeBuckets = [...buckets].filter((x) => !x.isArchived).sort((a, b) => a.name.localeCompare(b.name));
-      for (const b of activeBuckets) {
+    if (categories?.length) {
+      const activeCategories = [...categories].filter((c) => !c.isArchived);
+      for (const cat of activeCategories) {
+        const groupName = cat.groupId ? (groupNameById[cat.groupId as string] ?? "Other") : "Other";
         out.push({
-          value: `bucket:${b._id}`,
-          label: `${b.name} · ${formatCurrency(b.targetAmount)} target`,
-          group: "Bucket spend",
-        });
-      }
-    }
-
-    if (budgetItems?.length) {
-      const sorted = [...budgetItems].sort((a, b) => {
-        const ca = categoryNameById[a.categoryId] ?? "";
-        const cb = categoryNameById[b.categoryId] ?? "";
-        if (ca !== cb) return ca.localeCompare(cb);
-        return a.name.localeCompare(b.name);
-      });
-      for (const item of sorted) {
-        const cat = categoryNameById[item.categoryId] ?? "Category";
-        out.push({
-          value: `expense:${item._id}`,
-          label: `${item.name} · ${formatCurrency(item.amount)}/mo`,
-          group: `Expenses · ${cat}`,
+          value: `category:${cat._id}`,
+          label: cat.monthlyTarget
+            ? `${cat.name} · ${formatCurrency(cat.monthlyTarget)}/mo`
+            : cat.name,
+          group: groupName,
         });
       }
     }
@@ -154,40 +125,37 @@ export function TransactionForm({
       return a.label.localeCompare(b.label);
     });
     return out;
-  }, [budgetItems, creditCards, debts, buckets, categoryNameById]);
+  }, [categories, creditCards, debts, groupNameById]);
 
   const groupedSelect = useMemo(() => {
-    const groups: string[] = [];
+    const groupKeys: string[] = [];
     const byGroup = new Map<string, typeof payeeOptions>();
     for (const o of payeeOptions) {
       if (!byGroup.has(o.group)) {
         byGroup.set(o.group, []);
-        groups.push(o.group);
+        groupKeys.push(o.group);
       }
       byGroup.get(o.group)!.push(o);
     }
-    return groups.map((g) => ({ group: g, options: byGroup.get(g)! }));
+    return groupKeys.map((g) => ({ group: g, options: byGroup.get(g)! }));
   }, [payeeOptions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
-    let budgetItemId: Id<"budgetItems"> | undefined;
+    let categoryId: Id<"categories"> | undefined;
     let debtId: Id<"debts"> | undefined;
     let creditCardId: Id<"creditCards"> | undefined;
-    let bucketId: Id<"buckets"> | undefined;
 
-    if (payeeKey.startsWith("expense:")) {
-      budgetItemId = payeeKey.slice("expense:".length) as Id<"budgetItems">;
+    if (payeeKey.startsWith("category:")) {
+      categoryId = payeeKey.slice("category:".length) as Id<"categories">;
     } else if (payeeKey.startsWith("debt:")) {
       debtId = payeeKey.slice("debt:".length) as Id<"debts">;
     } else if (payeeKey.startsWith("cc:")) {
       creditCardId = payeeKey.slice("cc:".length) as Id<"creditCards">;
-    } else if (payeeKey.startsWith("bucket:")) {
-      bucketId = payeeKey.slice("bucket:".length) as Id<"buckets">;
     } else {
-      setError("Choose what this payment is for (bucket, expense, card, or loan)");
+      setError("Choose a category, card, or loan for this transaction");
       return;
     }
 
@@ -201,9 +169,7 @@ export function TransactionForm({
     setError("");
     try {
       const note = form.note.trim() ? form.note.trim() : undefined;
-      const accountId = form.accountId
-        ? (form.accountId as Id<"accounts">)
-        : undefined;
+      const accountId = form.accountId ? (form.accountId as Id<"accounts">) : undefined;
       if (editTransaction) {
         await updateTransaction({
           id: editTransaction._id,
@@ -212,10 +178,9 @@ export function TransactionForm({
           date: form.date,
           note,
           accountId,
-          budgetItemId,
+          categoryId,
           debtId,
           creditCardId,
-          bucketId,
         });
       } else {
         await createTransaction({
@@ -224,10 +189,9 @@ export function TransactionForm({
           date: form.date,
           note,
           accountId,
-          budgetItemId,
+          categoryId,
           debtId,
           creditCardId,
-          bucketId,
         });
         setPayeeKey(defaultPayee ?? "");
         setForm({
@@ -250,8 +214,7 @@ export function TransactionForm({
   };
 
   const noPayees =
-    (buckets?.filter((x) => !x.isArchived).length ?? 0) === 0 &&
-    (budgetItems?.length ?? 0) === 0 &&
+    (categories?.filter((x) => !x.isArchived).length ?? 0) === 0 &&
     (creditCards?.filter((x) => !x.isArchived).length ?? 0) === 0 &&
     (debts?.filter((x) => !x.isArchived).length ?? 0) === 0;
 
@@ -298,11 +261,11 @@ export function TransactionForm({
 
       <div>
         <label htmlFor="tx-payee" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-          Pay toward
+          Category
         </label>
         {noPayees ? (
           <p className="text-sm text-slate-500 dark:text-slate-400 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/80 px-3 py-2.5">
-            Add a bucket, a recurring expense, a debt, or a credit card first — then you can log payments here.
+            Add a budget category, a debt, or a credit card first — then you can log spending here.
           </p>
         ) : (
           <select
@@ -312,7 +275,7 @@ export function TransactionForm({
             className="w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors"
             required
           >
-            <option value="">Select bucket, expense, card, or loan…</option>
+            <option value="">Select a category, card, or loan…</option>
             {groupedSelect.map(({ group, options }) => (
               <optgroup key={group} label={group}>
                 {options.map((o) => (
@@ -324,9 +287,6 @@ export function TransactionForm({
             ))}
           </select>
         )}
-        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-          Spending is counted against a bucket, bill, or debt — no separate category pick.
-        </p>
       </div>
 
       <div>

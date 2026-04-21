@@ -136,6 +136,26 @@ export const archive = mutation({
   },
 });
 
+export const setFundedForMonth = mutation({
+  args: {
+    id: v.id("creditCards"),
+    userId: v.optional(v.string()),
+    monthKey: v.string(),
+    funded: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getEffectiveUserId(ctx, args.userId);
+    const budgetId = await getEffectiveBudgetIdForQuery(ctx, userId);
+    const doc = await ctx.db.get(args.id);
+    if (!doc || doc.userId !== userId || doc.budgetId !== budgetId) {
+      throw new Error("Credit card not found");
+    }
+    await ctx.db.patch(args.id, {
+      fundedForMonth: args.funded ? args.monthKey : undefined,
+    });
+  },
+});
+
 export const setPaidForMonth = mutation({
   args: {
     id: v.id("creditCards"),

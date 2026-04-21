@@ -10,3 +10,26 @@ alwaysApply: false
 - **User data**: Arguments should include **`userId`** (and **`budgetId`** when the row is budget-scoped). **Query with indexes** (`withIndex`) when filtering by `userId` / `budgetId`—avoid full table scans for hot paths.
 - **Patterns**: Follow naming and structure in neighboring files (e.g. `accounts.ts`, `transactions.ts`). Reuse helpers rather than duplicating money/date logic.
 - **Generated API**: After schema or function signature changes, ensure Convex codegen is satisfied (`npx convex dev` or deploy pipeline). Do not hand-edit **`convex/_generated/`**.
+
+## Key modules
+
+| File | Purpose |
+|------|---------|
+| `schema.ts` | Source of truth for all tables and indexes |
+| `groups.ts` | CRUD for groups (organizational containers for categories) |
+| `categories.ts` | CRUD + `getMonthlyProgress` — returns each category with `spent`, `target`, `remaining` for a given month |
+| `transactions.ts` | Spending records; payee is `categoryId`, `debtId`, or `creditCardId` |
+| `accounts.ts` | Bank/cash accounts with running balances |
+| `debts.ts` | Loans; appear on the timeline when `dueDayOfMonth` is set |
+| `creditCards.ts` | Credit card accounts; appear on the timeline similarly |
+| `migrations.ts` | Idempotent migration converting legacy `budgetItems` + `buckets` to `categories` |
+
+## Category fields to know
+
+```
+name, groupId, monthlyTarget, rollover, dueDayOfMonth,
+paymentAccountId, isAutopay, markedPaidForMonth, isArchived,
+color, icon, note
+```
+
+`getMonthlyProgress` sums transactions for the month and returns `{ category, spent, target, remaining }[]`. Categories without a `dueDayOfMonth` show in the flat spending section; those with one appear as date-anchored rows on the timeline.

@@ -11,7 +11,6 @@ import { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard,
   Tags,
-  Boxes,
   CreditCard,
   TrendingDown,
   Wallet,
@@ -92,7 +91,6 @@ function ThemeToggle({ className }: { className?: string }) {
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/categories", label: "Categories", icon: Tags },
-  { href: "/buckets", label: "Buckets", icon: Boxes },
   { href: "/credit-cards", label: "Cards", icon: CreditCard },
   { href: "/debts", label: "Debts", icon: TrendingDown },
   { href: "/accounts", label: "Accounts", icon: Wallet },
@@ -101,12 +99,12 @@ const NAV_LINKS = [
   { href: "/add-transaction", label: "Add", icon: PlusCircle },
 ];
 
-// Primary bottom-nav tabs: Dashboard, Categories, [Add FAB], Buckets, More
+// Primary bottom-nav tabs: Dashboard, Budget, [Add FAB], Accounts, More
 const PRIMARY_NAV = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/categories", label: "Categories", icon: Tags },
   // Add Transaction is rendered separately as the center FAB
-  { href: "/buckets", label: "Buckets", icon: Boxes },
+  { href: "/accounts", label: "Accounts", icon: Wallet },
 ];
 
 export function Sidebar() {
@@ -431,7 +429,7 @@ export function Sidebar() {
 
       {/* ── Mobile bottom nav ── */}
       {/*
-        5-slot layout: [Home] [Categories] [Add FAB] [Buckets] [More]
+        5-slot layout: [Home] [Budget] [Add FAB] [Accounts] [More]
         Add is a raised teal FAB in the center slot.
       */}
       <nav
@@ -470,7 +468,7 @@ export function Sidebar() {
           <span className="text-[10px] font-medium text-slate-500 -mt-2">Add</span>
         </div>
 
-        {/* Slot 4: Buckets */}
+        {/* Slot 4: Accounts */}
         {PRIMARY_NAV.slice(2).map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
