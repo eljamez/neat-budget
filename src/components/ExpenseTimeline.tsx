@@ -38,6 +38,7 @@ import { usePrefersReducedMotion } from "@/lib/hooks";
 import { BudgetItemManager } from "@/components/BudgetItemManager";
 import { BudgetAllocationModal } from "@/components/BudgetAllocationModal";
 import { DebtManager } from "@/components/DebtManager";
+import { CreditCardManager } from "@/components/CreditCardManager";
 import { CategoryEditModal } from "@/components/CategoryEditModal";
 import type { CategoryProgressForEdit } from "@/components/CategoryEditModal";
 import {
@@ -236,6 +237,8 @@ interface ExpenseTimelineProps {
   userId: string;
   /** Full debt records so timeline rows can open the same edit flow as the Debts page. */
   debts?: Doc<"debts">[];
+  /** Full credit card records so timeline rows can open the same edit flow as the Credit Cards page. */
+  creditCards?: Doc<"creditCards">[];
   categoryProgress?: CategoryProgressEntry[];
   groupNameById?: Record<string, string>;
 }
@@ -246,6 +249,7 @@ export function ExpenseTimeline({
   budgetMonth,
   userId,
   debts,
+  creditCards,
   categoryProgress,
   groupNameById,
 }: ExpenseTimelineProps) {
@@ -341,6 +345,7 @@ export function ExpenseTimeline({
 
   const [editTarget, setEditTarget] = useState<TimelineExpense | null>(null);
   const [editDebtId, setEditDebtId] = useState<Id<"debts"> | null>(null);
+  const [editCreditCardId, setEditCreditCardId] = useState<Id<"creditCards"> | null>(null);
   const [editCategoryItem, setEditCategoryItem] = useState<CategoryProgressForEdit | null>(null);
   const [archivePendingId, setArchivePendingId] = useState<Id<"budgetItems"> | null>(null);
   const [archiveDebtPendingId, setArchiveDebtPendingId] = useState<Id<"debts"> | null>(
@@ -908,6 +913,17 @@ export function ExpenseTimeline({
                                 }}
                               >
                                 Log payment
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="block w-full px-3 py-1.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                                onClick={() => {
+                                  setRowMenuKey(null);
+                                  setEditCreditCardId(item.creditCardId);
+                                }}
+                              >
+                                Edit card
                               </button>
                               <Link
                                 href="/credit-cards"
@@ -1922,6 +1938,50 @@ export function ExpenseTimeline({
                   editDebt={d}
                   onSuccess={() => setEditDebtId(null)}
                   onCancel={() => setEditDebtId(null)}
+                />
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {editCreditCardId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="timeline-cc-edit-title"
+          onClick={() => setEditCreditCardId(null)}
+        >
+          <div
+            className="w-full sm:w-3/4 max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="timeline-cc-edit-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">
+              Edit credit card
+            </h2>
+            {(() => {
+              const cc = creditCards?.find((x) => x._id === editCreditCardId);
+              if (!cc) {
+                return (
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    This card is not available to edit. Try again from the{" "}
+                    <Link
+                      href="/credit-cards"
+                      className="font-medium text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"
+                    >
+                      Credit Cards
+                    </Link>{" "}
+                    page.
+                  </p>
+                );
+              }
+              return (
+                <CreditCardManager
+                  key={editCreditCardId}
+                  editCard={cc}
+                  onSuccess={() => setEditCreditCardId(null)}
+                  onCancel={() => setEditCreditCardId(null)}
                 />
               );
             })()}

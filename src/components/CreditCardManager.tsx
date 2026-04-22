@@ -181,10 +181,13 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
     }
   };
 
+  const inputClass =
+    "w-full border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 transition-colors";
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="cc-name" className="block text-sm font-medium text-slate-600 mb-1.5">
+        <label htmlFor="cc-name" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
           Card name
         </label>
         <input
@@ -194,13 +197,13 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           placeholder="e.g. Chase Sapphire, Amex Gold"
           maxLength={120}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+          className={inputClass}
           required
         />
       </div>
 
       <div>
-        <label htmlFor="cc-usage" className="block text-sm font-medium text-slate-600 mb-1.5">
+        <label htmlFor="cc-usage" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
           Budget intent
         </label>
         <select
@@ -209,7 +212,7 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
           onChange={(e) =>
             setForm({ ...form, usageMode: e.target.value as CreditCardUsageModeKey })
           }
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+          className={inputClass}
         >
           {(Object.keys(CREDIT_CARD_USAGE_LABELS) as CreditCardUsageModeKey[]).map((key) => (
             <option key={key} value={key}>
@@ -217,16 +220,16 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
             </option>
           ))}
         </select>
-        <p className="text-xs text-slate-400 mt-1.5">
-          <strong className="text-slate-500">Using for bills</strong> — you charge expenses and pay the
-          card. <strong className="text-slate-500">Paying off</strong> — you’re focused on clearing a balance
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+          <strong className="text-slate-500 dark:text-slate-400">Using for bills</strong> — you charge expenses and pay the
+          card. <strong className="text-slate-500 dark:text-slate-400">Paying off</strong> — you&apos;re focused on clearing a balance
           (still link payments when you pay the issuer).
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="cc-balance" className="block text-sm font-medium text-slate-600 mb-1.5">
+          <label htmlFor="cc-balance" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
             Balance owed ($)
           </label>
           <input
@@ -236,12 +239,12 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
             min="0"
             value={form.balance}
             onChange={(e) => setForm({ ...form, balance: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className={inputClass}
             required
           />
         </div>
         <div>
-          <label htmlFor="cc-limit" className="block text-sm font-medium text-slate-600 mb-1.5">
+          <label htmlFor="cc-limit" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
             Credit limit ($) <span className="text-slate-400 font-normal">(optional)</span>
           </label>
           <input
@@ -252,14 +255,14 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
             value={form.creditLimit}
             onChange={(e) => setForm({ ...form, creditLimit: e.target.value })}
             placeholder="Total line"
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className={inputClass}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="cc-apr" className="block text-sm font-medium text-slate-600 mb-1.5">
+          <label htmlFor="cc-apr" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
             APR % <span className="text-slate-400 font-normal">(optional)</span>
           </label>
           <input
@@ -271,11 +274,11 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
             value={form.aprPercent}
             onChange={(e) => setForm({ ...form, aprPercent: e.target.value })}
             placeholder="e.g. 22.99"
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className={inputClass}
           />
         </div>
         <div>
-          <label htmlFor="cc-min" className="block text-sm font-medium text-slate-600 mb-1.5">
+          <label htmlFor="cc-min" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
             Minimum payment/mo <span className="text-slate-400 font-normal">(optional)</span>
           </label>
           <input
@@ -286,14 +289,14 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
             value={form.minimumPayment}
             onChange={(e) => setForm({ ...form, minimumPayment: e.target.value })}
             placeholder="0"
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className={inputClass}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="cc-creditor" className="block text-sm font-medium text-slate-600 mb-1.5">
+          <label htmlFor="cc-creditor" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
             Issuer
           </label>
           <input
@@ -303,11 +306,11 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
             onChange={(e) => setForm({ ...form, creditor: e.target.value })}
             placeholder="e.g. Chase, Amex"
             maxLength={120}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className={inputClass}
           />
         </div>
         <div>
-          <label htmlFor="cc-due" className="block text-sm font-medium text-slate-600 mb-1.5">
+          <label htmlFor="cc-due" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
             Typical due day <span className="text-slate-400 font-normal">(1–31)</span>
           </label>
           <input
@@ -318,28 +321,28 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
             value={form.dueDayOfMonth}
             onChange={(e) => setForm({ ...form, dueDayOfMonth: e.target.value })}
             placeholder="e.g. 15"
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+            className={inputClass}
           />
         </div>
       </div>
 
-      <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3">
+      <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-slate-800/50 px-3 py-3">
         <input
           type="checkbox"
           checked={form.isAutopay}
           onChange={(e) => setForm({ ...form, isAutopay: e.target.checked })}
-          className="mt-0.5 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+          className="mt-0.5 rounded border-slate-300 dark:border-slate-600 text-teal-600 focus:ring-teal-500"
         />
         <span>
-          <span className="block text-sm font-medium text-slate-700">Auto-pay</span>
-          <span className="block text-xs text-slate-500 mt-0.5">
+          <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">Auto-pay</span>
+          <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Statement or minimum is set to auto-pay with the issuer (you still track it here).
           </span>
         </span>
       </label>
 
       <div>
-        <label htmlFor="cc-pay-from" className="block text-sm font-medium text-slate-600 mb-1.5">
+        <label htmlFor="cc-pay-from" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
           Pay card bill from <span className="text-slate-400 font-normal">(optional)</span>
         </label>
         <select
@@ -347,7 +350,7 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
           value={form.paymentAccountId}
           onChange={(e) => setForm({ ...form, paymentAccountId: e.target.value })}
           disabled={accounts === undefined}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors disabled:opacity-60"
+          className={`${inputClass} disabled:opacity-60`}
         >
           <option value="">Not set — choose when logging payment</option>
           {(accounts ?? [])
@@ -359,13 +362,13 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
               </option>
             ))}
         </select>
-        <p className="text-xs text-slate-400 mt-1.5">
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
           Checking or savings you use to pay this issuer — not the card&apos;s balance account.
         </p>
       </div>
 
       <div>
-        <label htmlFor="cc-purpose" className="block text-sm font-medium text-slate-600 mb-1.5">
+        <label htmlFor="cc-purpose" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
           Note <span className="text-slate-400 font-normal">(optional)</span>
         </label>
         <input
@@ -375,12 +378,12 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
           onChange={(e) => setForm({ ...form, purpose: e.target.value })}
           placeholder="e.g. travel points, 0% promo"
           maxLength={200}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+          className={inputClass}
         />
       </div>
 
       <div>
-        <label htmlFor="cc-planned" className="block text-sm font-medium text-slate-600 mb-1.5">
+        <label htmlFor="cc-planned" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
           Planned monthly payment <span className="text-slate-400 font-normal">(optional)</span>
         </label>
         <input
@@ -391,12 +394,12 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
           value={form.plannedMonthlyPayment}
           onChange={(e) => setForm({ ...form, plannedMonthlyPayment: e.target.value })}
           placeholder="Paydown or amount to pay toward the bill"
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors"
+          className={inputClass}
         />
       </div>
 
       <div>
-        <label htmlFor="cc-notes" className="block text-sm font-medium text-slate-600 mb-1.5">
+        <label htmlFor="cc-notes" className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1.5">
           Notes <span className="text-slate-400 font-normal">(optional)</span>
         </label>
         <textarea
@@ -405,12 +408,12 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
           onChange={(e) => setForm({ ...form, notes: e.target.value })}
           rows={2}
           maxLength={500}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-slate-50 focus:bg-white transition-colors resize-none"
+          className={`${inputClass} resize-none`}
         />
       </div>
 
       <div>
-        <p className="text-sm font-medium text-slate-600 mb-2">Color</p>
+        <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Color</p>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Card color">
           {CATEGORY_COLORS.map((color) => (
             <button
@@ -429,13 +432,13 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
         </div>
       </div>
 
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-slate-400 dark:text-slate-500">
         Balance also goes down when you add a transaction and link this card as a payment. Edit the
         balance here to match your issuer.
       </p>
 
       {error && (
-        <p role="alert" className="text-sm text-rose-600 bg-rose-50 px-3 py-2 rounded-xl">
+        <p role="alert" className="text-sm text-rose-600 bg-rose-50 dark:bg-rose-950/40 dark:text-rose-400 px-3 py-2 rounded-xl">
           {error}
         </p>
       )}
@@ -452,7 +455,7 @@ export function CreditCardManager({ editCard, onSuccess, onCancel }: CreditCardM
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 bg-slate-100 text-slate-700 rounded-xl py-2.5 text-sm font-medium hover:bg-slate-200 transition-colors"
+            className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl py-2.5 text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
           >
             Cancel
           </button>
