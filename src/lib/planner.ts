@@ -28,6 +28,7 @@ export type PlannerDebtRow = {
   markedPaidForMonth?: string;
   fundedForMonth?: string;
   hasPaidTransaction?: boolean;
+  paidAmount?: number;
   accentColor?: string;
   isAutopay?: boolean;
   paymentAccountId?: Id<"accounts">;
@@ -44,6 +45,7 @@ export type PlannerCreditCardRow = {
   markedPaidForMonth?: string;
   fundedForMonth?: string;
   hasPaidTransaction?: boolean;
+  paidAmount?: number;
   accentColor?: string;
   isAutopay?: boolean;
   usageMode: "paying_off" | "active_use";

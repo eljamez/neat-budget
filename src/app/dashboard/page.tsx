@@ -1,7 +1,7 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import dynamic from "next/dynamic";
 
@@ -51,6 +51,7 @@ import {
   CreditCard,
   Landmark,
   Receipt,
+  Zap,
 } from "lucide-react";
 import { buildPlannerRows, type PlannerRow } from "@/lib/planner";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -87,6 +88,10 @@ export default function DashboardPage() {
   const { openAddTransaction, openEditTransaction } = useTransactionModal();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [showConfetti, setShowConfetti] = useState(false);
+  const [autoFunding, setAutoFunding] = useState(false);
+  const setCategoryFunded = useMutation(api.categories.setFundedForMonth);
+  const setDebtFunded = useMutation(api.debts.setFundedForMonth);
+  const setCardFunded = useMutation(api.creditCards.setFundedForMonth);
   const categoriesFirstLoadedRef = useRef(false);
   const prevAllOnTrackRef = useRef(false);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -107,30 +112,32 @@ export default function DashboardPage() {
   const debts = useQuery(api.debts.list, user ? { userId: user.id } : "skip");
   const creditCards = useQuery(api.creditCards.list, user ? { userId: user.id } : "skip");
 
-  const paidDebtIds = useMemo((): Set<string> => {
-    const s = new Set<string>();
+  const paidAmountByDebtId = useMemo((): Record<string, number> => {
+    const m: Record<string, number> = {};
     for (const tx of transactions ?? []) {
-      if (tx.debtId) s.add(tx.debtId as string);
+      if (tx.debtId) m[tx.debtId as string] = (m[tx.debtId as string] ?? 0) + tx.amount;
     }
-    return s;
+    return m;
   }, [transactions]);
 
-  const paidCCIds = useMemo((): Set<string> => {
-    const s = new Set<string>();
+  const paidAmountByCCId = useMemo((): Record<string, number> => {
+    const m: Record<string, number> = {};
     for (const tx of transactions ?? []) {
-      if (tx.creditCardId) s.add(tx.creditCardId as string);
+      if (tx.creditCardId) m[tx.creditCardId as string] = (m[tx.creditCardId as string] ?? 0) + tx.amount;
     }
-    return s;
+    return m;
   }, [transactions]);
 
   const plannerRows = useMemo(() => {
     const baseRows = buildPlannerRows([], debts, creditCards);
     const enrichedBaseRows = baseRows.map((row) => {
       if (row.rowKind === "debt") {
-        return { ...row, hasPaidTransaction: paidDebtIds.has(row.debtId as string) };
+        const paidAmount = paidAmountByDebtId[row.debtId as string] ?? 0;
+        return { ...row, hasPaidTransaction: paidAmount > 0, paidAmount };
       }
       if (row.rowKind === "creditCard") {
-        return { ...row, hasPaidTransaction: paidCCIds.has(row.creditCardId as string) };
+        const paidAmount = paidAmountByCCId[row.creditCardId as string] ?? 0;
+        return { ...row, hasPaidTransaction: paidAmount > 0, paidAmount };
       }
       return row;
     });
@@ -153,7 +160,7 @@ export default function DashboardPage() {
         spent: p.spent,
       }));
     return [...enrichedBaseRows, ...categoryRows];
-  }, [monthlyProgress, debts, creditCards, paidDebtIds, paidCCIds]);
+  }, [monthlyProgress, debts, creditCards, paidAmountByDebtId, paidAmountByCCId]);
 
   type AccountEntry = NonNullable<typeof accounts>[number];
   const accountMap = useMemo((): Record<string, AccountEntry> => {
@@ -255,6 +262,44 @@ export default function DashboardPage() {
     }
     prevAllOnTrackRef.current = onTrack;
   }, [monthlyProgress, overBudgetCount, totalSpent, prefersReducedMotion]);
+
+  async function handleAutoFund() {
+    if (!user || autoFunding) return;
+    setAutoFunding(true);
+    try {
+      const promises: Promise<unknown>[] = [];
+
+      for (const p of monthlyProgress ?? []) {
+        if (p.fundedForMonth === selectedMonth) continue;
+        if (!p.category.monthlyTarget || p.category.monthlyTarget <= 0) continue;
+        promises.push(
+          setCategoryFunded({ id: p.category._id, userId: user.id, monthKey: selectedMonth, funded: true })
+        );
+      }
+
+      for (const d of debts ?? []) {
+        if (d.fundedForMonth === selectedMonth) continue;
+        const amount = d.plannedMonthlyPayment ?? d.minimumPayment ?? 0;
+        if (amount <= 0) continue;
+        promises.push(
+          setDebtFunded({ id: d._id, userId: user.id, monthKey: selectedMonth, funded: true })
+        );
+      }
+
+      for (const c of creditCards ?? []) {
+        if (c.fundedForMonth === selectedMonth) continue;
+        const amount = c.plannedMonthlyPayment ?? c.minimumPayment ?? 0;
+        if (amount <= 0) continue;
+        promises.push(
+          setCardFunded({ id: c._id, userId: user.id, monthKey: selectedMonth, funded: true })
+        );
+      }
+
+      await Promise.all(promises);
+    } finally {
+      setAutoFunding(false);
+    }
+  }
 
   if (!isLoaded) {
     return <DashboardSkeleton />;
@@ -434,10 +479,24 @@ export default function DashboardPage() {
       {/* Timeline: categories + debts + credit cards (full width) */}
       {(plannerRows.length > 0 || (monthlyProgress?.length ?? 0) > 0) && (
         <div className="w-full space-y-4">
-          <div className="rounded-xl border border-teal-100 dark:border-teal-900/40 bg-linear-to-r from-teal-50/90 to-slate-50/80 dark:from-teal-950/50 dark:to-slate-900/80 px-4 py-3.5 sm:px-5 sm:py-4 shadow-sm">
+          <div className="rounded-xl border border-teal-100 dark:border-teal-900/40 bg-linear-to-r from-teal-50/90 to-slate-50/80 dark:from-teal-950/50 dark:to-slate-900/80 px-4 py-3.5 sm:px-5 sm:py-4 shadow-sm flex items-center justify-between gap-3">
             <h2 className="font-heading text-xl sm:text-2xl font-semibold tracking-tight text-teal-950 dark:text-teal-100">
               {formatMonth(selectedMonth)}
             </h2>
+            <button
+              type="button"
+              onClick={handleAutoFund}
+              disabled={autoFunding}
+              title="Fill all unfunded bills and buckets for this month"
+              className="inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors shrink-0"
+            >
+              {autoFunding ? (
+                <span>…</span>
+              ) : (
+                <Zap className="w-3.5 h-3.5" aria-hidden="true" />
+              )}
+              Fund All
+            </button>
           </div>
           {monthlyProgress === undefined || debts === undefined || creditCards === undefined ? (
             <div className="space-y-3">
