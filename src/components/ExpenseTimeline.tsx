@@ -569,36 +569,6 @@ export function ExpenseTimeline({
         </div>
       ) : null}
 
-      {items.some((item) => {
-        if (item.rowKind === "category") {
-          const cat = item as PlannerCategoryRow;
-          const isPaid = cat.markedPaidForMonth === budgetMonth || (cat.monthlyTarget > 0 && cat.spent >= cat.monthlyTarget);
-          return !isPaid && cat.fundedForMonth !== budgetMonth;
-        }
-        if (item.rowKind === "debt") {
-          const d = item as PlannerDebtRow;
-          const isPaid = d.hasPaidTransaction || d.markedPaidForMonth === budgetMonth;
-          return !isPaid && d.fundedForMonth !== budgetMonth;
-        }
-        if (item.rowKind === "creditCard") {
-          const cc = item as PlannerCreditCardRow;
-          const isPaid = cc.hasPaidTransaction || cc.markedPaidForMonth === budgetMonth;
-          return !isPaid && cc.fundedForMonth !== budgetMonth;
-        }
-        return false;
-      }) && (
-        <div className="mb-3 flex justify-end">
-          <button
-            type="button"
-            onClick={() => void handleFundAll()}
-            disabled={fundAllPending}
-            className="flex items-center gap-1.5 rounded-lg border border-yellow-200/90 bg-yellow-50 px-3 py-1.5 text-xs font-semibold text-yellow-900 shadow-sm transition-colors hover:bg-yellow-100 disabled:opacity-50 dark:border-yellow-500/35 dark:bg-yellow-950/40 dark:text-yellow-100 dark:hover:bg-yellow-950/70"
-          >
-            {fundAllPending ? "Funding…" : "Fund all"}
-          </button>
-        </div>
-      )}
-
       <div
         className="absolute left-[8px] top-3 bottom-3 w-px bg-slate-200 sm:left-[11px] dark:bg-white/10"
         aria-hidden="true"
@@ -716,7 +686,11 @@ export function ExpenseTimeline({
 
                   if (item.rowKind === "creditCard") {
                     const color = item.accentColor ?? CREDIT_CARDS_SECTION_COLOR;
-                    const isPaidForMonth = item.markedPaidForMonth === budgetMonth || !!item.hasPaidTransaction;
+                    const paidAmt = item.paidAmount ?? 0;
+                    const isPaidByTx = item.amount > 0.005 && paidAmt >= item.amount - 0.005;
+                    const isPaidForMonth = item.markedPaidForMonth === budgetMonth || isPaidByTx;
+                    const isPartiallyPaid = paidAmt > 0.005 && !isPaidForMonth;
+                    const paidPct = item.amount > 0.005 ? Math.min((paidAmt / item.amount) * 100, 100) : 0;
                     const fundState = debtOrCardFundState(
                       isPaidForMonth,
                       item.fundedForMonth,
@@ -743,23 +717,27 @@ export function ExpenseTimeline({
                       item.amount <= 0.005 ? "Set monthly payment on Cards page" : null,
                     ].filter(Boolean);
                     const metaLine = metaParts.join(" · ");
+                    const paidLine = isPartiallyPaid
+                      ? `${formatCurrency(paidAmt)} of ${formatCurrency(item.amount)} paid`
+                      : null;
                     const ccSubline = [
+                      paidLine,
                       metaLine || null,
                       isDuePast ? "Past due" : null,
                     ]
                       .filter(Boolean)
                       .join(" · ");
 
-                    const readinessPct = fundState === "waiting" ? 12 : 100;
-                    const readinessFill =
-                      fundState === "paid"
-                        ? "bg-emerald-500"
-                        : fundState === "funded"
-                          ? "bg-yellow-400"
-                          : "bg-rose-500/50 dark:bg-rose-500/45";
-                    const readinessLabel =
-                      fundState === "paid"
-                        ? `Payment paid for ${item.name}`
+                    const readinessPct = isPaidForMonth ? 100 : paidPct;
+                    const readinessFill = isPaidForMonth
+                      ? "bg-emerald-500"
+                      : isPartiallyPaid
+                        ? "bg-yellow-400"
+                        : "bg-rose-500/50 dark:bg-rose-500/45";
+                    const readinessLabel = isPaidForMonth
+                      ? `Payment paid for ${item.name}`
+                      : isPartiallyPaid
+                        ? `${formatCurrency(paidAmt)} of ${formatCurrency(item.amount)} paid for ${item.name}`
                         : fundState === "funded"
                           ? `Funded — ready to pay ${formatCurrency(item.amount)} for ${item.name}`
                           : `Unfunded — mark funded when money is set aside for ${item.name}`;
@@ -963,7 +941,11 @@ export function ExpenseTimeline({
 
                   if (item.rowKind === "debt") {
                     const color = item.accentColor ?? DEBTS_SECTION_COLOR;
-                    const isPaidForMonth = item.markedPaidForMonth === budgetMonth || !!item.hasPaidTransaction;
+                    const paidAmt = item.paidAmount ?? 0;
+                    const isPaidByTx = item.amount > 0.005 && paidAmt >= item.amount - 0.005;
+                    const isPaidForMonth = item.markedPaidForMonth === budgetMonth || isPaidByTx;
+                    const isPartiallyPaid = paidAmt > 0.005 && !isPaidForMonth;
+                    const paidPct = item.amount > 0.005 ? Math.min((paidAmt / item.amount) * 100, 100) : 0;
                     const fundState = debtOrCardFundState(
                       isPaidForMonth,
                       item.fundedForMonth,
@@ -984,7 +966,11 @@ export function ExpenseTimeline({
                       item.amount <= 0.005 ? "Add planned paydown ($)" : null,
                     ].filter(Boolean);
                     const metaLine = metaParts.join(" · ");
+                    const paidLine = isPartiallyPaid
+                      ? `${formatCurrency(paidAmt)} of ${formatCurrency(item.amount)} paid`
+                      : null;
                     const debtSubline = [
+                      paidLine,
                       metaLine || null,
                       isDuePast ? "Past due" : null,
                     ]
@@ -992,16 +978,16 @@ export function ExpenseTimeline({
                       .join(" · ");
                     const debtEditable = debts?.some((d) => d._id === item.debtId);
 
-                    const debtReadinessPct = fundState === "waiting" ? 12 : 100;
-                    const debtReadinessFill =
-                      fundState === "paid"
-                        ? "bg-emerald-500"
-                        : fundState === "funded"
-                          ? "bg-yellow-400"
-                          : "bg-rose-500/50 dark:bg-rose-500/45";
-                    const debtReadinessLabel =
-                      fundState === "paid"
-                        ? `Payment paid for ${item.name}`
+                    const debtReadinessPct = isPaidForMonth ? 100 : paidPct;
+                    const debtReadinessFill = isPaidForMonth
+                      ? "bg-emerald-500"
+                      : isPartiallyPaid
+                        ? "bg-yellow-400"
+                        : "bg-rose-500/50 dark:bg-rose-500/45";
+                    const debtReadinessLabel = isPaidForMonth
+                      ? `Payment paid for ${item.name}`
+                      : isPartiallyPaid
+                        ? `${formatCurrency(paidAmt)} of ${formatCurrency(item.amount)} paid for ${item.name}`
                         : fundState === "funded"
                           ? `Funded — ready to pay ${formatCurrency(item.amount)} for ${item.name}`
                           : `Unfunded — mark funded when money is set aside for ${item.name}`;
@@ -1277,9 +1263,11 @@ export function ExpenseTimeline({
                       groupName,
                     ].filter(Boolean);
                     const catSubline = [
-                      isEffectivelyPaid && spent === 0
+                      isEffectivelyPaid && spent <= 0.005
                         ? `Target ${formatCurrency(catItem.monthlyTarget)} · paid`
-                        : `${formatCurrency(spent)} spent · ${formatCurrency(catItem.monthlyTarget)} target`,
+                        : spent > 0.005
+                          ? `${formatCurrency(spent)} paid · ${formatCurrency(catItem.monthlyTarget)} target`
+                          : `${formatCurrency(catItem.monthlyTarget)} target`,
                       metaParts.length > 0 ? metaParts.join(" · ") : null,
                     ].filter(Boolean).join(" · ");
 
@@ -1482,12 +1470,16 @@ export function ExpenseTimeline({
                           <div className="px-2 pb-2 pt-0">
                             <TimelineFundingBar
                               pct={isEffectivelyPaid ? 100 : spentPct}
-                              fillClassName={isEffectivelyPaid ? "bg-emerald-500" : isOver ? "bg-rose-500" : ""}
-                              fillStyle={!isEffectivelyPaid && !isOver ? { backgroundColor: barFillColor } : undefined}
+                              fillClassName={isEffectivelyPaid ? "bg-emerald-500" : spent > 0.005 ? "bg-yellow-400" : isOver ? "bg-rose-500" : ""}
+                              fillStyle={!isEffectivelyPaid && spent <= 0.005 && !isOver ? { backgroundColor: barFillColor } : undefined}
                               label={
                                 isEffectivelyPaid
                                   ? `${catItem.name} paid for ${formatMonth(budgetMonth)}`
-                                  : `${catItem.name}: ${formatCurrency(spent)} of ${formatCurrency(catItem.monthlyTarget)} spent`
+                                  : spent > 0.005
+                                    ? `${formatCurrency(spent)} of ${formatCurrency(catItem.monthlyTarget)} paid`
+                                    : isCatFunded
+                                      ? `Funded — ready to pay ${formatCurrency(catItem.monthlyTarget)} for ${catItem.name}`
+                                      : `${catItem.name}: ${formatCurrency(catItem.monthlyTarget)} target`
                               }
                             />
                           </div>
