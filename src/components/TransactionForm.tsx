@@ -11,6 +11,8 @@ export interface TransactionFormProps {
   onSuccess?: () => void;
   /** Preselect e.g. `category:${id}`, `debt:${id}`, or `cc:${id}` */
   defaultPayee?: string;
+  /** Pre-fill the amount field (ignored when editing an existing transaction). */
+  defaultAmount?: number;
   /** When set, the form saves changes to this row instead of creating one. */
   editTransaction?: Doc<"transactions">;
 }
@@ -18,6 +20,7 @@ export interface TransactionFormProps {
 export function TransactionForm({
   onSuccess,
   defaultPayee,
+  defaultAmount,
   editTransaction,
 }: TransactionFormProps) {
   const { user } = useUser();
@@ -32,7 +35,7 @@ export function TransactionForm({
   const [payeeKey, setPayeeKey] = useState(defaultPayee ?? "");
   const [form, setForm] = useState({
     accountId: "",
-    amount: "",
+    amount: defaultAmount != null ? String(defaultAmount) : "",
     date: new Date().toISOString().split("T")[0],
     note: "",
   });

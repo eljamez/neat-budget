@@ -51,6 +51,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useTransactionModal } from "@/components/TransactionModalProvider";
+import { TransactionForm } from "@/components/TransactionForm";
 
 export interface TimelineCategory {
   _id: Id<"categories">;
@@ -372,6 +373,12 @@ export function ExpenseTimeline({
   } | null>(null);
   const [fundRowPendingKey, setFundRowPendingKey] = useState<string | null>(null);
   const [fundAllPending, setFundAllPending] = useState(false);
+
+  type TxModalTarget =
+    | { kind: "budget"; id: Id<"budgetItems">; payeeKey: string; amount: number; name: string; rowKey: string }
+    | { kind: "debt"; id: Id<"debts">; payeeKey: string; amount: number; name: string; rowKey: string }
+    | { kind: "cc"; id: Id<"creditCards">; payeeKey: string; amount: number; name: string; rowKey: string };
+  const [txModalTarget, setTxModalTarget] = useState<TxModalTarget | null>(null);
 
   const { openAddTransaction } = useTransactionModal();
 
@@ -755,18 +762,19 @@ export function ExpenseTimeline({
                               type="button"
                               onClick={async () => {
                                 if (!isPaidForMonth) {
-                                  setJustPaidKeys(prev => { const s = new Set(prev); s.add(rk); return s; });
-                                }
-                                setPaidTogglePendingKey(rk);
-                                try {
-                                  await setCreditCardPaidForMonth({
-                                    id: item.creditCardId,
-                                    userId,
-                                    monthKey: budgetMonth,
-                                    paid: !isPaidForMonth,
-                                  });
-                                } finally {
-                                  setPaidTogglePendingKey(null);
+                                  setTxModalTarget({ kind: "cc", id: item.creditCardId, payeeKey: `cc:${item.creditCardId}`, amount: item.amount, name: item.name, rowKey: rk });
+                                } else {
+                                  setPaidTogglePendingKey(rk);
+                                  try {
+                                    await setCreditCardPaidForMonth({
+                                      id: item.creditCardId,
+                                      userId,
+                                      monthKey: budgetMonth,
+                                      paid: false,
+                                    });
+                                  } finally {
+                                    setPaidTogglePendingKey(null);
+                                  }
                                 }
                               }}
                               disabled={paidTogglePendingKey === rk}
@@ -1005,18 +1013,19 @@ export function ExpenseTimeline({
                               type="button"
                               onClick={async () => {
                                 if (!isPaidForMonth) {
-                                  setJustPaidKeys(prev => { const s = new Set(prev); s.add(rk); return s; });
-                                }
-                                setPaidTogglePendingKey(rk);
-                                try {
-                                  await setDebtPaidForMonth({
-                                    id: item.debtId,
-                                    userId,
-                                    monthKey: budgetMonth,
-                                    paid: !isPaidForMonth,
-                                  });
-                                } finally {
-                                  setPaidTogglePendingKey(null);
+                                  setTxModalTarget({ kind: "debt", id: item.debtId, payeeKey: `debt:${item.debtId}`, amount: item.amount, name: item.name, rowKey: rk });
+                                } else {
+                                  setPaidTogglePendingKey(rk);
+                                  try {
+                                    await setDebtPaidForMonth({
+                                      id: item.debtId,
+                                      userId,
+                                      monthKey: budgetMonth,
+                                      paid: false,
+                                    });
+                                  } finally {
+                                    setPaidTogglePendingKey(null);
+                                  }
                                 }
                               }}
                               disabled={paidTogglePendingKey === rk}
@@ -1573,18 +1582,19 @@ export function ExpenseTimeline({
                             type="button"
                             onClick={async () => {
                               if (!isPaidForMonth) {
-                                setJustPaidKeys(prev => { const s = new Set(prev); s.add(rk); return s; });
-                              }
-                              setPaidTogglePendingKey(rk);
-                              try {
-                                await setBudgetPaidForMonth({
-                                  id: item._id,
-                                  userId,
-                                  monthKey: budgetMonth,
-                                  paid: !isPaidForMonth,
-                                });
-                              } finally {
-                                setPaidTogglePendingKey(null);
+                                setTxModalTarget({ kind: "budget", id: item._id, payeeKey: `category:${item.categoryId}`, amount: item.amount, name: item.name, rowKey: rk });
+                              } else {
+                                setPaidTogglePendingKey(rk);
+                                try {
+                                  await setBudgetPaidForMonth({
+                                    id: item._id,
+                                    userId,
+                                    monthKey: budgetMonth,
+                                    paid: false,
+                                  });
+                                } finally {
+                                  setPaidTogglePendingKey(null);
+                                }
                               }
                             }}
                             disabled={paidTogglePendingKey === rk}
@@ -2010,6 +2020,51 @@ export function ExpenseTimeline({
           onSuccess={() => setNewCategoryOpen(false)}
           onClose={() => setNewCategoryOpen(false)}
         />
+      )}
+
+      {txModalTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="timeline-tx-modal-title"
+          onClick={() => setTxModalTarget(null)}
+        >
+          <div
+            className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl sm:p-6 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="timeline-tx-modal-title" className="mb-4 font-semibold text-slate-800 dark:text-slate-100">
+              Log payment — {txModalTarget.name}
+            </h2>
+            <TransactionForm
+              key={txModalTarget.rowKey}
+              defaultPayee={txModalTarget.payeeKey}
+              defaultAmount={txModalTarget.amount > 0.005 ? txModalTarget.amount : undefined}
+              onSuccess={() => {
+                void (async () => {
+                  const target = txModalTarget;
+                  setJustPaidKeys(prev => { const s = new Set(prev); s.add(target.rowKey); return s; });
+                  if (target.kind === "budget") {
+                    await setBudgetPaidForMonth({ id: target.id, userId, monthKey: budgetMonth, paid: true });
+                  } else if (target.kind === "debt") {
+                    await setDebtPaidForMonth({ id: target.id, userId, monthKey: budgetMonth, paid: true });
+                  } else {
+                    await setCreditCardPaidForMonth({ id: target.id, userId, monthKey: budgetMonth, paid: true });
+                  }
+                  setTxModalTarget(null);
+                })();
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setTxModalTarget(null)}
+              className="mt-3 w-full rounded-xl border border-slate-200 py-2 text-sm text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/5"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {quickAddOpen && !quickAddCategoryId && (
