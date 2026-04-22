@@ -95,7 +95,7 @@ function timelineRowSurfaceClasses(state: TimelineFundState): string {
     case "paid":
       return "bg-emerald-50/55 border-emerald-200/85 ring-1 ring-emerald-200/45 dark:bg-emerald-950/35 dark:border-emerald-500/25 dark:ring-emerald-500/20";
     case "funded":
-      return "bg-amber-50/80 border-amber-200/90 ring-1 ring-amber-200/40 dark:bg-amber-950/35 dark:border-amber-500/25 dark:ring-amber-500/15";
+      return "bg-yellow-50/80 border-yellow-200/90 ring-1 ring-yellow-200/40 dark:bg-yellow-950/35 dark:border-yellow-500/25 dark:ring-yellow-500/15";
     case "waiting":
       return "bg-rose-50/60 border-rose-200/90 ring-1 ring-rose-200/35 dark:bg-rose-950/30 dark:border-rose-500/25 dark:ring-rose-500/15";
     default:
@@ -358,6 +358,7 @@ export function ExpenseTimeline({
     useState<TimelineExpense | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddCategoryId, setQuickAddCategoryId] = useState<Id<"categories"> | null>(null);
+  const [newCategoryOpen, setNewCategoryOpen] = useState(false);
   const [rowMenuKey, setRowMenuKey] = useState<string | null>(null);
   const [fundQuickPendingId, setFundQuickPendingId] = useState<Id<"budgetItems"> | null>(
     null
@@ -591,7 +592,7 @@ export function ExpenseTimeline({
             type="button"
             onClick={() => void handleFundAll()}
             disabled={fundAllPending}
-            className="flex items-center gap-1.5 rounded-lg border border-amber-200/90 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/35 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/70"
+            className="flex items-center gap-1.5 rounded-lg border border-yellow-200/90 bg-yellow-50 px-3 py-1.5 text-xs font-semibold text-yellow-900 shadow-sm transition-colors hover:bg-yellow-100 disabled:opacity-50 dark:border-yellow-500/35 dark:bg-yellow-950/40 dark:text-yellow-100 dark:hover:bg-yellow-950/70"
           >
             {fundAllPending ? "Funding…" : "Fund all"}
           </button>
@@ -684,16 +685,29 @@ export function ExpenseTimeline({
               {dayItems.length === 0 ? (
                 <div className="flex items-center gap-3 rounded-lg border border-dashed border-teal-300/70 bg-teal-50/40 px-3 py-2.5 dark:border-teal-600/30 dark:bg-teal-950/20">
                   <span className="text-xs text-slate-500 dark:text-slate-400">Nothing due today</span>
-                  <button
-                    type="button"
-                    onClick={() => setQuickAddOpen(true)}
-                    title="Add a new expense due today"
-                    aria-label="Add a new expense due today"
-                    className="ml-auto flex items-center gap-1 rounded-md border border-teal-300/80 bg-white px-2 py-1 text-[11px] font-medium text-teal-700 shadow-sm transition-colors hover:bg-teal-50 hover:border-teal-400 dark:border-teal-600/50 dark:bg-slate-900 dark:text-teal-400 dark:hover:bg-teal-950/40"
-                  >
-                    <Plus className="h-3 w-3" aria-hidden="true" />
-                    New expense
-                  </button>
+                  {isToday ? (
+                    <button
+                      type="button"
+                      onClick={() => setNewCategoryOpen(true)}
+                      title="Add a new category due today"
+                      aria-label="Add a new category due today"
+                      className="ml-auto flex items-center gap-1 rounded-md border border-teal-300/80 bg-white px-2 py-1 text-[11px] font-medium text-teal-700 shadow-sm transition-colors hover:bg-teal-50 hover:border-teal-400 dark:border-teal-600/50 dark:bg-slate-900 dark:text-teal-400 dark:hover:bg-teal-950/40"
+                    >
+                      <Plus className="h-3 w-3" aria-hidden="true" />
+                      New category
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setQuickAddOpen(true)}
+                      title="Add a new expense due today"
+                      aria-label="Add a new expense due today"
+                      className="ml-auto flex items-center gap-1 rounded-md border border-teal-300/80 bg-white px-2 py-1 text-[11px] font-medium text-teal-700 shadow-sm transition-colors hover:bg-teal-50 hover:border-teal-400 dark:border-teal-600/50 dark:bg-slate-900 dark:text-teal-400 dark:hover:bg-teal-950/40"
+                    >
+                      <Plus className="h-3 w-3" aria-hidden="true" />
+                      New expense
+                    </button>
+                  )}
                 </div>
               ) : null}
               <ul className="space-y-1.5 w-full min-w-0">
@@ -741,7 +755,7 @@ export function ExpenseTimeline({
                       fundState === "paid"
                         ? "bg-emerald-500"
                         : fundState === "funded"
-                          ? "bg-amber-500"
+                          ? "bg-yellow-400"
                           : "bg-rose-500/50 dark:bg-rose-500/45";
                     const readinessLabel =
                       fundState === "paid"
@@ -857,7 +871,7 @@ export function ExpenseTimeline({
                             )}
 
                             {fundState === "funded" && (
-                              <span className="shrink-0 rounded-md border border-amber-200/90 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-950 dark:border-amber-500/35 dark:bg-amber-950/45 dark:text-amber-100 sm:text-[11px]">
+                              <span className="shrink-0 rounded-md border border-yellow-200/90 bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold text-yellow-950 dark:border-yellow-500/35 dark:bg-yellow-950/45 dark:text-yellow-100 sm:text-[11px]">
                                 Funded
                               </span>
                             )}
@@ -881,7 +895,7 @@ export function ExpenseTimeline({
                                 <button
                                   type="button"
                                   role="menuitem"
-                                  className="block w-full px-3 py-1.5 text-left text-sm font-medium text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                                  className="block w-full px-3 py-1.5 text-left text-sm font-medium text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-950/50"
                                   onClick={async () => {
                                     setRowMenuKey(null);
                                     await setCreditCardFundedForMonth({ id: item.creditCardId, userId, monthKey: budgetMonth, funded: true });
@@ -983,7 +997,7 @@ export function ExpenseTimeline({
                       fundState === "paid"
                         ? "bg-emerald-500"
                         : fundState === "funded"
-                          ? "bg-amber-500"
+                          ? "bg-yellow-400"
                           : "bg-rose-500/50 dark:bg-rose-500/45";
                     const debtReadinessLabel =
                       fundState === "paid"
@@ -1099,7 +1113,7 @@ export function ExpenseTimeline({
                             )}
 
                             {fundState === "funded" && (
-                              <span className="shrink-0 rounded-md border border-amber-200/90 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-950 dark:border-amber-500/35 dark:bg-amber-950/45 dark:text-amber-100 sm:text-[11px]">
+                              <span className="shrink-0 rounded-md border border-yellow-200/90 bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold text-yellow-950 dark:border-yellow-500/35 dark:bg-yellow-950/45 dark:text-yellow-100 sm:text-[11px]">
                                 Funded
                               </span>
                             )}
@@ -1123,7 +1137,7 @@ export function ExpenseTimeline({
                                 <button
                                   type="button"
                                   role="menuitem"
-                                  className="block w-full px-3 py-1.5 text-left text-sm font-medium text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                                  className="block w-full px-3 py-1.5 text-left text-sm font-medium text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-950/50"
                                   onClick={async () => {
                                     setRowMenuKey(null);
                                     await setDebtFundedForMonth({ id: item.debtId, userId, monthKey: budgetMonth, funded: true });
@@ -1374,7 +1388,7 @@ export function ExpenseTimeline({
                             )}
 
                             {fundState === "funded" && (
-                              <span className="shrink-0 rounded-md border border-amber-200/90 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-950 dark:border-amber-500/35 dark:bg-amber-950/45 dark:text-amber-100 sm:text-[11px]">
+                              <span className="shrink-0 rounded-md border border-yellow-200/90 bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold text-yellow-950 dark:border-yellow-500/35 dark:bg-yellow-950/45 dark:text-yellow-100 sm:text-[11px]">
                                 Funded
                               </span>
                             )}
@@ -1404,7 +1418,7 @@ export function ExpenseTimeline({
                                 <button
                                   type="button"
                                   role="menuitem"
-                                  className="block w-full px-3 py-1.5 text-left text-sm font-medium text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                                  className="block w-full px-3 py-1.5 text-left text-sm font-medium text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-950/50"
                                   onClick={async () => {
                                     setRowMenuKey(null);
                                     await setCategoryFundedForMonth({ id: catItem.categoryId, userId, monthKey: budgetMonth, funded: true });
@@ -1557,7 +1571,7 @@ export function ExpenseTimeline({
                       <div
                         className={`group/row w-full min-w-0 overflow-visible rounded-lg border shadow-sm transition-colors ${
                           isOverAllocated && !isPaidForMonth
-                            ? `${timelineRowSurfaceClasses(fundState)} ring-2 ring-amber-500/50 ring-offset-2 ring-offset-white dark:ring-offset-slate-900`
+                            ? `${timelineRowSurfaceClasses(fundState)} ring-2 ring-yellow-400/50 ring-offset-2 ring-offset-white dark:ring-offset-slate-900`
                             : timelineRowSurfaceClasses(fundState)
                         }`}
                         style={{ borderLeftWidth: 3, borderLeftColor: color }}
@@ -1706,7 +1720,7 @@ export function ExpenseTimeline({
                                 className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors disabled:opacity-50 sm:text-[11px] ${
                                   fundingLevel === "none"
                                     ? "border border-rose-200/90 bg-rose-100 text-rose-900 hover:bg-rose-200/50 dark:border-rose-500/35 dark:bg-rose-950/50 dark:text-rose-100 dark:hover:bg-rose-950/80"
-                                    : "border border-amber-200/90 bg-amber-50 text-amber-950 hover:bg-amber-100/90 dark:border-amber-500/35 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/70"
+                                    : "border border-yellow-200/90 bg-yellow-50 text-yellow-950 hover:bg-yellow-100/90 dark:border-yellow-500/35 dark:bg-yellow-950/40 dark:text-yellow-100 dark:hover:bg-yellow-950/70"
                                 }`}
                               >
                                 {fundQuickPendingId === item._id
@@ -1717,7 +1731,7 @@ export function ExpenseTimeline({
                               </button>
                             ) : fundingLevel === "full" ? (
                               <span
-                                className="shrink-0 rounded-md border border-amber-200/90 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-950 dark:border-amber-500/35 dark:bg-amber-950/45 dark:text-amber-100 sm:text-[11px]"
+                                className="shrink-0 rounded-md border border-yellow-200/90 bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold text-yellow-950 dark:border-yellow-500/35 dark:bg-yellow-950/45 dark:text-yellow-100 sm:text-[11px]"
                                 title="Bill amount fully funded this month"
                               >
                                 Funded
@@ -1994,6 +2008,15 @@ export function ExpenseTimeline({
           editProgress={editCategoryItem}
           onSuccess={() => setEditCategoryItem(null)}
           onClose={() => setEditCategoryItem(null)}
+        />
+      )}
+
+      {newCategoryOpen && (
+        <CategoryEditModal
+          editProgress={null}
+          defaultDueDayOfMonth={todayDayOfMonth}
+          onSuccess={() => setNewCategoryOpen(false)}
+          onClose={() => setNewCategoryOpen(false)}
         />
       )}
 
