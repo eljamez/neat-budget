@@ -355,12 +355,12 @@ export default function QuickLinksPage() {
 
       {deletePendingId && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-ql-title"
         >
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 border border-slate-100 dark:border-white/10">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full sm:w-3/4 p-6 space-y-4 border border-slate-100 dark:border-white/10">
             <h2 id="delete-ql-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Remove this link?
             </h2>

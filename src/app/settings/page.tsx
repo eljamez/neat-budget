@@ -42,7 +42,7 @@ function DeleteModal({ budgetName, isDeleting, onConfirm, onCancel }: DeleteModa
       />
 
       {/* Panel */}
-      <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+      <div className="relative w-full sm:w-3/4 rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
         {/* Red accent bar */}
         <div className="h-1 bg-red-500" />
 
