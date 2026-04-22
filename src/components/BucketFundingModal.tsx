@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { formatCurrency, formatMonth, formatAccountType } from "@/lib/utils";
@@ -55,6 +55,23 @@ export function BucketFundingModal({
   const [loading, setLoading] = useState(false);
   const [clearAllLoading, setClearAllLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const accountsData = useQuery(api.accounts.list, { userId });
+  const allAllocsForMonth = useQuery(api.expenseAllocations.listByUserMonth, { userId, monthKey });
+  const allBucketFundingsForMonth = useQuery(api.bucketMonthFundings.listByUserMonth, { userId, monthKey });
+
+  const totalCash = accountsData?.reduce((s, a) => s + a.balance, 0) ?? 0;
+  const alreadyFunded =
+    (allAllocsForMonth?.reduce((s, a) => s + a.amount, 0) ?? 0) +
+    (allBucketFundingsForMonth?.reduce((s, f) => s + f.amount, 0) ?? 0);
+  const availableForNewFunding = totalCash - alreadyFunded;
+
+  const enteredAmount = parseFloat(amountStr);
+  const showCashWarning =
+    accountsData !== undefined &&
+    !isNaN(enteredAmount) &&
+    enteredAmount > 0 &&
+    enteredAmount > availableForNewFunding;
 
   const lines = fundings.filter((f) => f.bucketId === bucketId);
   const totalFunded = lines.reduce((s, l) => s + l.amount, 0);
@@ -197,6 +214,15 @@ export function BucketFundingModal({
               );
             })}
           </ul>
+        )}
+
+        {showCashWarning && (
+          <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-3 py-2.5 mb-3">
+            <p className="text-xs text-yellow-800">
+              ⚠️ This amount exceeds your available cash. You have{" "}
+              <span className="font-semibold">{formatCurrency(Math.max(0, availableForNewFunding))}</span> uncommitted across all accounts.
+            </p>
+          </div>
         )}
 
         <form onSubmit={handleAdd} className="space-y-3">
