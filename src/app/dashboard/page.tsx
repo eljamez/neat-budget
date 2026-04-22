@@ -452,6 +452,7 @@ export default function DashboardPage() {
               budgetMonth={selectedMonth}
               userId={user.id}
               debts={debts}
+              creditCards={creditCards}
               categoryProgress={monthlyProgress?.filter((p) => !p.category.dueDayOfMonth) ?? []}
               groupNameById={groupNameById}
             />
