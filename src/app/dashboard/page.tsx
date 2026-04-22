@@ -333,7 +333,7 @@ export default function DashboardPage() {
               {cashAccounts.length} {cashAccounts.length === 1 ? "account" : "accounts"}
             </p>
           </div>
-          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 border-l-[3px] border-l-amber-500 p-5 sm:p-6 shadow-sm">
+          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 border-l-[3px] border-l-yellow-400 p-5 sm:p-6 shadow-sm">
             <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">
               Budgeted
             </p>

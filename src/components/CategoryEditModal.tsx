@@ -32,6 +32,7 @@ interface CategoryEditModalProps {
   /** Pass null to create a new category. */
   editProgress: CategoryProgressForEdit | null;
   defaultGroupId?: Id<"groups"> | null;
+  defaultDueDayOfMonth?: number;
   onSuccess: () => void;
   onClose: () => void;
 }
@@ -39,6 +40,7 @@ interface CategoryEditModalProps {
 export function CategoryEditModal({
   editProgress,
   defaultGroupId,
+  defaultDueDayOfMonth,
   onSuccess,
   onClose,
 }: CategoryEditModalProps) {
@@ -66,7 +68,11 @@ export function CategoryEditModal({
   );
   const [note, setNote] = useState(editCat?.note ?? "");
   const [dueDay, setDueDay] = useState(
-    editCat?.dueDayOfMonth != null ? String(editCat.dueDayOfMonth) : ""
+    editCat?.dueDayOfMonth != null
+      ? String(editCat.dueDayOfMonth)
+      : defaultDueDayOfMonth != null
+        ? String(defaultDueDayOfMonth)
+        : ""
   );
   const [paymentAccountId, setPaymentAccountId] = useState<string>(
     editCat?.paymentAccountId ?? ""
