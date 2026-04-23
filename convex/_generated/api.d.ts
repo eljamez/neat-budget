@@ -25,6 +25,7 @@ import type * as debts from "../debts.js";
 import type * as expenseAllocations from "../expenseAllocations.js";
 import type * as groups from "../groups.js";
 import type * as migrations from "../migrations.js";
+import type * as onboarding from "../onboarding.js";
 import type * as quickLinks from "../quickLinks.js";
 import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   expenseAllocations: typeof expenseAllocations;
   groups: typeof groups;
   migrations: typeof migrations;
+  onboarding: typeof onboarding;
   quickLinks: typeof quickLinks;
   transactions: typeof transactions;
   users: typeof users;
