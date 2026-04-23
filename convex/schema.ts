@@ -44,6 +44,17 @@ export default defineSchema({
     email: v.string(),
     name: v.optional(v.string()),
     createdAt: v.number(),
+    onboardingStep: v.optional(v.union(
+      v.literal("account"),
+      v.literal("category"),
+      v.literal("fund"),
+      v.literal("transaction"),
+      v.literal("done"),
+    )),
+    onboardingStartedAt: v.optional(v.number()),
+    onboardingCompletedAt: v.optional(v.number()),
+    onboardingAccountId: v.optional(v.id("accounts")),
+    onboardingCategoryId: v.optional(v.id("categories")),
   }).index("by_clerk_id", ["clerkId"]),
 
   accounts: defineTable({
