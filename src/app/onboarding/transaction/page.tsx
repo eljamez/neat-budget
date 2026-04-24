@@ -2,12 +2,14 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { useOnboarding } from "@/lib/onboarding/useOnboarding";
 import { TransactionForm } from "./TransactionForm";
 
 export default function TransactionPage() {
   const router = useRouter();
-  const { state, isLoading } = useOnboarding();
+  const { user } = useUser();
+  const { state, isLoading } = useOnboarding(user?.id);
 
   useEffect(() => {
     if (isLoading) return;
