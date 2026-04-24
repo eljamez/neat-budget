@@ -14,7 +14,7 @@ import { onboardingCopy } from "../copy";
 export function AccountForm() {
   const router = useRouter();
   const { user } = useUser();
-  const { advance, setAccountId } = useOnboarding(user?.id);
+  const { state, isLoading, advance, setAccountId } = useOnboarding(user?.id);
   const createAccount = useMutation(api.accounts.create);
   const upsertUser = useMutation(api.users.upsertUser);
   const celebrate = useCelebrate();
@@ -74,6 +74,11 @@ export function AccountForm() {
   }
 
   const isValid = name.trim() !== "" && balance !== "" && parseFloat(balance) >= 0 && !isNaN(parseFloat(balance));
+
+  if (!isLoading && state?.step === "done") {
+    router.replace("/dashboard");
+    return null;
+  }
 
   return (
     <>
