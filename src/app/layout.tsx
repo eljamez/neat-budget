@@ -5,6 +5,7 @@ import { ConvexClerkProvider } from "@/components/providers/ConvexClerkProvider"
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { AppShell } from "@/components/AppShell";
 import { UserSync } from "@/components/UserSync";
+import { OnboardingGate } from "@/components/OnboardingGate";
 
 const geist = Geist({ subsets: ["latin"] });
 const jakarta = Plus_Jakarta_Sans({
@@ -43,6 +44,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ConvexClerkProvider>
             <UserSync />
+            <OnboardingGate />
             <AppShell>{children}</AppShell>
           </ConvexClerkProvider>
         </ThemeProvider>
