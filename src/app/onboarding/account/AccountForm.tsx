@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "../../../../convex/_generated/api";
+
 import { useOnboarding } from "@/lib/onboarding/useOnboarding";
 import { StepShell, useCelebrate, Celebration } from "../_components";
 import { AccountIllustration } from "../_components/illustrations/AccountIllustration";
@@ -15,6 +16,7 @@ export function AccountForm() {
   const { user } = useUser();
   const { advance, setAccountId } = useOnboarding(user?.id);
   const createAccount = useMutation(api.accounts.create);
+  const upsertUser = useMutation(api.users.upsertUser);
   const celebrate = useCelebrate();
 
   const [name, setName] = useState("");
@@ -50,6 +52,11 @@ export function AccountForm() {
     if (!validate()) return;
     setIsSubmitting(true);
     try {
+      await upsertUser({
+        clerkId: user!.id,
+        email: user!.primaryEmailAddress?.emailAddress ?? "",
+        name: user!.fullName ?? undefined,
+      });
       const id = await createAccount({
         name: name.trim(),
         balance: Math.round(parseFloat(balance) * 100) / 100,
