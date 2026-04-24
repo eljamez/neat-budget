@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { api } from "../../../../convex/_generated/api";
 import { useOnboarding } from "@/lib/onboarding/useOnboarding";
 import { StepShell, useCelebrate, Celebration } from "../_components";
@@ -23,15 +24,16 @@ function localMonthKey(): string {
 
 export function FundingPanel() {
   const router = useRouter();
-  const { state, advance } = useOnboarding();
+  const { user } = useUser();
+  const { state, advance } = useOnboarding(user?.id);
   const celebrate = useCelebrate();
 
   const setFundedForMonth = useMutation(api.categories.setFundedForMonth);
   const updateCategory = useMutation(api.categories.update);
 
-  const accounts = useQuery(api.accounts.list, {});
+  const accounts = useQuery(api.accounts.list, user ? { userId: user.id } : "skip");
   const monthKey = localMonthKey();
-  const monthlyProgress = useQuery(api.categories.getMonthlyProgress, { month: monthKey });
+  const monthlyProgress = useQuery(api.categories.getMonthlyProgress, user ? { month: monthKey, userId: user.id } : "skip");
 
   const account = accounts?.find((a) => a._id === state?.accountId);
   const categoryProgress = monthlyProgress?.find((c) => c.category._id === state?.categoryId);
@@ -60,8 +62,8 @@ export function FundingPanel() {
     if (!state?.categoryId || !state?.accountId || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await setFundedForMonth({ id: state.categoryId, monthKey, funded: true });
-      await updateCategory({ id: state.categoryId, paymentAccountId: state.accountId });
+      await setFundedForMonth({ id: state.categoryId, monthKey, funded: true, userId: user?.id });
+      await updateCategory({ id: state.categoryId, paymentAccountId: state.accountId, userId: user?.id });
       setAnimRunning(true);
     } catch (e) {
       console.error(e);
