@@ -17,13 +17,13 @@ export const onboardingCopy = {
     amountLabel: "How much do you need?",
     dateLabel: "Need it by?",
     submit: "Next",
-    success: "Envelope created.",
+    success: "Category created.",
   },
   fund: {
-    title: "Give this envelope a job.",
+    title: "Give this money a job.",
     subtitle: "Assigning tells your money what it\u2019s here for.",
-    realityCheck: "We\u2019ll keep your real balance put \u2014 this just reserves it for your envelope.",
-    success: "Envelope funded. That\u2019s the whole trick, really.",
+    realityCheck: "We\u2019ll keep your real balance intact \u2014 this just earmarks it.",
+    success: "Done. That\u2019s the whole trick, really.",
   },
   transaction: {
     // Step D fills these in

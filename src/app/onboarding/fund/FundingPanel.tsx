@@ -118,7 +118,7 @@ export function FundingPanel() {
 
             {/* Category card */}
             <div className="rounded-2xl border border-stone-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-col gap-2">
-              <p className="text-xs font-medium text-stone-400 dark:text-slate-500 uppercase tracking-wide">Envelope</p>
+              <p className="text-xs font-medium text-stone-400 dark:text-slate-500 uppercase tracking-wide">Assign to</p>
               <p className="font-semibold text-stone-800 dark:text-slate-100">{category.name}</p>
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-2 rounded-full bg-stone-100 dark:bg-slate-700 overflow-hidden">
