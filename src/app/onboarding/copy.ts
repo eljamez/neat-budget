@@ -28,7 +28,6 @@ export const onboardingCopy = {
   transaction: {
     title: "Now spend it, on purpose.",
     subtitle: "Log what you just spent. Close the loop.",
-    payeeLabel: "Who\u2019s it for?",
     amountLabel: "How much?",
     dateLabel: "When?",
     submit: "Record it",

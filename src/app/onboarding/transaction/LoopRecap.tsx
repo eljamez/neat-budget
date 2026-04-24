@@ -8,19 +8,12 @@ type LoopRecapProps = {
   pendingAmount: number;
 };
 
-function Chip({ children }: { children: React.ReactNode }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <span className="rounded-lg bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 px-3 py-2 text-sm text-stone-500 dark:text-slate-400 whitespace-nowrap">
-      {children}
-    </span>
-  );
-}
-
-function Arrow() {
-  return (
-    <span className="text-stone-300 dark:text-slate-600 text-sm shrink-0" aria-hidden="true">
-      →
-    </span>
+    <div className="flex items-center justify-between rounded-lg bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 px-3 py-2">
+      <span className="text-xs text-stone-400 dark:text-slate-500 uppercase tracking-wide">{label}</span>
+      <span className="text-sm font-medium text-stone-700 dark:text-slate-200">{value}</span>
+    </div>
   );
 }
 
@@ -32,18 +25,10 @@ export function LoopRecap({
   pendingAmount,
 }: LoopRecapProps) {
   return (
-    <div className="flex flex-row flex-wrap sm:flex-nowrap items-center gap-2 overflow-x-auto pb-1 -mb-1">
-      <Chip>
-        {accountName} — ${accountBalance.toFixed(2)} available
-      </Chip>
-      <Arrow />
-      <Chip>
-        {categoryName} — ${categoryMonthlyTarget.toFixed(2)} funded
-      </Chip>
-      <Arrow />
-      <Chip>
-        About to spend: ${pendingAmount > 0 ? pendingAmount.toFixed(2) : "0.00"}
-      </Chip>
+    <div className="flex flex-col gap-1.5">
+      <Row label="Account" value={`${accountName} — $${accountBalance.toFixed(2)} available`} />
+      <Row label="Category" value={`${categoryName} — $${categoryMonthlyTarget.toFixed(2)} assigned`} />
+      <Row label="Spending" value={`$${pendingAmount > 0 ? pendingAmount.toFixed(2) : "0.00"}`} />
     </div>
   );
 }
