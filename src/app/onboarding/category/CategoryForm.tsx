@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { useOnboarding } from "@/lib/onboarding/useOnboarding";
@@ -25,7 +26,8 @@ function defaultTargetDate(): Date {
 
 export function CategoryForm() {
   const router = useRouter();
-  const { advance, setCategoryId } = useOnboarding();
+  const { user } = useUser();
+  const { advance, setCategoryId } = useOnboarding(user?.id);
   const celebrate = useCelebrate();
 
   const groups = useQuery(api.groups.list, {});
@@ -63,7 +65,7 @@ export function CategoryForm() {
   async function resolveGroupId(): Promise<Id<"groups">> {
     const existing = (groups ?? []).find((g) => g.name === "Expenses");
     if (existing) return existing._id;
-    return await createGroup({ name: "Expenses" });
+    return await createGroup({ name: "Expenses", userId: user?.id });
   }
 
   async function handleSubmit() {
@@ -76,6 +78,7 @@ export function CategoryForm() {
         name: name.trim(),
         monthlyTarget: parsedAmount,
         dueDayOfMonth: targetDate.getDate(),
+        userId: user?.id,
       });
       await setCategoryId(categoryId);
       await advance("fund");
