@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
@@ -46,6 +46,8 @@ export function FundingPanel() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [animRunning, setAnimRunning] = useState(false);
+  const readyRef = useRef(false);
+  if (account && category) readyRef.current = true;
 
   const copy = onboardingCopy.fund;
 
@@ -56,7 +58,7 @@ export function FundingPanel() {
     router.push("/onboarding/transaction");
   }, [celebrate, advance, router]);
 
-  const isLoading = stateLoading || !accounts || !monthlyProgress;
+  const isLoading = !readyRef.current && (stateLoading || !accounts || !monthlyProgress);
 
   async function handleFund() {
     if (!state?.categoryId || !state?.accountId || isSubmitting) return;
