@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { api } from "../../../../convex/_generated/api";
 import { useOnboarding } from "@/lib/onboarding/useOnboarding";
 import { useCelebrate, Celebration } from "../_components";
@@ -26,7 +27,8 @@ function currentMonthKey(): string {
 
 export function TransactionForm() {
   const router = useRouter();
-  const { state, complete } = useOnboarding();
+  const { user } = useUser();
+  const { state, complete } = useOnboarding(user?.id);
   const celebrate = useCelebrate();
 
   const [description, setDescription] = useState("");
@@ -41,10 +43,10 @@ export function TransactionForm() {
 
   const createTransaction = useMutation(api.transactions.create);
 
-  const accounts = useQuery(api.accounts.list, {});
+  const accounts = useQuery(api.accounts.list, user ? { userId: user.id } : "skip");
   const monthlyProgress = useQuery(
     api.categories.getMonthlyProgress,
-    { month: currentMonthKey() }
+    user ? { month: currentMonthKey(), userId: user.id } : "skip"
   );
 
   const accountId = state?.accountId as Id<"accounts"> | undefined;
@@ -80,6 +82,7 @@ export function TransactionForm() {
         date,
         categoryId,
         accountId,
+        userId: user?.id,
       });
       celebrate({ intensity: "big" });
       await complete();
