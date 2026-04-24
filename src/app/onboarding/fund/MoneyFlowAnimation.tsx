@@ -8,25 +8,19 @@ type Props = {
 };
 
 export function MoneyFlowAnimation({ running, onComplete }: Props) {
-  const doneRef = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
-    if (!running || doneRef.current) return;
-    doneRef.current = true;
+    if (!running) return;
 
     const reduced = typeof window !== "undefined"
       ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
       : false;
 
-    if (reduced) {
-      // Reduced motion: just call onComplete after a short delay
-      const t = setTimeout(() => { onComplete(); }, 300);
-      return () => clearTimeout(t);
-    }
-
-    const t = setTimeout(() => { onComplete(); }, 2000);
+    const t = setTimeout(() => { onCompleteRef.current(); }, reduced ? 300 : 2000);
     return () => clearTimeout(t);
-  }, [running, onComplete]);
+  }, [running]);
 
   if (!running) return null;
 
