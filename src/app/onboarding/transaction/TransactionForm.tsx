@@ -162,7 +162,7 @@ export function TransactionForm() {
           </div>
           {overEnvelope && (
             <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-              You&apos;ll be over this envelope — that&apos;s ok, just heads up.
+              That&apos;s more than you assigned — that&apos;s ok, just heads up.
             </p>
           )}
         </div>
