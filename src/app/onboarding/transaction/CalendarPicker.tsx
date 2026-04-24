@@ -81,7 +81,7 @@ export function CalendarPicker({ value, onChange }: Props) {
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-72 rounded-2xl border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-4">
+        <div className="absolute z-50 bottom-full mb-1 w-72 rounded-2xl border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-4">
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
             <button type="button" onClick={prevMonth} className="p-1 rounded-lg hover:bg-stone-100 dark:hover:bg-slate-800">
