@@ -20,7 +20,10 @@ export const onboardingCopy = {
     success: "Envelope created.",
   },
   fund: {
-    // Step C fills these in
+    title: "Give this envelope a job.",
+    subtitle: "Assigning tells your money what it\u2019s here for.",
+    realityCheck: "We\u2019ll keep your real balance put \u2014 this just reserves it for your envelope.",
+    success: "Envelope funded. That\u2019s the whole trick, really.",
   },
   transaction: {
     // Step D fills these in
