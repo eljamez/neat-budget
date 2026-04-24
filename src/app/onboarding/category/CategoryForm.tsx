@@ -30,7 +30,7 @@ export function CategoryForm() {
   const { advance, setCategoryId } = useOnboarding(user?.id);
   const celebrate = useCelebrate();
 
-  const groups = useQuery(api.groups.list, {});
+  const groups = useQuery(api.groups.list, user ? { userId: user.id } : "skip");
   const createGroup = useMutation(api.groups.create);
   const createCategory = useMutation(api.categories.create);
 
