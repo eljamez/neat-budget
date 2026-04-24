@@ -1,6 +1,6 @@
 "use client";
 
-import { useConvexAuth, useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -22,8 +22,7 @@ export function useOnboarding(userId?: string): {
   setCategoryId: (id: Id<"categories">) => Promise<void>;
   complete: () => Promise<void>;
 } {
-  const { isAuthenticated } = useConvexAuth();
-  const raw = useQuery(api.onboarding.getState, isAuthenticated ? { userId } : "skip");
+  const raw = useQuery(api.onboarding.getState, userId ? { userId } : "skip");
   const advanceMut = useMutation(api.onboarding.advance);
   const setAccountIdMut = useMutation(api.onboarding.setAccountId);
   const setCategoryIdMut = useMutation(api.onboarding.setCategoryId);
