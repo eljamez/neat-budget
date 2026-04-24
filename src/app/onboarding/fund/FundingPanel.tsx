@@ -25,7 +25,7 @@ function localMonthKey(): string {
 export function FundingPanel() {
   const router = useRouter();
   const { user } = useUser();
-  const { state, advance } = useOnboarding(user?.id);
+  const { state, isLoading: stateLoading, advance } = useOnboarding(user?.id);
   const celebrate = useCelebrate();
 
   const setFundedForMonth = useMutation(api.categories.setFundedForMonth);
@@ -56,7 +56,7 @@ export function FundingPanel() {
     router.push("/onboarding/transaction");
   }, [celebrate, advance, router]);
 
-  const isLoading = !accounts || !monthlyProgress;
+  const isLoading = stateLoading || !accounts || !monthlyProgress;
 
   async function handleFund() {
     if (!state?.categoryId || !state?.accountId || isSubmitting) return;
@@ -71,10 +71,18 @@ export function FundingPanel() {
     }
   }
 
-  if (isLoading || !account || !category) {
+  if (isLoading) {
     return (
       <div className="flex justify-center py-12">
         <div className="w-5 h-5 rounded-full border-2 border-teal-600 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (!account || !category) {
+    return (
+      <div className="flex justify-center py-12 text-sm text-stone-400">
+        Could not load your account or category. Try refreshing.
       </div>
     );
   }
