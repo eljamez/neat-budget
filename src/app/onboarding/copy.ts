@@ -7,6 +7,7 @@ export const onboardingCopy = {
     balanceLabel: "How much is in there right now?",
     balanceHint: "Round to the nearest dollar — we'll track it from here.",
     submit: "Next",
+    hint: "Pick the account where most of your money lives right now. Checking is the usual answer.",
   },
   category: {
     // Step B fills these in
@@ -20,4 +21,4 @@ export const onboardingCopy = {
   done: {
     message: "That's the whole loop. Money in. Money assigned. Money spent on purpose.",
   },
-} as const;
+};

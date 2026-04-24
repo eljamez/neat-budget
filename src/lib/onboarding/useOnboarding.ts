@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -14,7 +14,7 @@ export type OnboardingState = {
   categoryId?: Id<"categories">;
 };
 
-export function useOnboarding(): {
+export function useOnboarding(userId?: string): {
   state: OnboardingState | undefined;
   isLoading: boolean;
   advance: (to: OnboardingStep) => Promise<void>;
@@ -22,7 +22,8 @@ export function useOnboarding(): {
   setCategoryId: (id: Id<"categories">) => Promise<void>;
   complete: () => Promise<void>;
 } {
-  const raw = useQuery(api.onboarding.getState, {});
+  const { isAuthenticated } = useConvexAuth();
+  const raw = useQuery(api.onboarding.getState, isAuthenticated ? { userId } : "skip");
   const advanceMut = useMutation(api.onboarding.advance);
   const setAccountIdMut = useMutation(api.onboarding.setAccountId);
   const setCategoryIdMut = useMutation(api.onboarding.setCategoryId);
@@ -44,9 +45,9 @@ export function useOnboarding(): {
   return {
     state,
     isLoading,
-    advance: async (to) => { await advanceMut({ step: to }); },
-    setAccountId: async (id) => { await setAccountIdMut({ accountId: id }); },
-    setCategoryId: async (id) => { await setCategoryIdMut({ categoryId: id }); },
-    complete: async () => { await completeMut({}); },
+    advance: async (to) => { await advanceMut({ step: to, userId }); },
+    setAccountId: async (id) => { await setAccountIdMut({ accountId: id, userId }); },
+    setCategoryId: async (id) => { await setCategoryIdMut({ categoryId: id, userId }); },
+    complete: async () => { await completeMut({ userId }); },
   };
 }
