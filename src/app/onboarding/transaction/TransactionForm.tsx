@@ -10,6 +10,7 @@ import { useCelebrate, Celebration } from "../_components";
 import { StepShell } from "../_components";
 import { TransactionIllustration } from "../_components/illustrations/TransactionIllustration";
 import { LoopRecap } from "./LoopRecap";
+import { CalendarPicker } from "./CalendarPicker";
 import { onboardingCopy } from "../copy";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
@@ -132,27 +133,10 @@ export function TransactionForm() {
 
           {/* Date */}
           <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label htmlFor="tx-date" className="text-sm font-medium text-stone-700 dark:text-slate-300">
-                {copy.dateLabel}
-              </label>
-              {date !== todayIso() && (
-                <button
-                  type="button"
-                  onClick={() => setDate(todayIso())}
-                  className="text-xs text-teal-600 dark:text-teal-400 hover:underline"
-                >
-                  Today
-                </button>
-              )}
-            </div>
-            <input
-              id="tx-date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-xl border border-stone-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
+            <label className="text-sm font-medium text-stone-700 dark:text-slate-300">
+              {copy.dateLabel}
+            </label>
+            <CalendarPicker value={date} onChange={setDate} />
           </div>
         </div>
       </StepShell>
