@@ -28,6 +28,10 @@ export function AccountForm() {
   const nameRef = useRef<HTMLInputElement>(null);
   useEffect(() => { nameRef.current?.focus(); }, []);
 
+  useEffect(() => {
+    if (!isLoading && state?.step === "done") router.replace("/dashboard");
+  }, [isLoading, state, router]);
+
   const copy = onboardingCopy.account;
 
   function validate() {
@@ -75,10 +79,7 @@ export function AccountForm() {
 
   const isValid = name.trim() !== "" && balance !== "" && parseFloat(balance) >= 0 && !isNaN(parseFloat(balance));
 
-  if (!isLoading && state?.step === "done") {
-    router.replace("/dashboard");
-    return null;
-  }
+  if (!isLoading && state?.step === "done") return null;
 
   return (
     <>
