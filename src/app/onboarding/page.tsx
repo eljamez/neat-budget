@@ -2,20 +2,22 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { useOnboarding } from "@/lib/onboarding/useOnboarding";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
 export default function OnboardingIndexPage() {
   const router = useRouter();
-  const { state, isLoading } = useOnboarding();
+  const { user } = useUser();
+  const { state, isLoading } = useOnboarding(user?.id);
   const start = useMutation(api.onboarding.start);
 
   useEffect(() => {
     if (isLoading) return;
 
     if (!state || !state.startedAt) {
-      start({}).catch(console.error);
+      start({ userId: user?.id }).catch(console.error);
       return;
     }
 

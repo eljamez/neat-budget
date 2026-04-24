@@ -26,7 +26,12 @@ export const onboardingCopy = {
     success: "Done. That\u2019s the whole trick, really.",
   },
   transaction: {
-    // Step D fills these in
+    title: "Now spend it, on purpose.",
+    subtitle: "Log what you just spent. Close the loop.",
+    amountLabel: "How much?",
+    dateLabel: "When?",
+    submit: "Record it",
+    bigCelebration: "That\u2019s the whole loop. Money in. Money assigned. Money spent on purpose.",
   },
   done: {
     message: "That's the whole loop. Money in. Money assigned. Money spent on purpose.",
