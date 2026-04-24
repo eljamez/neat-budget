@@ -10,7 +10,14 @@ export const onboardingCopy = {
     hint: "Pick the account where most of your money lives right now. Checking is the usual answer.",
   },
   category: {
-    // Step B fills these in
+    title: "Now, tell your money where to go.",
+    subtitle: "Name the thing you're saving for. Set a target and a date.",
+    nameLabel: "What is it?",
+    namePlaceholder: "Rent",
+    amountLabel: "How much do you need?",
+    dateLabel: "Need it by?",
+    submit: "Next",
+    success: "Envelope created.",
   },
   fund: {
     // Step C fills these in
