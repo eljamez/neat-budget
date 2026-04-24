@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start -p 3005",
     "lint": "eslint",
-    "test:e2e": "playwright test"
+    "test:e2e": "node --env-file=.env.test ./node_modules/.bin/playwright test"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.12",
@@ -22,6 +22,8 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@clerk/testing": "^2.0.20",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

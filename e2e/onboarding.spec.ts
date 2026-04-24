@@ -1,120 +1,91 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import { setupClerkTestingToken } from "@clerk/testing/playwright";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../convex/_generated/api";
 
-/**
- * These tests require Clerk test credentials to run.
- *
- * To unblock: set the following in a `.env.test` file at the repo root:
- *   CLERK_SECRET_KEY=sk_test_...
- *   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
- *   E2E_TEST_USER_EMAIL=...
- *   E2E_TEST_USER_PASSWORD=...
- *
- * Also install @clerk/testing: `npm install -D @clerk/testing`
- * and configure setupAuth in playwright.config.ts using clerkSetup().
- *
- * Until those credentials are provided, all tests are marked fixme.
- */
-
-function oneMonthFromToday(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 1);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+async function resetTestUser() {
+  const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+  await client.mutation(api.testing.resetUserForTesting, {
+    email: process.env.E2E_TEST_USER_EMAIL!,
+  });
 }
 
-function todayIso(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+async function signIn(page: Page) {
+  await setupClerkTestingToken({ page });
+  await page.goto("/sign-in");
+  await page.fill('input[name="identifier"]', process.env.E2E_TEST_USER_EMAIL!);
+  await page.getByRole("button", { name: /continue/i }).click();
+  await page.fill('input[type="password"]', process.env.E2E_TEST_USER_PASSWORD!);
+  await page.getByRole("button", { name: /continue/i }).click();
+  await page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 15000 });
 }
 
 test.describe("Onboarding flow", () => {
-  test.fixme(
-    "first-run onboarding happy path",
-    async ({ page }) => {
-      // FIXME: Requires Clerk test user credentials.
-      // See file header for setup instructions.
+  test.beforeEach(async () => {
+    await resetTestUser();
+  });
 
-      // Sign in as a fresh user (no prior data)
-      // await clerkSignIn(page, { email: process.env.E2E_TEST_USER_EMAIL!, password: process.env.E2E_TEST_USER_PASSWORD! });
+  test("first-run onboarding happy path", async ({ page }) => {
+    await signIn(page);
 
-      // A fresh user hitting /dashboard should land on /onboarding/account
-      await page.goto("/dashboard");
-      await expect(page).toHaveURL(/\/onboarding\/account/, { timeout: 10000 });
+    // Fresh user redirected from /dashboard → /onboarding/account
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/onboarding\/account/, { timeout: 10000 });
 
-      // Step 1: account
-      await page.getByLabel("Account name").fill("Checking");
-      await page.getByLabel(/how much/i).fill("2400");
-      await page.getByRole("button", { name: /next/i }).click();
-      await expect(page).toHaveURL(/\/onboarding\/category/, { timeout: 10000 });
+    // Step 1: account
+    await page.getByLabel("Account name").fill("Checking");
+    await page.getByLabel("How much is in there right now?").fill("2400");
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(page).toHaveURL(/\/onboarding\/category/, { timeout: 10000 });
 
-      // Step 2: category
-      await page.getByLabel(/what is it/i).fill("Rent");
-      await page.getByLabel(/how much/i).fill("1800");
-      await page.getByLabel(/need it by/i).fill(oneMonthFromToday());
-      await page.getByRole("button", { name: /next/i }).click();
-      await expect(page).toHaveURL(/\/onboarding\/fund/, { timeout: 10000 });
+    // Step 2: category (date picker defaults to next month — already valid)
+    await page.getByLabel("What is it?").fill("Rent");
+    await page.getByLabel("How much do you need?").fill("1800");
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(page).toHaveURL(/\/onboarding\/fund/, { timeout: 10000 });
 
-      // Step 3: fund (slider at default, click Fund button)
-      await page.getByRole("button", { name: /fund \$/i }).click();
-      await expect(page).toHaveURL(/\/onboarding\/transaction/, { timeout: 10000 });
+    // Step 3: fund (slider defaults to max — click Fund button)
+    await page.getByRole("button", { name: /fund \$/i }).click();
+    await expect(page).toHaveURL(/\/onboarding\/transaction/, { timeout: 15000 });
 
-      // Step 4: transaction
-      await page.getByLabel(/who.s it for/i).fill("Landlord");
-      await page.getByLabel(/how much/i).fill("1800");
-      await page.getByLabel(/when/i).fill(todayIso());
-      await page.getByRole("button", { name: /record it/i }).click();
-      await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
-    }
-  );
+    // Step 4: transaction (date defaults to today)
+    await page.getByLabel("How much?").fill("1800");
+    await page.getByRole("button", { name: "Record it" }).click();
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
+  });
 
-  test.fixme(
-    "resume after refresh mid-flow",
-    async ({ page }) => {
-      // FIXME: Requires Clerk test user credentials.
-      // See file header for setup instructions.
+  test("resume after refresh mid-flow", async ({ page }) => {
+    await signIn(page);
 
-      // Sign in as a fresh user, complete step 1
-      await page.goto("/onboarding/account");
-      await expect(page).toHaveURL(/\/onboarding\/account/, { timeout: 10000 });
-      await page.getByLabel("Account name").fill("Checking");
-      await page.getByLabel(/how much/i).fill("2400");
-      await page.getByRole("button", { name: /next/i }).click();
-      await expect(page).toHaveURL(/\/onboarding\/category/, { timeout: 10000 });
+    await page.goto("/onboarding/account");
+    await expect(page).toHaveURL(/\/onboarding\/account/, { timeout: 10000 });
 
-      // Reload — should resume at category (or further)
-      await page.reload();
-      await expect(page).toHaveURL(/\/onboarding\/(category|fund|transaction)/, { timeout: 10000 });
-    }
-  );
+    await page.getByLabel("Account name").fill("Checking");
+    await page.getByLabel("How much is in there right now?").fill("2400");
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(page).toHaveURL(/\/onboarding\/category/, { timeout: 10000 });
 
-  test.fixme(
-    "honors prefers-reduced-motion",
-    async ({ browser }) => {
-      // FIXME: Requires Clerk test user credentials.
-      // See file header for setup instructions.
+    // Reload — OnboardingGate should keep us at category (or later)
+    await page.reload();
+    await expect(page).toHaveURL(/\/onboarding\/(category|fund|transaction)/, { timeout: 10000 });
+  });
 
-      const context = await browser.newContext({ reducedMotion: "reduce" });
-      const page = await context.newPage();
+  test("honors prefers-reduced-motion on account step", async ({ browser }) => {
+    const context = await browser.newContext({ reducedMotion: "reduce" });
+    const page = await context.newPage();
 
-      // Walk through the flow; confetti canvas should not be present
-      await page.goto("/onboarding/account");
-      await expect(page).toHaveURL(/\/onboarding\/account/, { timeout: 10000 });
+    await signIn(page);
+    await page.goto("/onboarding/account");
+    await expect(page).toHaveURL(/\/onboarding\/account/, { timeout: 10000 });
 
-      await page.getByLabel("Account name").fill("Checking");
-      await page.getByLabel(/how much/i).fill("2400");
-      await page.getByRole("button", { name: /next/i }).click();
-      await expect(page).toHaveURL(/\/onboarding\/category/, { timeout: 10000 });
+    await page.getByLabel("Account name").fill("Checking");
+    await page.getByLabel("How much is in there right now?").fill("2400");
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(page).toHaveURL(/\/onboarding\/category/, { timeout: 10000 });
 
-      // The confetti canvas (z-[100]) should not be present since reducedMotion is set
-      const confettiCanvas = page.locator("canvas");
-      await expect(confettiCanvas).toHaveCount(0);
+    // No confetti canvas should appear with reduced motion
+    await expect(page.locator("canvas")).toHaveCount(0);
 
-      await context.close();
-    }
-  );
+    await context.close();
+  });
 });
