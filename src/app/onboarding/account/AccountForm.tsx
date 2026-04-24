@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { api } from "../../../../convex/_generated/api";
 import { useOnboarding } from "@/lib/onboarding/useOnboarding";
 import { StepShell, useCelebrate, Celebration } from "../_components";
@@ -11,7 +12,8 @@ import { onboardingCopy } from "../copy";
 
 export function AccountForm() {
   const router = useRouter();
-  const { advance, setAccountId } = useOnboarding();
+  const { user } = useUser();
+  const { advance, setAccountId } = useOnboarding(user?.id);
   const createAccount = useMutation(api.accounts.create);
   const celebrate = useCelebrate();
 
@@ -52,6 +54,7 @@ export function AccountForm() {
         name: name.trim(),
         balance: Math.round(parseFloat(balance) * 100) / 100,
         accountType: "checking",
+        userId: user?.id,
       });
       await setAccountId(id);
       await advance("category");
