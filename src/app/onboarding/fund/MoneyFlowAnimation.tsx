@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 type Props = {
   running: boolean;
@@ -9,7 +9,7 @@ type Props = {
 
 export function MoneyFlowAnimation({ running, onComplete }: Props) {
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+  useLayoutEffect(() => { onCompleteRef.current = onComplete; });
 
   useEffect(() => {
     if (!running) return;
