@@ -1,10 +1,12 @@
 "use client";
 
+import { useUser } from "@clerk/nextjs";
 import { ProgressBar } from "./_components/ProgressBar";
 import { useOnboarding } from "@/lib/onboarding/useOnboarding";
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
-  const { state } = useOnboarding();
+  const { user } = useUser();
+  const { state } = useOnboarding(user?.id);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#fafaf9] dark:bg-slate-950 overflow-y-auto">
