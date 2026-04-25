@@ -77,7 +77,7 @@ export function AccountForm() {
     }
   }
 
-  const isValid = name.trim() !== "" && balance !== "" && parseFloat(balance) >= 0 && !isNaN(parseFloat(balance));
+  const isValid = !!user && name.trim() !== "" && balance !== "" && parseFloat(balance) >= 0 && !isNaN(parseFloat(balance));
 
   if (!isLoading && state?.step === "done") return null;
 
