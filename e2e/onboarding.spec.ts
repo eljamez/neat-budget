@@ -1,23 +1,21 @@
-import { test, expect, type Page } from "@playwright/test";
-import { setupClerkTestingToken } from "@clerk/testing/playwright";
+import { test, expect } from "@playwright/test";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
 
 async function resetTestUser() {
-  const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-  await client.mutation(api.testing.resetUserForTesting, {
-    email: process.env.E2E_TEST_USER_EMAIL!,
-  });
-}
-
-async function signIn(page: Page) {
-  await setupClerkTestingToken({ page });
-  await page.goto("/sign-in");
-  await page.fill('input[name="identifier"]', process.env.E2E_TEST_USER_EMAIL!);
-  await page.getByRole("button", { name: /continue/i }).click();
-  await page.fill('input[type="password"]', process.env.E2E_TEST_USER_PASSWORD!);
-  await page.getByRole("button", { name: /continue/i }).click();
-  await page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 15000 });
+  // Retry up to 3 times — Convex HTTP client can occasionally fail on first attempt
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const client = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+      await client.mutation(api.testing.resetUserForTesting, {
+        email: process.env.E2E_TEST_USER_EMAIL!,
+      });
+      return;
+    } catch (err) {
+      if (attempt === 3) throw err;
+      await new Promise((r) => setTimeout(r, 500 * attempt));
+    }
+  }
 }
 
 test.describe("Onboarding flow", () => {
@@ -26,22 +24,20 @@ test.describe("Onboarding flow", () => {
   });
 
   test("first-run onboarding happy path", async ({ page }) => {
-    await signIn(page);
-
-    // Fresh user redirected from /dashboard → /onboarding/account
+    // Fresh user: navigating to /dashboard should redirect to /onboarding/account
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/onboarding\/account/, { timeout: 10000 });
 
     // Step 1: account
     await page.getByLabel("Account name").fill("Checking");
     await page.getByLabel("How much is in there right now?").fill("2400");
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     await expect(page).toHaveURL(/\/onboarding\/category/, { timeout: 10000 });
 
     // Step 2: category (date picker defaults to next month — already valid)
     await page.getByLabel("What is it?").fill("Rent");
     await page.getByLabel("How much do you need?").fill("1800");
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     await expect(page).toHaveURL(/\/onboarding\/fund/, { timeout: 10000 });
 
     // Step 3: fund (slider defaults to max — click Fund button)
@@ -55,14 +51,12 @@ test.describe("Onboarding flow", () => {
   });
 
   test("resume after refresh mid-flow", async ({ page }) => {
-    await signIn(page);
-
     await page.goto("/onboarding/account");
     await expect(page).toHaveURL(/\/onboarding\/account/, { timeout: 10000 });
 
     await page.getByLabel("Account name").fill("Checking");
     await page.getByLabel("How much is in there right now?").fill("2400");
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     await expect(page).toHaveURL(/\/onboarding\/category/, { timeout: 10000 });
 
     // Reload — OnboardingGate should keep us at category (or later)
@@ -71,16 +65,19 @@ test.describe("Onboarding flow", () => {
   });
 
   test("honors prefers-reduced-motion on account step", async ({ browser }) => {
-    const context = await browser.newContext({ reducedMotion: "reduce" });
+    await resetTestUser();
+    const context = await browser.newContext({
+      reducedMotion: "reduce",
+      storageState: "e2e/.auth/state.json",
+    });
     const page = await context.newPage();
 
-    await signIn(page);
     await page.goto("/onboarding/account");
     await expect(page).toHaveURL(/\/onboarding\/account/, { timeout: 10000 });
 
     await page.getByLabel("Account name").fill("Checking");
     await page.getByLabel("How much is in there right now?").fill("2400");
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     await expect(page).toHaveURL(/\/onboarding\/category/, { timeout: 10000 });
 
     // No confetti canvas should appear with reduced motion

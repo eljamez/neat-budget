@@ -27,6 +27,7 @@ import type * as groups from "../groups.js";
 import type * as migrations from "../migrations.js";
 import type * as onboarding from "../onboarding.js";
 import type * as quickLinks from "../quickLinks.js";
+import type * as testing from "../testing.js";
 import type * as transactions from "../transactions.js";
 import type * as users from "../users.js";
 
@@ -56,6 +57,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   onboarding: typeof onboarding;
   quickLinks: typeof quickLinks;
+  testing: typeof testing;
   transactions: typeof transactions;
   users: typeof users;
 }>;
