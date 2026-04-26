@@ -15,7 +15,12 @@ async function getUserRow(ctx: Parameters<typeof getEffectiveUserId>[0], userId:
 export const getState = query({
   args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const userId = await getEffectiveUserId(ctx, args.userId);
+    let userId: string;
+    try {
+      userId = await getEffectiveUserId(ctx, args.userId);
+    } catch {
+      return null;
+    }
     const user = await getUserRow(ctx, userId);
     if (!user) return null;
     return {
@@ -35,10 +40,27 @@ export const start = mutation({
     const user = await getUserRow(ctx, userId);
     if (!user) throw new Error("User not found");
     if (user.onboardingStep) return; // already started
-    await ctx.db.patch(user._id, {
-      onboardingStep: "account",
-      onboardingStartedAt: Date.now(),
-    });
+
+    // Users who existed before onboarding was built already have real data.
+    // Skip onboarding for them rather than forcing the new-user flow.
+    const existingAccount = await ctx.db
+      .query("accounts")
+      .filter((q) => q.eq(q.field("userId"), userId))
+      .first();
+
+    const now = Date.now();
+    if (existingAccount) {
+      await ctx.db.patch(user._id, {
+        onboardingStep: "done",
+        onboardingStartedAt: now,
+        onboardingCompletedAt: now,
+      });
+    } else {
+      await ctx.db.patch(user._id, {
+        onboardingStep: "account",
+        onboardingStartedAt: now,
+      });
+    }
   },
 });
 
