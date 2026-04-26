@@ -11,7 +11,7 @@ export const upsertUser = mutation({
     const existing = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-      .unique();
+      .first();
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -36,6 +36,6 @@ export const getByClerkId = query({
     return await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
-      .unique();
+      .first();
   },
 });
