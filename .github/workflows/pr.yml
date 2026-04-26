@@ -3,12 +3,14 @@
 # validate frontend/flow changes. PRs that include breaking Convex schema
 # changes should be merged carefully (Convex deploy happens on main merge).
 #
-# Required repository secrets (Settings → Secrets and variables → Actions):
+# Repository Variables (Settings → Secrets and variables → Actions → Variables):
 #   NEXT_PUBLIC_CONVEX_URL            — e.g. https://grand-tortoise-382.convex.cloud
 #   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY — Clerk publishable key
-#   CLERK_SECRET_KEY                  — Clerk secret key
-#   E2E_TEST_USER_EMAIL               — email of the dedicated Clerk test user
-#   E2E_TEST_USER_PASSWORD            — password of the dedicated Clerk test user
+#
+# Repository Secrets (Settings → Secrets and variables → Actions → Secrets):
+#   CLERK_SECRET_KEY       — Clerk secret key
+#   E2E_TEST_USER_EMAIL    — email of the dedicated Clerk test user
+#   E2E_TEST_USER_PASSWORD — password of the dedicated Clerk test user
 
 name: PR Checks
 
@@ -60,13 +62,15 @@ jobs:
 
       - name: Run E2E tests
         env:
-          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          # Public config — store as repository Variables (Settings → Variables)
+          NEXT_PUBLIC_CONVEX_URL: ${{ vars.NEXT_PUBLIC_CONVEX_URL }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
           NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
           NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: /dashboard
           NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: /onboarding/account
+          # Credentials — store as repository Secrets (Settings → Secrets)
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_TEST_USER_EMAIL: ${{ secrets.E2E_TEST_USER_EMAIL }}
           E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
         run: npx playwright test
