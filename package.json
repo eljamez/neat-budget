@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start -p 3005",
     "lint": "eslint",
-    "test:e2e": "node --env-file=.env.test $([ -f .env.test.local ] && echo '--env-file=.env.test.local') ./node_modules/.bin/playwright test"
+    "test:e2e": "node --env-file=.env.test $([ -f .env.local ] && echo '--env-file=.env.local') ./node_modules/.bin/playwright test"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.12",
