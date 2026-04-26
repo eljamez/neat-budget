@@ -9,7 +9,7 @@ async function getUserRow(ctx: Parameters<typeof getEffectiveUserId>[0], userId:
   return await ctx.db
     .query("users")
     .withIndex("by_clerk_id", (q) => q.eq("clerkId", userId))
-    .unique();
+    .first();
 }
 
 export const getState = query({
