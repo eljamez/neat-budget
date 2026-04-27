@@ -19,7 +19,17 @@ export function OnboardingGate() {
   useEffect(() => {
     if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) return;
     if (!user) return;
-    if (isLoading || state === undefined) return;
+    if (isLoading) return;
+
+    if (state === undefined) {
+      // getState returned null — user row doesn't exist yet (upsertUser still in flight).
+      // Don't let new users sit on a protected page. Redirect to /onboarding which shows
+      // a spinner and handles the transient state gracefully.
+      if (!pathname.startsWith("/onboarding")) {
+        router.replace("/onboarding");
+      }
+      return;
+    }
 
     if (!state.startedAt) {
       start({ userId: user.id }).catch(console.error);
