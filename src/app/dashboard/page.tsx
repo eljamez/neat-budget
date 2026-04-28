@@ -180,10 +180,6 @@ export default function DashboardPage() {
   }, [creditCards]);
 
   // Aggregate category progress data
-  const totalTarget = useMemo(
-    () => (monthlyProgress ?? []).reduce((s, p) => s + (p.target ?? 0), 0),
-    [monthlyProgress]
-  );
   const totalSpent = useMemo(
     () => (monthlyProgress ?? []).reduce((s, p) => s + p.spent, 0),
     [monthlyProgress]
