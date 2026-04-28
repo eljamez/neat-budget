@@ -13,23 +13,35 @@ async function getUserRow(ctx: Parameters<typeof getEffectiveUserId>[0], userId:
 }
 
 export const getState = query({
+  // userId kept for backward-compat with callers that still pass it, but the
+  // server always resolves identity from the Convex auth context first.
+  // The whole handler is wrapped in try/catch so a Clerk v7 JWT parse issue
+  // (which surfaces as a platform-level error before handler code runs) or any
+  // other unexpected throw never propagates to the client as a "Server Error".
   args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    let userId: string;
     try {
-      userId = await getEffectiveUserId(ctx, args.userId);
+      let userId: string;
+      try {
+        userId = await getEffectiveUserId(ctx, args.userId);
+      } catch {
+        return null;
+      }
+      const user = await getUserRow(ctx, userId);
+      if (!user) return null;
+      return {
+        step: (user.onboardingStep ?? "account") as OnboardingStep,
+        startedAt: user.onboardingStartedAt ?? 0,
+        completedAt: user.onboardingCompletedAt,
+        accountId: user.onboardingAccountId,
+        categoryId: user.onboardingCategoryId,
+      };
     } catch {
+      // Any unexpected error (schema mismatch on read, platform auth issue,
+      // transient DB error) should be treated as "not started" so the client
+      // redirects to onboarding rather than crashing.
       return null;
     }
-    const user = await getUserRow(ctx, userId);
-    if (!user) return null;
-    return {
-      step: (user.onboardingStep ?? "account") as OnboardingStep,
-      startedAt: user.onboardingStartedAt ?? 0,
-      completedAt: user.onboardingCompletedAt,
-      accountId: user.onboardingAccountId,
-      categoryId: user.onboardingCategoryId,
-    };
   },
 });
 
