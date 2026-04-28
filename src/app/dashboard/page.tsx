@@ -44,7 +44,6 @@ import { redirect } from "next/navigation";
 import {
   CheckCircle2,
   AlertTriangle,
-  ArrowRight,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -425,64 +424,50 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Budget alert / on-track strip */}
-      {overBudgetCount > 0 ? (
-        <div role="alert" className="animate-slide-up bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 rounded-2xl p-4 flex items-center gap-4">
-          <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 flex-shrink-0" aria-hidden="true" />
-          <div className="flex-1">
-            <p className="font-semibold text-rose-800 dark:text-rose-200">
-              {overBudgetCount} {overBudgetCount === 1 ? "category" : "categories"} over budget
-            </p>
-            <p className="text-sm text-rose-500 dark:text-rose-400 mt-0.5">Review your spending to stay on track.</p>
-          </div>
-          <Link href="/categories" className="inline-flex items-center gap-1 text-sm font-medium text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 flex-shrink-0">
-            View <ArrowRight size={13} aria-hidden="true" />
-          </Link>
-        </div>
-      ) : allOnTrack ? (
-        <div className="animate-slide-up relative bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 rounded-2xl p-4 flex items-center gap-3 overflow-hidden">
-          {showConfetti && (
-            <div className="pointer-events-none absolute top-1/2 left-10" aria-hidden="true">
-              {CONFETTI_PIECES.map((p) => (
-                <div
-                  key={p.id}
-                  className="absolute rounded-sm"
-                  style={{
-                    backgroundColor: p.color,
-                    width: p.w,
-                    height: p.h,
-                    top: 0,
-                    left: 0,
-                    "--tx": `${p.tx}px`,
-                    "--ty": `${p.ty}px`,
-                    "--rot": `${p.rot}deg`,
-                    animation: `confetti-fly ${p.duration}s ease-out ${p.delay}s both`,
-                  } as React.CSSProperties}
-                />
-              ))}
-            </div>
-          )}
-          <CheckCircle2 className="w-5 h-5 text-teal-600 dark:text-teal-400 flex-shrink-0 relative z-10" aria-hidden="true" />
-          <div className="flex-1 relative z-10">
-            <p className="font-semibold text-teal-800 dark:text-teal-200 text-sm">Every category is on track</p>
-            <p className="text-xs text-teal-600 dark:text-teal-400 mt-0.5">
-              {remainingToPay !== null && remainingToPay > 0
-                ? viewingCalendarMonth
-                  ? `${formatCurrency(remainingToPay)} left to pay — nice work this month.`
-                  : `${formatCurrency(remainingToPay)} left to pay for ${formatMonth(selectedMonth)}.`
-                : "Keep it up!"}
-            </p>
-          </div>
-        </div>
-      ) : null}
-
       {/* Timeline: categories + debts + credit cards (full width) */}
       {(plannerRows.length > 0 || (monthlyProgress?.length ?? 0) > 0) && (
         <div className="w-full space-y-4">
-          <div className="rounded-xl border border-teal-100 dark:border-teal-900/40 bg-linear-to-r from-teal-50/90 to-slate-50/80 dark:from-teal-950/50 dark:to-slate-900/80 px-4 py-3.5 sm:px-5 sm:py-4 shadow-sm flex items-center justify-between gap-3">
-            <h2 className="font-heading text-xl sm:text-2xl font-semibold tracking-tight text-teal-950 dark:text-teal-100">
-              {formatMonth(selectedMonth)}
-            </h2>
+          <div className="rounded-xl border border-teal-100 dark:border-teal-900/40 bg-linear-to-r from-teal-50/90 to-slate-50/80 dark:from-teal-950/50 dark:to-slate-900/80 px-4 py-3.5 sm:px-5 sm:py-4 shadow-sm flex items-center justify-between gap-3 relative overflow-hidden">
+            {showConfetti && (
+              <div className="pointer-events-none absolute top-1/2 left-10 z-0" aria-hidden="true">
+                {CONFETTI_PIECES.map((p) => (
+                  <div
+                    key={p.id}
+                    className="absolute rounded-sm"
+                    style={{
+                      backgroundColor: p.color,
+                      width: p.w,
+                      height: p.h,
+                      top: 0,
+                      left: 0,
+                      "--tx": `${p.tx}px`,
+                      "--ty": `${p.ty}px`,
+                      "--rot": `${p.rot}deg`,
+                      animation: `confetti-fly ${p.duration}s ease-out ${p.delay}s both`,
+                    } as React.CSSProperties}
+                  />
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2.5 min-w-0 relative z-10">
+              <h2 className="font-heading text-xl sm:text-2xl font-semibold tracking-tight text-teal-950 dark:text-teal-100 shrink-0">
+                {formatMonth(selectedMonth)}
+              </h2>
+              {overBudgetCount > 0 ? (
+                <Link
+                  href="/categories"
+                  className="inline-flex items-center gap-1 text-xs font-semibold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-800/60 hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors shrink-0"
+                >
+                  <AlertTriangle className="w-3 h-3" aria-hidden="true" />
+                  {overBudgetCount} over budget
+                </Link>
+              ) : allOnTrack ? (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 px-2 py-0.5 rounded-full border border-teal-200 dark:border-teal-800/60 shrink-0">
+                  <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+                  On track
+                </span>
+              ) : null}
+            </div>
             <button
               type="button"
               onClick={handleAutoFund}
