@@ -535,56 +535,51 @@ export default function DashboardPage() {
                       ? ACCENT_COLOR_FALLBACK.debt
                       : ACCENT_COLOR_FALLBACK.category;
                 const accentBg = `${accentColor}18`;
+                const label = (() => {
+                  let l = tx.description;
+                  if (!tx.categoryId) {
+                    if (tx.debtId && debtMap[tx.debtId] && (!l || l === "Payment")) {
+                      l = `Loan · ${debtMap[tx.debtId].name}`;
+                    } else if (tx.creditCardId && cardMap[tx.creditCardId] && (!l || l === "Payment")) {
+                      l = `Card · ${cardMap[tx.creditCardId].name}`;
+                    }
+                  }
+                  return l;
+                })();
+                const metaParts = [formatShortDate(tx.date)];
+                if (tx.accountId && accountMap[tx.accountId]) metaParts.push(accountMap[tx.accountId].name);
+                if (tx.note?.trim()) metaParts.push(tx.note.trim());
                 return (
                   <button
                     type="button"
                     key={tx._id}
                     onClick={() => openEditTransaction(tx)}
-                    className={`flex w-full text-left items-center justify-between px-4 py-3 transition-colors hover:bg-slate-50/90 dark:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-inset ${
+                    className={`flex w-full text-left items-center justify-between gap-3 px-4 py-2 transition-colors hover:bg-slate-50/90 dark:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-inset ${
                       i < Math.min(transactions.length, 12) - 1 ? "border-b border-slate-50 dark:border-white/10" : ""
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
                       <div
                         aria-hidden="true"
-                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: accentBg }}
                       >
                         {cardOnly ? (
-                          <CreditCard className="w-4 h-4" style={{ color: accentColor }} aria-hidden="true" />
+                          <CreditCard className="w-3 h-3" style={{ color: accentColor }} aria-hidden="true" />
                         ) : debtOnly ? (
-                          <Landmark className="w-4 h-4" style={{ color: accentColor }} aria-hidden="true" />
+                          <Landmark className="w-3 h-3" style={{ color: accentColor }} aria-hidden="true" />
                         ) : (
-                          <Receipt className="w-4 h-4" style={{ color: accentColor }} aria-hidden="true" />
+                          <Receipt className="w-3 h-3" style={{ color: accentColor }} aria-hidden="true" />
                         )}
                       </div>
-                      <div className="min-w-0">
-                        {(() => {
-                          let label = tx.description;
-                          if (!tx.categoryId) {
-                            if (tx.debtId && debtMap[tx.debtId] && (!label || label === "Payment")) {
-                              label = `Loan payment · ${debtMap[tx.debtId].name}`;
-                            } else if (tx.creditCardId && cardMap[tx.creditCardId] && (!label || label === "Payment")) {
-                              label = `Card payment · ${cardMap[tx.creditCardId].name}`;
-                            }
-                          }
-                          return <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{label}</p>;
-                        })()}
-                        <p className="text-xs text-slate-500 dark:text-slate-400">{formatShortDate(tx.date)}</p>
-                        {(() => {
-                          const parts: string[] = [];
-                          if (tx.accountId && accountMap[tx.accountId]) {
-                            parts.push(accountMap[tx.accountId].name);
-                          }
-                          const note = tx.note?.trim();
-                          if (note) parts.push(note);
-                          return parts.length > 0 ? (
-                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{parts.join(" · ")}</p>
-                          ) : null;
-                        })()}
-                      </div>
+                      <p className="text-sm min-w-0 truncate">
+                        <span className="font-medium text-slate-800 dark:text-slate-100">{label}</span>
+                        <span className="text-slate-400 dark:text-slate-500 font-normal text-xs ml-1.5">
+                          {metaParts.join(" · ")}
+                        </span>
+                      </p>
                     </div>
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 ml-2 flex-shrink-0">
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex-shrink-0 tabular-nums">
                       {formatCurrency(tx.amount)}
                     </span>
                   </button>
@@ -594,51 +589,6 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
-
-      {/* Accounts */}
-      {accounts !== undefined && accounts.length > 0 && (
-        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 p-5 shadow-sm w-full">
-          <SectionHeader title="Your accounts" action={{ kind: "link", href: "/accounts" }} />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {accounts.map((acc) => {
-              const isAsset = accountIsAssetForAvailability(acc.accountType);
-              const accentClass =
-                acc.accountType === "credit_card"
-                  ? "border-l-indigo-600"
-                  : isAsset
-                    ? "border-l-teal-600"
-                    : "border-l-slate-500";
-              return (
-                <div
-                  key={acc._id}
-                  className={cn("rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50/90 dark:bg-slate-800/50 px-4 py-4 border-l-[3px]", accentClass)}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-800 dark:text-slate-100 truncate text-sm sm:text-base">{acc.name}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium uppercase tracking-wide">
-                        {formatAccountType(acc.accountType)}
-                      </p>
-                    </div>
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-700 dark:text-teal-400 ring-1 ring-teal-600/10 dark:ring-teal-500/20">
-                      <Landmark className="h-4 w-4" aria-hidden="true" />
-                    </div>
-                  </div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">Balance</p>
-                  <p className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums leading-none">
-                    {formatCurrency(acc.balance)}
-                  </p>
-                  {!isAsset && (
-                    <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                      Liability — not included in the cash total.
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Credit Cards */}
       {creditCards !== undefined && creditCards.length > 0 && (
