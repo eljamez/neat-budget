@@ -6,8 +6,8 @@ import { UserButton, useAuth } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { cn } from "@/lib/utils";
-import { useState, useEffect, useRef } from "react";
+import { cn, formatCurrency, accountIsAssetForAvailability } from "@/lib/utils";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   LayoutDashboard,
   Tags,
@@ -90,10 +90,10 @@ function ThemeToggle({ className }: { className?: string }) {
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/accounts", label: "Accounts", icon: Wallet },
   { href: "/categories", label: "Categories", icon: Tags },
   { href: "/credit-cards", label: "Cards", icon: CreditCard },
   { href: "/debts", label: "Debts", icon: TrendingDown },
-  { href: "/accounts", label: "Accounts", icon: Wallet },
   { href: "/quick-links", label: "Links", icon: Link2 },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/add-transaction", label: "Add", icon: PlusCircle },
@@ -117,6 +117,13 @@ export function Sidebar() {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const prevOpenRef = useRef(false);
   const budgets = useQuery(api.budgets.list, userId ? { userId } : "skip");
+  const accounts = useQuery(api.accounts.list, userId ? { userId } : "skip");
+  const availableBalance = useMemo(() => {
+    if (!accounts) return null;
+    return accounts
+      .filter((a) => accountIsAssetForAvailability(a.accountType))
+      .reduce((sum, a) => sum + a.balance, 0);
+  }, [accounts]);
   const ensureDefaultBudget = useMutation(api.budgets.ensureDefault);
   const setActiveBudget = useMutation(api.budgets.setActive);
   const createBudget = useMutation(api.budgets.create);
@@ -253,6 +260,7 @@ export function Sidebar() {
             const active = pathname === href;
             const isAdd = href === "/add-transaction";
             const addActive = isAdd && pathname === "/add-transaction";
+            const isAccounts = href === "/accounts";
             const itemClass = cn(
               "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 w-full text-left",
               active || addActive
@@ -279,15 +287,26 @@ export function Sidebar() {
             }
 
             return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={itemClass}
-              >
-                <Icon className={iconClass} aria-hidden="true" />
-                {label}
-              </Link>
+              <div key={href}>
+                <Link
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={itemClass}
+                >
+                  <Icon className={iconClass} aria-hidden="true" />
+                  {label}
+                </Link>
+                {isAccounts && (
+                  <div className="mx-1 mt-0.5 mb-1 rounded-lg bg-white/5 border border-white/8 px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">
+                      Available
+                    </p>
+                    <p className="text-sm font-bold tabular-nums text-teal-400">
+                      {availableBalance !== null ? formatCurrency(availableBalance) : "—"}
+                    </p>
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -375,6 +394,7 @@ export function Sidebar() {
                 const active = pathname === href;
                 const isAdd = href === "/add-transaction";
                 const addActive = isAdd && pathname === "/add-transaction";
+                const isAccounts = href === "/accounts";
                 const itemClass = cn(
                   "flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium transition-all w-full text-left",
                   active || addActive
@@ -404,16 +424,27 @@ export function Sidebar() {
                 }
 
                 return (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={() => setDrawerOpen(false)}
-                    aria-current={active ? "page" : undefined}
-                    className={itemClass}
-                  >
-                    <Icon className={iconClass} aria-hidden="true" />
-                    {label}
-                  </Link>
+                  <div key={href}>
+                    <Link
+                      href={href}
+                      onClick={() => setDrawerOpen(false)}
+                      aria-current={active ? "page" : undefined}
+                      className={itemClass}
+                    >
+                      <Icon className={iconClass} aria-hidden="true" />
+                      {label}
+                    </Link>
+                    {isAccounts && (
+                      <div className="mx-1 mt-1 mb-1 rounded-xl bg-white/5 border border-white/8 px-4 py-2.5 flex items-center justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                          Available
+                        </p>
+                        <p className="text-sm font-bold tabular-nums text-teal-400">
+                          {availableBalance !== null ? formatCurrency(availableBalance) : "—"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </nav>

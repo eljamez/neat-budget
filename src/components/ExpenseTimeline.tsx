@@ -477,11 +477,9 @@ export function ExpenseTimeline({
 
       {/* Budget categories section */}
       {hasCategoryProgress && (
-        <div className="w-full space-y-1.5">
-          {categoryProgress!.map((p) => {
+        <div className="w-full rounded-xl border border-slate-100 dark:border-white/10 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+          {categoryProgress!.map((p, idx) => {
             const color = p.category.color ?? ACCENT_COLOR_FALLBACK.category;
-            const IconComp = p.category.icon ? CATEGORY_ICON_MAP[p.category.icon] : null;
-            const groupName = p.category.groupId ? (groupNameById?.[p.category.groupId] ?? null) : null;
             const rawPct = p.target && p.target > 0 ? (p.spent / p.target) * 100 : 0;
             const displayPct = Math.min(rawPct, 100);
             const isOver = p.target !== null && p.spent > p.target;
@@ -491,60 +489,88 @@ export function ExpenseTimeline({
               : isWarn
                 ? ACCENT_COLOR_FALLBACK.warning
                 : color;
+            const rk = `cat-progress:${p.category._id}`;
             return (
               <div
                 key={p.category._id}
-                className="w-full overflow-hidden rounded-lg border border-slate-100 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900"
-                style={{ borderLeftWidth: 3, borderLeftColor: color }}
+                className={`px-4 pt-3 pb-3 ${idx < categoryProgress!.length - 1 ? "border-b border-slate-50 dark:border-white/5" : ""}`}
               >
-                <div className="flex w-full min-w-0 items-center gap-2.5 px-3 py-2.5">
-                  <div
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
-                    style={{ backgroundColor: `${color}26` }}
-                  >
-                    {IconComp ? (
-                      <IconComp className="h-3.5 w-3.5" style={{ color }} aria-hidden="true" />
-                    ) : (
-                      <span className="text-[11px] leading-none" aria-hidden="true">💰</span>
+                <div className="flex items-center justify-between mb-1.5 gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: barColor }}
+                      aria-hidden="true"
+                    />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
+                      {p.category.name}
+                    </span>
+                    {isOver && (
+                      <span className="shrink-0 text-[11px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/70 border border-rose-200/80 dark:border-rose-800/50 px-1.5 py-0.5 rounded-full">
+                        Over
+                      </span>
                     )}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate text-xs font-medium text-slate-800 dark:text-slate-100 sm:text-sm">
-                        {p.category.name}
-                        {groupName && (
-                          <span className="ml-1.5 font-normal text-slate-400 dark:text-slate-500">
-                            {groupName}
-                          </span>
-                        )}
-                      </span>
-                      <span className="shrink-0 tabular-nums text-xs font-semibold text-slate-700 dark:text-slate-200">
-                        {p.target !== null
-                          ? `${formatCurrency(p.spent)} / ${formatCurrency(p.target)}`
-                          : formatCurrency(p.spent)}
-                      </span>
-                    </div>
-                    <div className="mt-1.5">
-                      <div
-                        className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/90 dark:bg-white/8"
-                        role="progressbar"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={Math.round(displayPct)}
-                        aria-label={`${p.category.name}: ${Math.round(rawPct)}% of budget used`}
-                      >
-                        <div
-                          className="h-full w-full origin-left transition-transform duration-200"
-                          style={{ transform: `scaleX(${displayPct / 100})`, backgroundColor: barColor }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  {isOver && (
-                    <span className="shrink-0 rounded-md border border-rose-200/80 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-800 dark:border-rose-500/35 dark:bg-rose-950/45 dark:text-rose-200">
-                      Over
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className={`tabular-nums text-sm font-semibold ${isOver ? "text-rose-600 dark:text-rose-400" : "text-slate-800 dark:text-slate-100"}`}>
+                      {formatCurrency(p.spent)}
                     </span>
-                  )}
+                    {p.target !== null && (
+                      <span className="text-slate-400 dark:text-slate-500 text-xs"> / {formatCurrency(p.target)}</span>
+                    )}
+                    <TimelineRowActionsMenu
+                      rowKey={rk}
+                      menuOpenKey={rowMenuKey}
+                      setMenuOpenKey={setRowMenuKey}
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="block w-full px-3 py-1.5 text-left text-sm font-medium text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+                        onClick={() => {
+                          setRowMenuKey(null);
+                          openAddTransaction(`category:${p.category._id}`);
+                        }}
+                      >
+                        Log transaction
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="block w-full px-3 py-1.5 text-left text-sm font-medium text-teal-700 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-950/50"
+                        onClick={() => {
+                          setRowMenuKey(null);
+                          setEditCategoryItem({
+                            category: {
+                              _id: p.category._id as Id<"categories">,
+                              name: p.category.name,
+                              groupId: p.category.groupId as Id<"groups"> | undefined,
+                              color: p.category.color,
+                              icon: p.category.icon,
+                            },
+                            spent: p.spent,
+                            target: p.target,
+                            remaining: p.remaining,
+                          });
+                        }}
+                      >
+                        Edit
+                      </button>
+                    </TimelineRowActionsMenu>
+                  </div>
+                </div>
+                <div
+                  className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/8"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(displayPct)}
+                  aria-label={`${p.category.name}: ${Math.round(rawPct)}% of budget used`}
+                >
+                  <div
+                    className="h-full w-full origin-left transition-transform duration-200"
+                    style={{ transform: `scaleX(${displayPct / 100})`, backgroundColor: barColor }}
+                  />
                 </div>
               </div>
             );

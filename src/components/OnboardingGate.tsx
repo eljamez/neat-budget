@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { useMutation } from "convex/react";
@@ -10,11 +10,6 @@ import { useOnboarding } from "@/lib/onboarding/useOnboarding";
 const PUBLIC_PATHS = ["/", "/sign-in", "/sign-up"];
 const DONE_FLAG = "nb_onboarding_done";
 
-function getLocalDoneFlag(): boolean {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem(DONE_FLAG) === "1";
-}
-
 export function OnboardingGate() {
   const router = useRouter();
   const pathname = usePathname();
@@ -22,13 +17,24 @@ export function OnboardingGate() {
   const { state, isLoading } = useOnboarding(user?.id);
   const start = useMutation(api.onboarding.start);
 
+  // Start as false to match the server render, then read localStorage after mount.
+  // Calling localStorage synchronously during render causes a hydration mismatch
+  // because the server has no access to it and always returns false.
+  const [localDone, setLocalDone] = useState(false);
+  useEffect(() => {
+    setLocalDone(localStorage.getItem(DONE_FLAG) === "1");
+  }, []);
+
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
   const isOnboardingPath = pathname.startsWith("/onboarding");
   const isDone = state?.step === "done";
 
   // Persist completion so returning users skip the overlay on subsequent loads.
   useEffect(() => {
-    if (isDone) localStorage.setItem(DONE_FLAG, "1");
+    if (isDone) {
+      localStorage.setItem(DONE_FLAG, "1");
+      setLocalDone(true);
+    }
   }, [isDone]);
 
   // Show a blocking overlay on protected routes while we're determining where the user
@@ -38,7 +44,7 @@ export function OnboardingGate() {
   const showOverlay =
     !isPublicPath &&
     !isOnboardingPath &&
-    !getLocalDoneFlag() &&
+    !localDone &&
     (!isUserLoaded || isLoading || (!!user && !isDone));
 
   useEffect(() => {
