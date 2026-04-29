@@ -237,6 +237,11 @@ export default function DashboardPage() {
     [cashAccounts]
   );
 
+  const totalTarget = useMemo(
+    () => (monthlyProgress ?? []).reduce((s, p) => s + (p.target ?? 0), 0),
+    [monthlyProgress]
+  );
+
   // Confetti when all categories go on-track
   useEffect(() => {
     if (monthlyProgress === undefined) return;
@@ -312,109 +317,139 @@ export default function DashboardPage() {
   return (
     <div className="w-full space-y-6 lg:space-y-8">
       {/* Header */}
-      <header className="-mx-5 px-5 lg:-mx-8 lg:px-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between w-full">
-          <div className="min-w-0 flex-1">
-            <h1 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              Good {getTimeOfDay()}, {user.firstName ?? "there"}
-            </h1>
+      <header className="relative overflow-hidden">
+        {/* Confetti fires here when everything goes on-track */}
+        {showConfetti && (
+          <div className="pointer-events-none absolute top-1/2 left-10 z-0" aria-hidden="true">
+            {CONFETTI_PIECES.map((p) => (
+              <div
+                key={p.id}
+                className="absolute rounded-sm"
+                style={{
+                  backgroundColor: p.color,
+                  width: p.w,
+                  height: p.h,
+                  top: 0,
+                  left: 0,
+                  "--tx": `${p.tx}px`,
+                  "--ty": `${p.ty}px`,
+                  "--rot": `${p.rot}deg`,
+                  animation: `confetti-fly ${p.duration}s ease-out ${p.delay}s both`,
+                } as React.CSSProperties}
+              />
+            ))}
           </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
-            <div className="flex items-center rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 shadow-sm overflow-hidden dark:[color-scheme:dark]">
+        )}
+        <div className="relative z-10 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            Good {getTimeOfDay()}, {user.firstName ?? "there"}
+          </h1>
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+            {/* Month nav */}
+            <div className="flex items-center gap-0.5">
               <button
                 type="button"
                 onClick={() => setSelectedMonth((m) => shiftMonth(m, -1))}
-                className="p-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-slate-100 transition-colors border-r border-slate-100 dark:border-white/10"
+                className="p-1 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 rounded-md hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
                 aria-label="Previous month"
               >
                 <ChevronLeft className="w-5 h-5" aria-hidden="true" />
               </button>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                aria-label="Select month"
-                className="min-w-0 flex-1 sm:w-38 border-0 bg-transparent px-2 py-2.5 text-base text-slate-700 dark:text-slate-200 text-center focus:ring-0 focus:outline-none"
-              />
+              <span className="text-sm font-semibold text-slate-600 dark:text-slate-300 px-1 tabular-nums">
+                {formatMonth(selectedMonth)}
+              </span>
               <button
                 type="button"
                 onClick={() => setSelectedMonth((m) => shiftMonth(m, 1))}
-                className="p-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-slate-100 transition-colors border-l border-slate-100 dark:border-white/10"
+                className="p-1 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 rounded-md hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
                 aria-label="Next month"
               >
                 <ChevronRight className="w-5 h-5" aria-hidden="true" />
               </button>
+              {!viewingCalendarMonth && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedMonth(getCurrentMonth())}
+                  className="text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 px-2 py-1 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-colors"
+                >
+                  Today
+                </button>
+              )}
             </div>
-            {!viewingCalendarMonth && (
-              <button
-                type="button"
-                onClick={() => setSelectedMonth(getCurrentMonth())}
-                className="text-base font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 px-2 py-1 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-colors"
+            {/* Status badge */}
+            {overBudgetCount > 0 ? (
+              <Link
+                href="/categories"
+                className="inline-flex items-center gap-1 text-xs font-semibold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 px-2 py-1 rounded-full border border-rose-200 dark:border-rose-800/60 hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors"
               >
-                This month
-              </button>
-            )}
+                <AlertTriangle className="w-3 h-3" aria-hidden="true" />
+                {overBudgetCount} over budget
+              </Link>
+            ) : allOnTrack ? (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 px-2 py-1 rounded-full border border-teal-200 dark:border-teal-800/60">
+                <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+                On track
+              </span>
+            ) : null}
           </div>
         </div>
       </header>
 
-      {/* Summary cards */}
+      {/* Summary chips */}
       <section aria-labelledby="dashboard-summary-heading">
         <h2 id="dashboard-summary-heading" className="sr-only">Budget summary</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
-          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 border-l-[3px] border-l-teal-600 p-5 sm:p-6 shadow-sm">
-            <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">
-              Cash
-            </p>
-            <p className="text-4xl sm:text-5xl font-bold tracking-tight text-teal-600 dark:text-teal-400 tabular-nums">
-              {accounts !== undefined ? formatCurrency(totalCashBalance) : "—"}
-            </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-              {cashAccounts.length} {cashAccounts.length === 1 ? "account" : "accounts"}
-            </p>
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          {/* Cash + Fund All */}
+          <div className="bg-teal-50/80 dark:bg-teal-950/60 border border-teal-200/80 dark:border-teal-800/50 rounded-xl px-3 py-2.5 flex flex-col items-center gap-1.5">
+            <div className="text-center">
+              <p className="text-teal-700 dark:text-teal-300 font-bold text-sm sm:text-base tabular-nums">
+                {accounts !== undefined ? formatCurrency(totalCashBalance) : "—"}
+              </p>
+              <p className="text-teal-600/70 dark:text-teal-600 text-xs">Cash</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleAutoFund}
+              disabled={autoFunding}
+              title="Mark all bills and categories as funded for this month"
+              className="inline-flex items-center gap-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors w-full justify-center"
+            >
+              {autoFunding ? (
+                <span>…</span>
+              ) : (
+                <Zap className="w-3 h-3" aria-hidden="true" />
+              )}
+              Fund All
+            </button>
           </div>
-          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 border-l-[3px] border-l-yellow-400 p-5 sm:p-6 shadow-sm">
-            <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">
-              Budgeted
-            </p>
-            <p className="text-4xl sm:text-5xl font-bold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">
+          {/* Budgeted */}
+          <div className="bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200 dark:border-white/8 rounded-xl px-3 py-2.5 text-center">
+            <p className="text-slate-800 dark:text-slate-100 font-bold text-sm sm:text-base tabular-nums">
               {monthlyProgress !== undefined && debts !== undefined && creditCards !== undefined
                 ? formatCurrency(totalFunded)
                 : "—"}
             </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-              {fundedItemCount > 0
-                ? `${fundedItemCount} ${fundedItemCount === 1 ? "item" : "items"} funded`
-                : "nothing funded yet"}
-            </p>
+            <p className="text-slate-500 dark:text-slate-500 text-xs mt-0.5">Budgeted</p>
           </div>
-          <div
-            className={cn(
-              "rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/10 border-l-[3px] p-5 sm:p-6 shadow-sm",
-              remainingToPay !== null && remainingToPay < 0 ? "border-l-rose-500" : "border-l-emerald-500"
-            )}
-          >
-            <p className="text-slate-400 dark:text-slate-500 text-sm font-semibold uppercase tracking-widest mb-3">
-              Spent
-            </p>
-            <p
-              className={cn(
-                "text-4xl sm:text-5xl font-bold tracking-tight tabular-nums",
-                remainingToPay === null
-                  ? "text-slate-900 dark:text-slate-100"
-                  : remainingToPay < 0
-                    ? "text-rose-600 dark:text-rose-400"
-                    : "text-emerald-600 dark:text-emerald-400"
-              )}
-            >
+          {/* Spent */}
+          <div className={`rounded-xl px-3 py-2.5 text-center border ${
+            overBudgetCount > 0
+              ? "bg-rose-50/80 dark:bg-rose-950/60 border-rose-200/80 dark:border-rose-800/50"
+              : "bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-white/8"
+          }`}>
+            <p className={`font-bold text-sm sm:text-base tabular-nums ${
+              overBudgetCount > 0
+                ? "text-rose-600 dark:text-rose-400"
+                : "text-slate-800 dark:text-slate-100"
+            }`}>
               {transactions !== undefined ? formatCurrency(totalPaid) : "—"}
             </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-              {remainingToPay === null
-                ? viewingCalendarMonth ? "paid this month" : `paid in ${formatMonth(selectedMonth)}`
-                : remainingToPay < 0
-                  ? `${formatCurrency(Math.abs(remainingToPay))} over funded`
-                  : `${formatCurrency(remainingToPay)} left to pay`}
+            <p className={`text-xs mt-0.5 ${
+              overBudgetCount > 0
+                ? "text-rose-500/70 dark:text-rose-700"
+                : "text-slate-500 dark:text-slate-500"
+            }`}>
+              {overBudgetCount > 0 ? `Spent · ${overBudgetCount} over` : "Spent"}
             </p>
           </div>
         </div>
@@ -423,62 +458,6 @@ export default function DashboardPage() {
       {/* Timeline: categories + debts + credit cards (full width) */}
       {(plannerRows.length > 0 || (monthlyProgress?.length ?? 0) > 0) && (
         <div className="w-full space-y-4">
-          <div className="rounded-xl border border-teal-100 dark:border-teal-900/40 bg-linear-to-r from-teal-50/90 to-slate-50/80 dark:from-teal-950/50 dark:to-slate-900/80 px-4 py-3.5 sm:px-5 sm:py-4 shadow-sm flex items-center justify-between gap-3 relative overflow-hidden">
-            {showConfetti && (
-              <div className="pointer-events-none absolute top-1/2 left-10 z-0" aria-hidden="true">
-                {CONFETTI_PIECES.map((p) => (
-                  <div
-                    key={p.id}
-                    className="absolute rounded-sm"
-                    style={{
-                      backgroundColor: p.color,
-                      width: p.w,
-                      height: p.h,
-                      top: 0,
-                      left: 0,
-                      "--tx": `${p.tx}px`,
-                      "--ty": `${p.ty}px`,
-                      "--rot": `${p.rot}deg`,
-                      animation: `confetti-fly ${p.duration}s ease-out ${p.delay}s both`,
-                    } as React.CSSProperties}
-                  />
-                ))}
-              </div>
-            )}
-            <div className="flex items-center gap-2.5 min-w-0 relative z-10">
-              <h2 className="font-heading text-xl sm:text-2xl font-semibold tracking-tight text-teal-950 dark:text-teal-100 shrink-0">
-                {formatMonth(selectedMonth)}
-              </h2>
-              {overBudgetCount > 0 ? (
-                <Link
-                  href="/categories"
-                  className="inline-flex items-center gap-1 text-xs font-semibold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-800/60 hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors shrink-0"
-                >
-                  <AlertTriangle className="w-3 h-3" aria-hidden="true" />
-                  {overBudgetCount} over budget
-                </Link>
-              ) : allOnTrack ? (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 px-2 py-0.5 rounded-full border border-teal-200 dark:border-teal-800/60 shrink-0">
-                  <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
-                  On track
-                </span>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={handleAutoFund}
-              disabled={autoFunding}
-              title="Fill all unfunded bills and buckets for this month"
-              className="inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors shrink-0"
-            >
-              {autoFunding ? (
-                <span>…</span>
-              ) : (
-                <Zap className="w-3.5 h-3.5" aria-hidden="true" />
-              )}
-              Fund All
-            </button>
-          </div>
           {monthlyProgress === undefined || debts === undefined || creditCards === undefined ? (
             <div className="space-y-3">
               {[1, 2, 3, 4].map((i) => (
